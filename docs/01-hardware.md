@@ -186,13 +186,16 @@ Stock `/proc/partitions` on an untouched unit, for orientation — sizes in 1 Ki
 
 — **verified on the unit**
 
-The firmware is **not known to boot from the microSD slot**, so plan on installing
-Linux to the eMMC and on a USB stick to start from. Owners asked about booting a
-card at least three times over the thread's life and were told it does not work
-(4PDA #2191, #2410, #3411); nobody there reports having done it. That is decent
-evidence and not proof — it has not been tried on the unit behind this guide. If
-you are about to build a card anyway, look for it under `Boot Override` first: it
-costs one reboot, and if it is there you can skip the stick entirely.
+The firmware **does not boot from the microSD slot**. Install Linux to the eMMC and
+start from a USB stick.
+
+This was tested here, not assumed: a card built by `scripts/make-media.sh` — GPT,
+FAT32, carrying `\EFI\BOOT\BOOTIA32.EFI`, the same layout that boots this tablet
+from a USB stick — was put in the slot and **does not appear under `Boot Override`
+at all**. — **verified on the unit**
+
+That matches what owners have said for years (4PDA #2191, #2410, #3411) and closes
+a question this document previously answered on their word alone.
 
 You can put `/home` on the SD card afterwards if you want.
 

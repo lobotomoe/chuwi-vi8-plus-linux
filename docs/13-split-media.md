@@ -122,16 +122,15 @@ Press `e` at the GRUB menu and add it to the `linux` line. Reach for this only i
 scan picks the wrong device — and check the number with `lsblk` first, because
 `mmcblk` numbering is assigned in probe order and is not guaranteed.
 
-## Before you commit to this: try booting the card on its own
+## Why not just boot the card and skip the stick
 
-`make-media.sh` puts `\EFI\BOOT\BOOTIA32.EFI` on everything it builds, so the live
-medium is a bootable volume in its own right. The firmware is
-[not known to boot from the card slot](01-hardware.md#storage) — but that rests on
-owner reports, not on a test here.
+Because the firmware will not. `make-media.sh` puts `\EFI\BOOT\BOOTIA32.EFI` on
+everything it builds, so the card is a bootable volume in its own right — and it
+still does not appear under `Boot Override`. That was
+[tested here](01-hardware.md#storage), not assumed.
 
-So look. Put the finished card in the slot, enter setup, open `Boot Override`. If it
-is listed, boot it and stop reading: you need no USB stick, no hub in the critical
-path, and none of this page.
+Hence the split: the firmware can only start from USB, so USB carries the start and
+nothing else.
 
 ## Cards drop out on this model too
 

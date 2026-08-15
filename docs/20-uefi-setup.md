@@ -260,6 +260,48 @@ contents have not been photographed, so the exact item name is not recorded.
 
 Save with **F4** and let it reboot.
 
+### `Advanced` -> `System Component`, for reference
+
+Recorded because two of the fixes owners reach for when a microSD card misbehaves
+live in here, and hunting for them with a card already failing is the wrong time to
+find out what the menu looks like. Values are this unit's defaults:
+
+```
+PMIC ACPI OBJECT               [Enabled]
+Asset SLP_S0IX_N in S0ix       [Auto]
+PCIe based WLAN module - BCM4356
+BCM4356                        [Disabled]
+Power&Performance(PNP) Setting [Power&Performance]
+LPC Pins PNP Setting           [Disabled]
+XDB GPIO                       [Disabled]
+Flashless Modem                [Disabled]
+MS Custom Sdbus Driver         [Enabled]
+Toggle SelfClockDisabling      [Disabled]
+ADS GPS HID Selection          [Broadcom 47521 GPS]
+CHT-HR setup options override  [Disabled]
+VGG 50mW Workaround            [Disabled]
+OS IMAGE ID                    [Windows 8.1]
+PSS Storage                    [Disabled]
+S5-Charging Driver             [Enabled]
+S5 LPM Settings                [Disabled]
+Persistent RAM size            [Disabled]
+Offline Crash Dump selection   [Disabled]
+```
+
+— **verified on the unit**
+
+`MS Custom Sdbus Driver` is the SD bus item owners change when cards are not
+detected (4PDA #3046). It is **already `Enabled` by default**, so there is nothing
+to do here unless a card is actually misbehaving.
+
+`BCM4356` is a PCIe Wi-Fi module this configuration does not have — the Wi-Fi on
+this tablet is a BCM43430 on SDIO. `Disabled` is correct; leaving it that way costs
+nothing.
+
+**Do not change anything in here speculatively.** This is the menu depth at which a
+wrong value leaves the tablet on the Chuwi logo with no way back, and none of these
+items fixes a problem you do not already have.
+
 ## Booting the stick
 
 There is no separate `Boot Manager` tab on this firmware. The one-off boot choice
