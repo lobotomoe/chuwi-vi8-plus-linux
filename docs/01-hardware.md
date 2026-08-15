@@ -235,16 +235,33 @@ the plain `brcm/brcmfmac43430a0-sdio.txt`, so put an NVRAM there.
 ls /lib/firmware/brcm/ | grep 43430          # what your distribution ships
 sudo sh -c 'zstd -dc "/lib/firmware/brcm/brcmfmac43430-sdio.Hampoo-D2D3_Vi8A1.txt.zst" \
     > /lib/firmware/brcm/brcmfmac43430a0-sdio.txt'
-sudo modprobe -r brcmfmac && sudo modprobe brcmfmac
-ip -br link                                   # wlan0 should appear
+sudo reboot
+ip -br link                                   # wlan0 appears
 ```
 
-Candidates in preference order, all of them 8" Cherry Trail tablets with the same
-AmPak module: this board's own `Hampoo-D2D3_Vi8A1` first, since NVRAM is mostly board
-RF calibration; then the `a0` files `ilife-S806`, `ONDA-V80 PLUS`,
-`jumper-ezpad-mini3`. Trying one costs a file copy and a module reload, so work down
-the list. `ilife-S806` is the one upstream already associates with a Hampoo
-`Cherry Trail CR` board, in `brcmfmac/dmi.c`.
+— **verified on the unit**: `wlan0` comes up with an AmPak MAC (`00:17:cd:…`), and
+NetworkManager finds networks normally. The board's own NVRAM works on the `a0`
+revision, so the a1/a0 split is in the *filename*, not in the calibration data. The
+file even says so in its header: *"NVRAM config file for the 43430 WiFi/BT chip as
+found on the Chuwi Vi8 Plus"*.
+
+**Reboot — do not just reload the module.** After the first failed boot the chip is
+left wedged by the `HT Avail timeout`, and `modprobe -r brcmfmac && modprobe brcmfmac`
+comes back with a different error that looks like a second, unrelated problem:
+
+```
+brcmfmac mmc2:0001:1: probe with driver brcmfmac failed with error -16
+```
+
+`-16` is `EBUSY`, not a firmware failure — note there is no `-2` line with it, which
+means the NVRAM *was* found. Only a power cycle of the SDIO function clears it, and a
+reboot is the simple way to get one.
+
+If the board's own file does not work, the fallbacks are the `a0` ones, all from 8"
+Cherry Trail tablets with the same AmPak module: `ilife-S806` first — upstream already
+associates it with a Hampoo `Cherry Trail CR` board in `brcmfmac/dmi.c` — then
+`ONDA-V80 PLUS`, then `jumper-ezpad-mini3`. Each attempt is one file copy and one
+reboot.
 
 ### Audio — Realtek RT5651
 
