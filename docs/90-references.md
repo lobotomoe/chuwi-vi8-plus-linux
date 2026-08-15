@@ -174,6 +174,60 @@ Post numbers are the thread's own (`#NNNN`), reachable by paging to them.
 - The Ventoy mention in the thread (#3997) is for a **Chuwi Hi10 CWI515**, not
   this tablet. Nothing in the thread confirms Ventoy's IA32 loader on a Vi8 Plus.
 
+## Recovery, and corroboration from outside 4PDA
+
+The 4PDA findings above were cross-checked against English-language and vendor
+sources. Where those agree, it is noted; where they disagree, that is noted too,
+because a claim repeated by one community is not the same as a verified one.
+
+- **Hans de Goede, "Soft unbricking Bay- and Cherry-Trail tablets with broken
+  BIOS settings"** — the DNX mode recovery: power on holding both volume keys,
+  then `fastboot flash osloader grubia32.efi` and `fastboot boot
+  empty-aboot.img`, where that GRUB has `fwsetup` compiled into its `grub.cfg`
+  and drops the tablet into its own BIOS setup. Swap the cable for the OTG
+  keyboard during the reboot or you get a menu with no input. The author is the
+  kernel developer behind this tablet's touchscreen, audio and EFI
+  embedded-firmware support, so this is as authoritative as this topic gets. The
+  original LiveJournal has since been deleted; read it at
+  <https://web.archive.org/web/20210507014353/https://hansdegoede.livejournal.com/25342.html>
+  — **verified, and the binaries are still hosted** at
+  <https://fedorapeople.org/~jwrdegoede/grub-efi-directly-enter-fwsetup/>
+  (`grubia32.efi`, `grubx64.efi`, `empty-aboot.img`; directory listing checked
+  August 2026). Cherry Trail has the USB gadget PHY in the SoC, so DNX works
+  here; many Bay Trail units display DNX but cannot use it.
+- **techtablets.com, "Chuwi vi8 plus Boot in USB to install Ubuntu"**, January
+  2016 — <https://techtablets.com/forum/topic/chuwi-vi8-plus/>. Six posts, this
+  exact model, entirely independent of 4PDA. Confirms **Esc** enters setup,
+  `Boot Override` **in the last tab** is what actually boots the stick, and that
+  adding `bootia32.efi` to `EFI/BOOT` is the whole fix. Three further points:
+  - Reordering the boot list did **not** work — *"it seems like 'windows boot
+    manager' is overriding the settings"* (#23272). `Boot Override` did.
+  - Disabling USB in setup bricked the tablet outright (#23355), recoverable only
+    because Windows still booted and could reflash from inside itself. This is
+    the specific trap `SHOW ALL ITEM` exposes.
+  - A stock Ubuntu ISO with `bootx64.efi` still present, plus an added
+    `bootia32.efi`, reached the GRUB menu — **counter-evidence** to the claim
+    below that the x64 loader has to be deleted.
+  - A second owner could not enter setup with Esc and got in with the volume
+    keys instead (#34717), which is why both are documented.
+- **Dell KB 000141299, "Systems with 32 bit processor will not boot to USB key if
+  both 32 bit and 64 bit images are present"** — prescribes a key carrying only
+  the 32-bit loader. **Retired by Dell** (every locale now returns "The chosen
+  document is not currently available", checked August 2026) and recoverable only
+  from search-engine indexes, so treat it as weak. Its stated mechanism — that
+  the firmware "will not boot past the bootx64.efi boot file" — also contradicts
+  the UEFI specification, under which IA32 firmware looks only for
+  `\EFI\BOOT\BOOTIA32.EFI`. Taken together with the techtablets counter-evidence,
+  this repository keeps `bootx64.efi` on the stick and lists deleting it as a
+  troubleshooting step rather than a rule.
+- **Slow USB boot is characteristic of the platform, not of this tablet.** The
+  Bay/Cherry Trail Linux community reports sticks taking many minutes with
+  nothing on screen, independently of the 4PDA figure of 5-10 minutes. The
+  black-screen-after-GRUB symptom and the `i915.modeset=0` workaround come from
+  the same body of reports.
+  <https://sturmflut.github.io/linux/ubuntu/2015/02/04/installing-ubuntu-on-baytrail-tablets-version-2/>
+  <https://github.com/hakuna-m/wubiuefi/issues/27>
+
 ## The device itself
 
 - Notebookcheck review of the Chuwi Vi8 Plus (CWI519) — ports, the single USB-C

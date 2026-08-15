@@ -43,10 +43,58 @@ no CMOS jumper and no coin cell to pull. Recovery, in order:
 3. **HDMI.** Micro-HDMI sometimes still carries a picture when the panel does
    not, which turns a blind recovery into a sighted one.
 
-If none of that works, the remaining route is disassembly and reflashing the SPI
-chip with a **1.8 V** CH341A programmer. That is a repair-shop job, and it is the
-reason [20-uefi-setup.md](20-uefi-setup.md#most-of-this-menu-is-hidden--turn-it-on-first)
+### DNX mode: the software recovery, before you reach for a programmer
+
+Forum threads on these tablets jump straight to "you need a programmer". That is
+usually wrong. Bay Trail and Cherry Trail tablets have a fastboot variant built
+into the firmware called **DNX mode**, and Hans de Goede — the kernel developer
+behind most of this tablet's driver support — documented using it to recover a
+tablet whose BIOS settings were corrupted so badly it would neither boot nor
+enter setup. **Cherry Trail is the good case here:** the USB gadget PHY is
+integrated into the SoC, so DNX works, where on many Bay Trail units it does not.
+
+Enter it by powering on with **Volume Up and Volume Down held together**. The
+tablet prints `DNX` on the panel.
+
+Then, from a PC with `fastboot` installed and the tablet connected over USB:
+
+```sh
+fastboot flash osloader grubia32.efi      # ia32 - this tablet's firmware
+fastboot boot empty-aboot.img
+```
+
+Those two files are prebuilt and still hosted:
+<https://fedorapeople.org/~jwrdegoede/grub-efi-directly-enter-fwsetup/>
+(`grubia32.efi`, `grubx64.efi`, `empty-aboot.img`). The GRUB build has a
+`grub.cfg` compiled into it containing a single `fwsetup` command, so running it
+reboots the tablet straight into its own BIOS setup.
+
+The trick that makes it usable: **swap the USB cable for the OTG adapter and
+keyboard while it is rebooting.** If the tablet is left on the plain USB cable
+through the reboot you will get the setup menu with no working input. Once you
+are in, `load setup defaults`, then save and exit.
+
+Only if DNX mode itself does not come up is the answer disassembly and reflashing
+the SPI chip with a **1.8 V** CH341A programmer — the common 3.3 V ones will not
+do. That is the reason
+[20-uefi-setup.md](20-uefi-setup.md#most-of-this-menu-is-hidden--turn-it-on-first)
 tells you to change Secure Boot and nothing else.
+
+### Never disable USB in the firmware setup
+
+Worth its own warning, because it is a one-way door and `SHOW ALL ITEM` puts the
+switch in plain sight. A Vi8 Plus owner did exactly this in January 2016:
+
+> *"I DEACTIVATED the USB in the bios hence i couldn't plug anything on the
+> tablet or it would crash, i couldn't reset the bios either because i couldn't
+> plug ANY keyboard as they are USB. The tablet was lost."*
+> — techtablets forum, post #23355
+
+The only input this tablet has is a USB keyboard. Turning USB off removes the
+means of turning it back on. They recovered only because Windows still booted and
+could flash a stock firmware image from inside it — which is not an option once
+you have replaced Windows with Linux. DNX mode above is the route that does not
+depend on having a working OS.
 
 ## The tablet does not list the USB stick at all
 
@@ -98,9 +146,20 @@ Edit the GRUB entry (press `e`) and append to the `linux` line:
 video=1280x800@60
 ```
 
-`nomodeset` is the sledgehammer version — it gets you a picture but no
-acceleration, and it is almost never needed on Cherry Trail with a modern
-kernel. Try `video=` first.
+If that does not do it, work down this ladder, least destructive first:
+
+```
+video=1280x800@60          # tell the driver the mode, keep acceleration
+i915.modeset=0             # the Cherry Trail-specific one
+nomodeset                  # sledgehammer: a picture, but no acceleration
+```
+
+A black screen right after picking "Try Ubuntu" is the classic Bay/Cherry Trail
+symptom, and `i915.modeset=0` is what that community settled on. Both reports we
+have for this tablet — a Vi8 Plus owner in January 2016 and the wider Bay Trail
+thread — hit it. Note that both predate years of i915 work, so on a current
+kernel you may well not need any of this: try booting untouched first, and reach
+for these only when it actually fails.
 
 ## The install finished and now nothing boots
 

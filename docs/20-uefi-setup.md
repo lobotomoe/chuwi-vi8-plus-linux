@@ -186,7 +186,11 @@ hub, and a tablet has no CMOS jumper or coin cell to clear a forgotten password
 with. Treat the password as a temporary key, write it down while it is set, and
 remove it as soon as Secure Boot is off.
 
-**2. Boot order — nothing to do.** The shipped order already puts USB first:
+**2. Boot order — nothing to do, and do not rely on it anyway.** Use
+`Boot Override` (below) to pick the stick. Reordering the boot list is reported
+not to take effect on this tablet — *"it seems like 'windows boot manager' is
+overriding the settings"* (techtablets post #23272) — while `Boot Override` works.
+The shipped order already puts USB first regardless:
 
 ```
 Boot Option #1   [USB Lan]
@@ -282,10 +286,22 @@ and described what it took:
 Three things in that are worth taking seriously:
 
 - **`\EFI\BOOT\` contained only `bootia32.efi`** — everything else, including
-  `bootx64.efi`, was deleted. A conformant 32-bit firmware should simply ignore
-  `bootx64.efi`, so this should not matter; on AMI builds of this vintage it
-  reportedly did. If a stick that looks correct will not start, emptying
-  `\EFI\BOOT\` down to the single 32-bit loader is a cheap thing to test.
+  `bootx64.efi`, was deleted. Treat this as a thing to try, not a rule:
+  - *For it:* Dell published a knowledge-base article, "Systems with 32 bit
+    processor will not boot to USB key if both 32 bit and 64 bit images are
+    present" (KB 000141299), describing exactly this failure and prescribing a
+    key carrying only the 32-bit loader. Dell has since retired the article, and
+    its stated mechanism — that the firmware "will not boot past the bootx64.efi
+    boot file" — contradicts the UEFI specification, under which IA32 firmware
+    looks for `\EFI\BOOT\BOOTIA32.EFI` and never considers the x64 path at all.
+  - *Against it:* a Vi8 Plus owner reached the GRUB menu in January 2016 with a
+    stock Ubuntu ISO that still had `bootx64.efi` on it, having only *added*
+    `bootia32.efi` (techtablets post #23355). On this tablet, both files present
+    demonstrably did not prevent booting.
+
+  So the scripts here leave `bootx64.efi` in place. If a stick that looks correct
+  will not start, deleting it is a cheap thing to test before rebuilding
+  anything.
 - **The installer needs a working network connection**, or it fails at the very
   end. This tablet's Wi-Fi does work in a live session, but if you are installing
   somewhere without Wi-Fi, plan for a USB Ethernet adapter on the hub.
