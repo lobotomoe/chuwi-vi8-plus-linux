@@ -106,25 +106,48 @@ against the respective sources — see [docs/90-references.md](docs/90-reference
 
 ## Hardware support summary
 
-All of this was verified against the shipping kernel configuration of Ubuntu 26.04 LTS
-(Linux 7.0.0-31-generic) and current mainline sources — see
-[docs/01-hardware.md](docs/01-hardware.md) for the per-component detail and the exact
+Lubuntu 26.04 has been installed on the reference tablet and runs: it boots from its
+own 32-bit GRUB, the desktop is accelerated, and it is online over Wi-Fi. The table
+below separates **what the kernel supports** — checked against Ubuntu 26.04's shipping
+configuration (Linux 7.0.0-31-generic) and current mainline sources — from **what was
+actually observed on that unit**, because on this hardware the two are not the same.
+
+See [docs/01-hardware.md](docs/01-hardware.md) for per-component detail and the exact
 kernel symbols.
 
-| Component | Works out of the box | Notes |
+| Component | In the kernel | On the reference unit |
 |---|---|---|
-| Graphics (Cherry Trail, `i915`) | Yes | 1280x800, accelerated |
-| Touchscreen (Chipone ICN8505) | Yes | Firmware is read out of the tablet's own UEFI at boot |
-| Wi-Fi (BCM43430) | Yes | 2.4 GHz only — the radio has no 5 GHz support |
-| Audio (RT5651) | Yes | Mono speaker; the quirk is upstream |
-| Accelerometer / auto-rotation | Yes | Mount matrix is in systemd's hwdb |
-| Battery, charging (AXP288) | Yes | |
-| Backlight | Yes | |
-| eMMC, microSD | Yes | |
-| micro-HDMI | Yes | |
-| Bluetooth (BCM43430A1 over UART) | Usually | Verify on your unit; see troubleshooting |
-| Cameras | **No** | Cherry Trail ISP has no usable mainline driver. Treat them as absent. |
-| Suspend | Partly | s2idle works; expect higher idle drain than Windows |
+| Graphics (Cherry Trail, `i915`) | Yes | **Works**, accelerated, no `nomodeset` needed |
+| eMMC, microSD | Yes | **Works** — installed to eMMC, ran the installer off a card |
+| Wi-Fi (BCM43430) | Yes | **Works after a manual NVRAM copy** — see below. 2.4 GHz only, the radio has no 5 GHz |
+| Touchscreen (Chipone ICN8505) | Yes | **Does not work** — the DMI quirk does not match, so the firmware is never extracted |
+| Audio (RT5651) | Yes | Untested; the quirk does not match, so expect wrong channel mapping |
+| Accelerometer / auto-rotation | Yes | Untested; the hwdb mount matrix does not match. Rotating by hand works |
+| Battery, charging (AXP288) | Yes | Untested on the installed system |
+| Backlight | Yes | Untested on the installed system |
+| micro-HDMI | Yes | Untested |
+| Bluetooth (BCM43430A1 over UART) | Yes | Untested |
+| Suspend | Partly | Untested. s2idle is what to expect; idle drain is worse than Windows |
+| Cameras | **No** | Cherry Trail ISP has no usable mainline driver. Treat them as absent |
+
+### Why several of those say "does not match"
+
+**Some units ship with their DMI fields unfilled.** The reference tablet reports
+`To be filled by O.E.M.` for both `sys_vendor` and `product_name`; only the board
+fields are set. Nearly every per-device kernel quirk for this tablet keys off the
+system fields, so on such a unit the touchscreen, the Wi-Fi calibration lookup, the
+audio routing quirk and the accelerometer mount matrix all silently fail to apply —
+four unrelated-looking faults from one placeholder string.
+
+Wi-Fi and the touchscreen have DMI-independent workarounds; audio and the mount
+matrix do not. Check yours before you conclude anything:
+
+```sh
+cat /sys/class/dmi/id/sys_vendor /sys/class/dmi/id/product_name
+```
+
+Full explanation and the fixes:
+[docs/01-hardware.md](docs/01-hardware.md#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-four-things-at-once).
 
 ---
 

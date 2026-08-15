@@ -456,6 +456,45 @@ cat /proc/asound/cards
   (`BYT_RT5651_HP_LR_SWAPPED`). If they are still swapped, you are on a kernel
   older than the quirk; update it.
 
+## There is no network icon in the tray
+
+Check whether Wi-Fi actually works before touching anything, because the icon and
+the radio are separate problems and the icon is the trivial one:
+
+```sh
+nmcli device wifi list
+```
+
+Networks listed means the radio, the driver and NetworkManager are all fine and only
+the applet is missing. Connect from the shell and carry on:
+
+```sh
+nmcli device wifi connect "Your SSID" --ask
+```
+
+`--ask` prompts for the passphrase instead of taking it as an argument, which keeps
+it out of `~/.bash_history` and out of the process list.
+
+Lubuntu's applet is `nm-tray`. Start it, and if that works add it under
+**Preferences -> LXQt settings -> Session Settings -> Autostart**:
+
+```sh
+nm-tray &
+sudo apt install nm-tray        # if the command is not found
+```
+
+If the list is empty instead:
+
+```sh
+nmcli device status             # wlan0 "unmanaged"? NetworkManager started before the driver
+sudo systemctl restart NetworkManager
+rfkill list                     # "Soft blocked: yes"?
+sudo rfkill unblock wifi
+```
+
+And if there is no `wlan0` at all, it is the firmware, not the applet — see
+[01-hardware.md](01-hardware.md#two-chip-revisions-ship-in-this-model-and-they-want-different-nvram).
+
 ## Bluetooth does not appear
 
 ```sh
