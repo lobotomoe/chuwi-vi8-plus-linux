@@ -150,6 +150,7 @@ require_cmd rsync find
 mnt_iso=$(mktemp -d)
 mnt_usb=$(mktemp -d)
 workdir=
+progress_pid=
 if [ "$os" = macos ]; then
   [ -d "$scratch" ] || die "no such scratch directory: $scratch"
   iso_kb=$(($(wc -c <"$iso") / 1024))
@@ -159,7 +160,48 @@ if [ "$os" = macos ]; then
   workdir=$(mktemp -d "$scratch/vi8-iso.XXXXXX")
 fi
 
+# Copying several gigabytes with no output looks indistinguishable from a hang,
+# and this is the step people wait longest on. rsync's own --info=progress2 is
+# not an option: macOS ships openrsync, which reports itself as 2.6.9 and has
+# neither that flag nor --progress in a usable form. Polling how full the
+# destination has become needs nothing from rsync at all and behaves the same on
+# both platforms.
+PROGRESS_INTERVAL_SECONDS=2
+
+report_progress() {
+  local dst=$1 total_kib=$2 used pct
+  while :; do
+    used=$(df -Pk "$dst" 2>/dev/null | awk 'NR == 2 { print $3 }')
+    # The mount disappearing means the copy is over, one way or another.
+    [ -n "$used" ] || break
+    pct=$((used * 100 / total_kib))
+    [ "$pct" -le 100 ] || pct=100
+    printf '\r  %3d%%   %d of %d MiB' \
+      "$pct" "$((used / 1024))" "$((total_kib / 1024))" >&2
+    sleep "$PROGRESS_INTERVAL_SECONDS"
+  done
+}
+
+start_progress() {
+  local dst=$1 total_kib=$2
+  # Only when someone is watching: carriage returns are noise in a log file, and
+  # the test suite captures this output.
+  [ -t 2 ] || return 0
+  [ "${total_kib:-0}" -gt 0 ] || return 0
+  report_progress "$dst" "$total_kib" &
+  progress_pid=$!
+}
+
+stop_progress() {
+  [ -n "$progress_pid" ] || return 0
+  kill "$progress_pid" 2>/dev/null || true
+  wait "$progress_pid" 2>/dev/null || true
+  progress_pid=
+  printf '\r%-40s\r' '' >&2
+}
+
 cleanup() {
+  stop_progress
   if [ "$os" = macos ]; then
     diskutil unmount "$mnt_usb" >/dev/null 2>&1 || true
   else
@@ -311,10 +353,14 @@ if [ "$os" = macos ]; then partition_macos; else partition_linux; fi
 # Copy the ISO contents
 # --------------------------------------------------------------------------
 
-log "Copying to the stick (this is the slow part)..."
+copy_kib=$(du -sk "$src" | awk '{ print $1 }')
+log "Copying $((copy_kib / 1024)) MiB to the stick (this is the slow part)..."
+start_progress "$mnt_usb" "$copy_kib"
 # -r without -l: symlinks are skipped, and hard links become independent copies.
 # FAT32 supports neither, and no distribution needs them to boot or install.
 rsync -rt "$src"/ "$mnt_usb"/ || die "copy failed"
+stop_progress
+log "Copied."
 
 # --------------------------------------------------------------------------
 # Install the 32-bit bootloader

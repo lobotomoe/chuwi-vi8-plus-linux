@@ -198,14 +198,17 @@ try {
                'Use Ventoy - see docs\12-usb-windows.md.')
     }
 
-    Write-Host 'Copying to the stick (this is the slow part)...'
+    $copyMiB = [int]((Get-ChildItem -LiteralPath $isoRoot -Recurse -File |
+        Measure-Object -Property Length -Sum).Sum / 1MB)
+    Write-Host "Copying $copyMiB MiB to the stick (this is the slow part)..."
     # robocopy uses exit codes 0-7 for success (1 = "files were copied", the
-    # normal outcome here). PowerShell 7.4+ defaults
-    # $PSNativeCommandUseErrorActionPreference to $true, which turns any non-zero
-    # exit into a terminating error under $ErrorActionPreference = 'Stop' - so a
-    # successful copy would throw. Suppress that for this one call and judge the
-    # exit code ourselves. Setting the variable is harmless on Windows PowerShell
-    # 5.1, where it does not exist.
+    # normal outcome here). If $PSNativeCommandUseErrorActionPreference is on,
+    # any non-zero exit becomes a terminating error under
+    # $ErrorActionPreference = 'Stop' - so a successful copy would throw. It
+    # measured $false on PowerShell 7.6.5, but it is a preference: a profile, a
+    # future default or a caller can flip it. Pin it for this one call and judge
+    # the exit code ourselves. Setting it is harmless on Windows PowerShell 5.1,
+    # where it does not exist.
     & {
         $PSNativeCommandUseErrorActionPreference = $false
         robocopy $isoRoot $usbRoot /E /NFL /NDL /NJH /NJS /R:1 /W:1 | Out-Null
