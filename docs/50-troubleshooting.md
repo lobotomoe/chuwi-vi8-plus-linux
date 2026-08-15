@@ -281,36 +281,114 @@ when its **root filesystem disappears**. Anything already in page cache keeps wo
 for a while; the first process that has to read from the squashfs blocks forever, and
 the session dies component by component over several minutes.
 
-The cause is the USB-C port changing role. `extcon_intel_int3496` is the driver that
-decides whether the port is host or device, and on this generation it can flip the
-port back to device mode after boot — taking the live USB, and with it the root
-filesystem, away from the running system. Plugging in a charger mid-session is one
-way to trigger it.
+### A USB 3.0 stick cannot hold a link here
 
-Add both of these to the `linux` line in GRUB (press `e`, then Ctrl+X):
+This is the cause seen on the unit this guide was written against, and it is worth
+checking first because the fix costs nothing.
+
+The tablet's single Type-C port is wired for USB 2.0. Give it a USB 3.0 stick — through
+a USB 3.0 hub, which is what most Type-C hubs are — and the two try to come up at
+SuperSpeed anyway. The link does not hold, the device resets in a loop, and the
+mass-storage driver never binds. What that looks like in `dmesg`:
+
+```
+usb 2-1.1: reset SuperSpeed USB device number 3 using xhci_hcd
+usb 2-1.1: reset SuperSpeed USB device number 3 using xhci_hcd
+```
+
+Bus 2 is the SuperSpeed side. A device that appears there and only ever gets reset is
+the one to suspect — and there will be no matching `usb-storage`/`sd` line anywhere
+after it. Meanwhile a keyboard on bus 1 at high speed keeps working perfectly, which
+is what makes this so misleading: **input works, so the port is clearly in host mode,
+so surely USB is fine.**
+
+It fails intermittently, which is the other reason it is hard to recognise. The same
+stick in the same hub may enumerate correctly on one boot and be reset in a loop on
+the next, or drop out an hour into a working session. — **verified on the unit**
+
+Fixes, cheapest first:
+
+- **Move the stick to a different port on the hub.** Enough on its own sometimes; it
+  was on this unit.
+- **Put a USB 2.0 extension cable between hub and stick.** A USB 2.0 A-to-A cable
+  physically has no SuperSpeed conductors, so the link is forced down to high speed —
+  the mode this port actually supports.
+- **Use a USB 2.0 hub, or a USB 2.0 stick.** The durable answer.
+- **Put the live filesystem on the microSD card instead.** The firmware cannot boot
+  from SD, but it does not have to: it only reads GRUB, the kernel and the initrd off
+  the USB, using its own USB stack, and that works. Once the kernel is up, casper will
+  find the live filesystem on the SD card, and USB stops mattering for the rest of the
+  session — including the entire install.
+
+Note that the last one is the only fix that also protects the **install itself**, which
+is 30–60 minutes of continuous reading from that stick.
+
+### The other candidate: the port dropping out of host mode
+
+`extcon_intel_int3496` decides whether the port is host or device, and on this
+generation it can flip back to device mode after boot, taking the live USB with it.
+Hans de Goede hits this on his own Vi8 Plus and boots with:
 
 ```
 modprobe.blacklist=extcon_intel_int3496 gpiolib_acpi.run_edge_events_on_boot=0
 ```
 
-Note the spelling of `blacklist`. Hans de Goede's own notes for this tablet have a
-typo there (`blaclist`), and a misspelled kernel parameter is silently ignored — you
-get the same failure and conclude the workaround does not help.
-
-**Telling this apart from a display problem** costs one boot: append a bare `3` as
-well, which starts the session in text mode. A text login prompt means the system is
-alive and the fault was in the display path. Nothing at all means the root filesystem
-went away and you are in this section.
+Note the spelling of `blacklist`. His notes have a typo there (`blaclist`), and a
+misspelled kernel parameter is silently ignored — you get the same failure and
+conclude the workaround does not help.
 
 Both parameters are current — `extcon-intel-int3496` is still built
 ([drivers/extcon/Makefile](https://github.com/torvalds/linux/blob/master/drivers/extcon/Makefile)),
 and `run_edge_events_on_boot` still lives in `gpiolib_acpi`
 ([gpiolib-acpi-quirks.c](https://github.com/torvalds/linux/blob/master/drivers/gpio/gpiolib-acpi-quirks.c),
-`0=no, 1=yes, -1=auto`).
+`0=no, 1=yes, -1=auto`). — **not reproduced here**: on this unit the port kept host
+mode throughout (the keyboard never stopped working), so the SuperSpeed link above was
+the actual fault. Reach for these parameters only once you have ruled that out.
+
+**Telling any of this apart from a display problem** costs one boot: append a bare `3`,
+which starts the session in text mode. A text login prompt means the system is alive
+and the fault was in the display path. Nothing at all means you are in this section.
 
 A weak ten-year-old battery produces a similar picture — the tablet browns out under
 load — and the fix overlaps: keep a charger on a 5 V-passing hub. See
 [01-hardware.md](01-hardware.md#ports-otg-and-charging-while-a-hub-is-attached).
+
+## `Unable to find a medium containing a live file system`
+
+The initramfs could not find the live filesystem. On this tablet that almost always
+means the USB stick is not there — see
+[the section above](#a-usb-30-stick-cannot-hold-a-link-here).
+
+It is also the best diagnostic opportunity you get on this machine, because it hands
+you a shell. At the prompt:
+
+```
+Attempt interactive netboot from a URL?
+yes no (default yes): no
+```
+
+Answer **`no`** and you land in a BusyBox `(initramfs)` shell with a working keyboard.
+From there:
+
+```sh
+cat /proc/partitions          # is the stick there at all? look for sda
+dmesg | grep -i usb | tail -25
+```
+
+Unplug and replug the stick, wait a few seconds, and run `cat /proc/partitions` again —
+udev is running, so hotplug works here.
+
+**`exit` does not make it try again.** This is worth knowing before you waste a cycle
+on it: leaving the shell resumes the boot script where it stopped, which is at
+`run-init`, and since nothing ever got mounted you get
+
+```
+No init found. Try passing init= bootarg.
+```
+
+and drop straight back to the same shell. Once the stick shows up in
+`/proc/partitions`, reboot (`reboot -f`) and boot again — the search only runs from the
+start of boot. — **verified on the unit**
 
 ## The install finished and now nothing boots
 

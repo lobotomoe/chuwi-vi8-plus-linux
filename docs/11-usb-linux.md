@@ -4,6 +4,23 @@
 booted this tablet. Ventoy looks like the easier route and is kept here as Option
 B, but see the warning on it first.
 
+## Pick a USB 2.0 stick, and a USB 2.0 hub
+
+Do this before you build anything, because no amount of getting the stick's contents
+right will help if the tablet cannot read it.
+
+The Type-C port is wired for USB 2.0, but the SoC still exposes a SuperSpeed bus. A
+USB 3.0 stick behind a USB 3.0 hub — which is what most Type-C hubs are — negotiates
+SuperSpeed, fails to hold the link, and resets in a loop without ever appearing as a
+disk. It is intermittent, so it will work once and convince you the hardware is fine.
+
+If USB 2.0 parts are what you have, a **USB 2.0 A-to-A extension cable** between hub
+and stick does the job too: it has no SuperSpeed conductors, so the link is forced
+down to a mode that works.
+
+Symptoms and the full diagnosis are in
+[50-troubleshooting.md](50-troubleshooting.md#a-usb-30-stick-cannot-hold-a-link-here).
+
 ---
 
 ## Option A: the script (one ISO, nothing else on the stick)
@@ -27,6 +44,11 @@ Skip to [the script section](#the-script) below.
 If you do try Ventoy and the stick does not show up under `Boot Override`, check
 `Advanced` -> `USB Configuration` **before** blaming the bootloader — if the
 device is not listed there, the problem is upstream of anything Ventoy does.
+
+That is exactly what happened in the attempt above, and the hub turned out to be the
+reason: swapping to a different one made the same stick appear immediately. Worth
+knowing before you conclude anything about Ventoy — and worth reading the stick and
+hub note at the top of this page first.
 
 [Ventoy](https://www.ventoy.net/) installs its own bootloader on the stick and
 then boots ISO files you simply copy on. It has carried IA32 UEFI support since

@@ -167,10 +167,32 @@ little optimistic; the fuel gauge is calibrated by the firmware, not by Linux.
 
 - eMMC via `sdhci-acpi`, appears as `/dev/mmcblk0` (occasionally `mmcblk1` — always
   check with `lsblk` rather than assuming).
-- microSD appears as a second `mmcblk` device.
+- microSD appears as a **separate** `mmcblk` device, and not necessarily the next
+  number: on this unit a card in the slot came up as `mmcblk2`, because `mmcblk1` is
+  taken by the eMMC's own boot hardware partitions (`mmcblk0boot0`, `mmcblk0boot1`).
+  Check, never assume.
+
+Stock `/proc/partitions` on an untouched unit, for orientation — sizes in 1 KiB blocks:
+
+```
+179  0  30310400  mmcblk0        # eMMC, ~28.9 GiB usable of a "32 GB" part
+179  1    102400  mmcblk0p1      # ESP
+179  2     16384  mmcblk0p2      # Microsoft reserved
+179  3  29728768  mmcblk0p3      # Windows
+179  4    460800  mmcblk0p4      # Windows recovery
+179  8      4096  mmcblk0boot0
+179 16      4096  mmcblk0boot1
+```
+
+— **verified on the unit**
 
 The firmware **cannot boot from the microSD slot**. Linux must be installed to the
 eMMC. You can put `/home` on the SD card afterwards if you want.
+
+The card is still useful during the install, though: the kernel reads it over the SD
+controller rather than over USB, so a live filesystem placed there is immune to the
+USB problems described in
+[50-troubleshooting.md](50-troubleshooting.md#a-usb-30-stick-cannot-hold-a-link-here).
 
 ### Cameras
 
@@ -181,6 +203,15 @@ Treat both cameras as non-functional. This is not going to change.
 ### Ports, OTG, and charging while a hub is attached
 
 The single USB-C port carries both power and data, at USB 2.0 speed.
+
+**It will still try to talk to USB 3.0 devices, and fail.** The SoC's xHCI exposes a
+SuperSpeed root bus, so a USB 3.0 stick behind a USB 3.0 hub negotiates SuperSpeed,
+cannot hold the link, and resets forever without ever becoming a block device — while
+a keyboard on the high-speed bus works flawlessly through the same hub. Prefer USB 2.0
+storage and USB 2.0 hubs here; it is not a preference for compatibility's sake, it is
+the difference between working and not. See
+[50-troubleshooting.md](50-troubleshooting.md#a-usb-30-stick-cannot-hold-a-link-here). —
+**verified on the unit**
 
 **Charging is 5 V / 2 A and nothing else.** The port does not speak USB Power Delivery.
 A modern PD charger reached over a C-to-C cable commonly settles on 500 mA, which is
