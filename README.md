@@ -126,6 +126,7 @@ kernel symbols.
 artifacts/    bootia32.efi and its provenance - the file that makes the stick bootable
 scripts/      build the stick, inspect ISOs, back up the eMMC, repair GRUB, tune
 docs/         the actual guide, split by host OS and by distribution
+tests/        checks the scripts still behave; see "Tests" below
 ```
 
 Docs and scripts are MIT. `artifacts/bootia32.efi` is an unmodified Debian GRUB binary
@@ -149,6 +150,23 @@ Shell scripts are `bash`, pass `shellcheck` cleanly, and depend only on what the
 ships. Every script that can destroy data prints what it found and refuses to continue
 until you type the target device back — including the restore path, which is why it is
 a script and not a `dd` line to copy out of a document.
+
+Each of them also does its checking **before** the destructive step, never after:
+`make-usb.sh` verifies the ISO and confirms the image can even fit on FAT32 while the
+stick is still untouched, and `restore-emmc.sh` verifies the image against its checksum
+and refuses a target it would not fit on before it writes a byte.
+
+### Tests
+
+```sh
+./tests/run-tests.sh          # static analysis, argument handling, artifact integrity
+sudo ./tests/run-tests.sh     # the above, plus an end-to-end make-usb.sh run
+```
+
+The end-to-end test builds a synthetic ISO, attaches a **virtual** disk (a disk image
+on macOS, a loop device on Linux), runs `make-usb.sh` against it and checks the
+resulting stick really carries `EFI/BOOT/bootia32.efi` and the ISO's tree. It never
+touches a real device.
 
 ---
 
