@@ -24,7 +24,7 @@ Write the ISO however you like, including plain `dd` or Rufus in DD mode:
 sudo dd if=archlinux-x86_64.iso of=/dev/sdX bs=4M status=progress oflag=sync
 ```
 
-`scripts/make-usb.sh` also works and will detect the existing `BOOTIA32.EFI` and
+`scripts/make-media.sh` also works and will detect the existing `BOOTIA32.EFI` and
 leave it alone.
 
 Verified against `archlinux-2026.08.01-x86_64.iso`. Run

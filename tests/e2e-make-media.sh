@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# End-to-end test for make-usb.sh, against a virtual disk.
+# End-to-end test for make-media.sh, against a virtual disk.
 #
 # Builds a synthetic ISO, attaches a throwaway block device (a disk image on
-# macOS, a loop device on Linux), runs make-usb.sh against it exactly as an
+# macOS, a loop device on Linux), runs make-media.sh against it exactly as an
 # operator would, and then checks the resulting stick really carries what makes
 # the tablet boot: EFI/BOOT/bootia32.efi and the ISO's own tree.
 #
-# Needs root, because make-usb.sh partitions and mounts. It never touches a real
+# Needs root, because make-media.sh partitions and mounts. It never touches a real
 # device: the target is created here and detached at the end.
 #
 # Called by run-tests.sh; can also be run on its own.
@@ -51,10 +51,20 @@ fail() {
 # ---------------------------------------------------------------------------
 
 tree=$work/tree
-mkdir -p "$tree/EFI/BOOT" "$tree/boot/grub" "$tree/casper"
-printf 'menuentry "Try or Install" { linux /casper/vmlinuz }\n' >"$tree/boot/grub/grub.cfg"
+mkdir -p "$tree/EFI/BOOT" "$tree/boot/grub" "$tree/boot/grub/fonts" "$tree/casper"
+cat >"$tree/boot/grub/grub.cfg" <<'CFG'
+search --no-floppy --set=root --label E2ESOURCE
+menuentry "Try or Install" {
+    linux  /casper/vmlinuz  --- quiet splash
+    initrd /casper/initrd
+}
+CFG
 head -c 65536 /dev/urandom >"$tree/EFI/BOOT/bootx64.efi"
 head -c 1048576 /dev/urandom >"$tree/casper/vmlinuz"
+head -c 1048576 /dev/urandom >"$tree/casper/initrd"
+head -c 4096 /dev/urandom >"$tree/boot/grub/fonts/unicode.pf2"
+# Stands in for the live filesystem: the thing --boot-only must leave behind.
+head -c 2097152 /dev/urandom >"$tree/casper/minimal.squashfs"
 
 iso=$work/test.iso
 if command -v hdiutil >/dev/null 2>&1; then
@@ -96,20 +106,20 @@ fi
 printf 'e2e: target is %s\n' "$device"
 
 # ---------------------------------------------------------------------------
-# Run make-usb.sh exactly as documented, answering the confirmation prompt
+# Run make-media.sh exactly as documented, answering the confirmation prompt
 # ---------------------------------------------------------------------------
 
 # A loop device is neither removable nor USB-attached, and a macOS disk image is
 # not a physical stick, so the removable check has to be waived here. That check
 # is what protects a real operator; it is tested separately, not bypassed there.
-out=$work/make-usb.log
+out=$work/make-media.log
 if ! printf 'ERASE %s\n' "$device" |
-  "$REPO_ROOT/scripts/make-usb.sh" \
+  "$REPO_ROOT/scripts/make-media.sh" \
     --iso "$iso" --sha256 "$iso_sha" --device "$device" \
     --label E2ETEST --force --scratch "$work" >"$out" 2>&1; then
-  printf '%s\n' "--- make-usb.sh output ---" >&2
+  printf '%s\n' "--- make-media.sh output ---" >&2
   cat "$out" >&2
-  fail "make-usb.sh exited non-zero"
+  fail "make-media.sh exited non-zero"
 fi
 
 # ---------------------------------------------------------------------------
@@ -120,7 +130,7 @@ check=$work/check
 mkdir -p "$check"
 
 if [ "$(uname -s)" = Darwin ]; then
-  # make-usb.sh ejects on macOS, so re-attach to inspect the result.
+  # make-media.sh ejects on macOS, so re-attach to inspect the result.
   hdiutil detach "$device" -force >/dev/null 2>&1 || true
   device=$(hdiutil attach -nomount "$work/disk.dmg" | head -1 | awk '{ print $1 }')
   [ -n "$device" ] || fail "could not re-attach the image for inspection"
@@ -148,7 +158,7 @@ expect_file "EFI/BOOT/bootia32.efi"
 expect_file "EFI/BOOT/bootx64.efi"
 expect_file "boot/grub/grub.cfg"
 expect_file "casper/vmlinuz"
-# The prefix shim make-usb.sh writes when the ISO carries a GRUB menu.
+# The prefix shim make-media.sh writes when the ISO carries a GRUB menu.
 expect_file "boot/grub/i386-efi/grub.cfg"
 
 # bootia32.efi must be the artifact, byte for byte, not a truncated copy.
@@ -198,7 +208,7 @@ fi
 
 set +o errexit
 bigout=$(printf 'ERASE %s\n' "$device" |
-  "$REPO_ROOT/scripts/make-usb.sh" \
+  "$REPO_ROOT/scripts/make-media.sh" \
     --iso "$bigiso" --device "$device" \
     --label E2ETEST --force --scratch "$work" 2>&1)
 bigstatus=$?
@@ -234,3 +244,101 @@ else
   umount "$check" || true
 fi
 printf 'e2e: ok    stick from the earlier run survived intact\n'
+
+# ---------------------------------------------------------------------------
+# --boot-only: the small half of a split-media pair
+#
+# This runs last because it erases the device built above.
+# ---------------------------------------------------------------------------
+
+bootout=$work/boot-only.log
+if ! printf 'ERASE %s\n' "$device" |
+  "$REPO_ROOT/scripts/make-media.sh" \
+    --iso "$iso" --device "$device" --boot-only \
+    --label E2EBOOT --force --scratch "$work" >"$bootout" 2>&1; then
+  printf '%s\n' "--- make-media.sh --boot-only output ---" >&2
+  cat "$bootout" >&2
+  fail "make-media.sh --boot-only exited non-zero"
+fi
+
+if [ "$(uname -s)" = Darwin ]; then
+  hdiutil detach "$device" -force >/dev/null 2>&1 || true
+  device=$(hdiutil attach -nomount "$work/disk.dmg" | head -1 | awk '{ print $1 }')
+  [ -n "$device" ] || fail "could not re-attach the image for inspection"
+  diskutil mount -mountPoint "$check" "${device}s1" >/dev/null ||
+    fail "could not mount the boot-only medium"
+else
+  part=${device}p1
+  [ -b "$part" ] || part=${device}1
+  mount "$part" "$check" || fail "could not mount the boot-only medium"
+fi
+
+status=0
+expect_absent() {
+  if [ -e "$check/$1" ]; then
+    printf 'e2e: FAIL  %s should not be on a boot-only medium\n' "$1" >&2
+    status=1
+  else
+    printf 'e2e: ok    %s absent\n' "$1"
+  fi
+}
+
+expect_file "vmlinuz"
+expect_file "initrd"
+expect_file "boot/grub/grub.cfg"
+expect_file "boot/grub/fonts/unicode.pf2"
+expect_file "EFI/BOOT/bootia32.efi"
+
+# The invariant the whole split-media arrangement rests on. A casper/ directory
+# here would be a medium that looks live and is not, which is exactly what the
+# live-boot scan must never be offered.
+expect_absent "casper"
+expect_absent "casper/minimal.squashfs"
+
+cfg=$check/boot/grub/grub.cfg
+if [ -f "$cfg" ]; then
+  # Paths must point at the root of this volume, where the files actually are.
+  if grep -q '^[[:space:]]*linux[[:space:]]\{1,\}/vmlinuz' "$cfg"; then
+    printf 'e2e: ok    grub.cfg loads /vmlinuz\n'
+  else
+    printf 'e2e: FAIL  grub.cfg does not load /vmlinuz\n' >&2
+    status=1
+  fi
+  if grep -q '^[[:space:]]*initrd[[:space:]]\{1,\}/initrd' "$cfg"; then
+    printf 'e2e: ok    grub.cfg loads /initrd\n'
+  else
+    printf 'e2e: FAIL  grub.cfg does not load /initrd\n' >&2
+    status=1
+  fi
+  # A stale /casper/ path would send GRUB looking for files that are not there.
+  if grep -q '/casper/' "$cfg"; then
+    printf 'e2e: FAIL  grub.cfg still references /casper/\n' >&2
+    status=1
+  else
+    printf 'e2e: ok    grub.cfg has no /casper/ paths left\n'
+  fi
+  # search would set $root by hunting for the source ISO's label, which does not
+  # exist on this medium - and $root is already correct without it.
+  if grep -q '^[[:space:]]*search[[:space:]]' "$cfg"; then
+    printf 'e2e: FAIL  grub.cfg still has a search line\n' >&2
+    status=1
+  else
+    printf 'e2e: ok    search line dropped\n'
+  fi
+  # The distribution's own kernel arguments have to survive the rewrite.
+  if grep -q -- '--- quiet splash' "$cfg"; then
+    printf 'e2e: ok    kernel arguments preserved\n'
+  else
+    printf 'e2e: FAIL  kernel arguments were lost\n' >&2
+    status=1
+  fi
+fi
+
+if [ "$(uname -s)" = Darwin ]; then
+  diskutil unmount "$check" >/dev/null 2>&1 || true
+else
+  umount "$check" || true
+fi
+
+[ "$status" -eq 0 ] || fail "the boot-only medium is wrong"
+printf 'e2e: boot-only medium built and verified\n'

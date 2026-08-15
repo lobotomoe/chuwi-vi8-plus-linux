@@ -42,7 +42,7 @@ Read carefully. You want the whole-disk node, `/dev/disk4`, not a slice like
 **4. Build it:**
 
 ```sh
-sudo ./scripts/make-usb.sh \
+sudo ./scripts/make-media.sh \
   --iso ~/Downloads/lubuntu-26.04-desktop-amd64.iso \
   --sha256 <the digest from lubuntu.me> \
   --device /dev/disk4
@@ -60,7 +60,7 @@ Scratch space: unpacking needs as much free disk as the ISO is big, in
 `$TMPDIR`. If your boot volume is tight, point it elsewhere:
 
 ```sh
-sudo ./scripts/make-usb.sh --iso ... --device ... --scratch /Volumes/Big
+sudo ./scripts/make-media.sh --iso ... --device ... --scratch /Volumes/Big
 ```
 
 **5. Optional, Ubuntu flavours only — carry the 32-bit GRUB package along.**

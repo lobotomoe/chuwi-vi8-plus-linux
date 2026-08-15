@@ -56,6 +56,12 @@ Confirm which one you have before doing anything else — see
    - [macOS](docs/10-usb-macos.md)
    - [Linux](docs/11-usb-linux.md)
    - [Windows](docs/12-usb-windows.md)
+
+   **Use a USB 2.0 stick if you have one.** The Type-C port is wired for USB 2.0 but
+   still negotiates SuperSpeed with USB 3.0 devices, fails to hold the link, and drops
+   the stick — sometimes minutes into a working session. If it happens to you,
+   [docs/13-split-media.md](docs/13-split-media.md) moves the live filesystem onto the
+   microSD card and takes USB out of the picture entirely.
 4. Get into the tablet's firmware setup, disable Secure Boot, boot the stick —
    [docs/20-uefi-setup.md](docs/20-uefi-setup.md). **Then wait ten minutes.** This
    tablet sits on the CHUWI logo for 5-10 minutes after you pick the stick, and
@@ -137,8 +143,8 @@ and stays under the GPL v3+ — [`LICENSE`](LICENSE),
 
 | Script | Runs on | What it does |
 |---|---|---|
-| `make-usb.sh` | macOS, Linux | Builds the install stick: GPT + FAT32, ISO contents, `bootia32.efi` |
-| `make-usb.ps1` | Windows | The same, via the Storage cmdlets and `robocopy` |
+| `make-media.sh` | macOS, Linux | Builds the install stick: GPT + FAT32, ISO contents, `bootia32.efi` |
+| `make-media.ps1` | Windows | The same, via the Storage cmdlets and `robocopy` |
 | `check-iso-ia32.sh` | macOS, Linux | Says whether an ISO boots 32-bit firmware as shipped |
 | `fetch-bootia32.sh` | macOS, Linux | Re-derives `bootia32.efi` from Debian's archive, checksum-verified |
 | `fetch-offline-payload.sh` | macOS, Linux | Downloads `grub-efi-ia32-bin` to carry on the stick |
@@ -154,7 +160,7 @@ until you type the target device back — including the restore path, which is w
 a script and not a `dd` line to copy out of a document.
 
 Each of them also does its checking **before** the destructive step, never after:
-`make-usb.sh` verifies the ISO and confirms the image can even fit on FAT32 while the
+`make-media.sh` verifies the ISO and confirms the image can even fit on FAT32 while the
 stick is still untouched, and `restore-emmc.sh` verifies the image against its checksum
 and refuses a target it would not fit on before it writes a byte.
 
@@ -162,11 +168,11 @@ and refuses a target it would not fit on before it writes a byte.
 
 ```sh
 ./tests/run-tests.sh          # static analysis, argument handling, artifact integrity
-sudo ./tests/run-tests.sh     # the above, plus an end-to-end make-usb.sh run
+sudo ./tests/run-tests.sh     # the above, plus an end-to-end make-media.sh run
 ```
 
 The end-to-end test builds a synthetic ISO, attaches a **virtual** disk (a disk image
-on macOS, a loop device on Linux), runs `make-usb.sh` against it and checks the
+on macOS, a loop device on Linux), runs `make-media.sh` against it and checks the
 resulting stick really carries `EFI/BOOT/bootia32.efi` and the ISO's tree. It never
 touches a real device.
 

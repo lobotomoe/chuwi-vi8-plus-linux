@@ -89,7 +89,7 @@ netinst leaves 14 KB free, and `bootia32.efi` is 1.8 MB.
 
 So instead the stick is built the other way around: format it FAT32 yourself, copy the
 **contents** of the ISO onto it, and add `bootia32.efi`. That is exactly what
-`scripts/make-usb.sh` and `scripts/make-usb.ps1` do, and it is also what Rufus does in
+`scripts/make-media.sh` and `scripts/make-media.ps1` do, and it is also what Rufus does in
 "ISO image mode".
 
 The alternative is [Ventoy](https://www.ventoy.net/), which keeps ISOs as files and

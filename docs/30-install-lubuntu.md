@@ -25,7 +25,7 @@ and `grub-efi-ia32-unsigned` in `pool/main/g/grub2/`.
 **Connect Wi-Fi before you install anyway.** What has been verified here is that
 the packages are on the ISO and that the installer asks for the right one. What
 has *not* been verified is that `apt-cdrom` finds the medium when the stick is a
-FAT32 copy of the ISO (what `make-usb.sh` builds) rather than a `dd`-written
+FAT32 copy of the ISO (what `make-media.sh` builds) rather than a `dd`-written
 ISO9660 image — the two are not the same medium as far as `apt-cdrom` is
 concerned. With network available the step succeeds either way. If you must
 install offline, expect to run

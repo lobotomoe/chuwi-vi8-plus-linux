@@ -3,10 +3,10 @@
 # Test suite for the scripts in this repository.
 #
 #   ./tests/run-tests.sh          logic, argument handling and artifact checks
-#   sudo ./tests/run-tests.sh     the above, plus an end-to-end make-usb.sh run
+#   sudo ./tests/run-tests.sh     the above, plus an end-to-end make-media.sh run
 #
 # The end-to-end test builds a synthetic ISO, attaches a virtual disk (a disk
-# image on macOS, a loop device on Linux) and runs make-usb.sh against it, so it
+# image on macOS, a loop device on Linux) and runs make-media.sh against it, so it
 # exercises the partition/format/copy path without needing a real USB stick and
 # without any risk to a real device. It is skipped when not run as root.
 
@@ -103,7 +103,7 @@ fi
 # ---------------------------------------------------------------------------
 group "Usage and argument handling"
 
-for s in make-usb.sh backup-emmc.sh restore-emmc.sh postinstall-grub-ia32.sh \
+for s in make-media.sh backup-emmc.sh restore-emmc.sh postinstall-grub-ia32.sh \
   postinstall-tune.sh check-iso-ia32.sh fetch-bootia32.sh fetch-offline-payload.sh \
   collect-hw-report.sh; do
   set +o errexit
@@ -118,37 +118,37 @@ for s in make-usb.sh backup-emmc.sh restore-emmc.sh postinstall-grub-ia32.sh \
 done
 
 # Missing required arguments must be exit 2 (usage), not a generic failure.
-expect_fail "make-usb.sh with no arguments prints usage" 2 "Usage:" -- \
-  "$SCRIPTS/make-usb.sh"
+expect_fail "make-media.sh with no arguments prints usage" 2 "Usage:" -- \
+  "$SCRIPTS/make-media.sh"
 expect_fail "backup-emmc.sh with no arguments prints usage" 2 "Usage:" -- \
   "$SCRIPTS/backup-emmc.sh"
 expect_fail "restore-emmc.sh with no arguments prints usage" 2 "Usage:" -- \
   "$SCRIPTS/restore-emmc.sh"
 
-expect_fail "make-usb.sh rejects an unknown argument" 1 "unknown argument" -- \
-  "$SCRIPTS/make-usb.sh" --wat
-expect_fail "make-usb.sh rejects a missing ISO" 1 "no such ISO" -- \
-  "$SCRIPTS/make-usb.sh" --iso /nonexistent.iso --device /dev/null
+expect_fail "make-media.sh rejects an unknown argument" 1 "unknown argument" -- \
+  "$SCRIPTS/make-media.sh" --wat
+expect_fail "make-media.sh rejects a missing ISO" 1 "no such ISO" -- \
+  "$SCRIPTS/make-media.sh" --iso /nonexistent.iso --device /dev/null
 
 # A whole SHA256SUMS line pasted into --sha256 must be named as such, not
 # reported as a checksum mismatch.
-expect_fail "make-usb.sh rejects a pasted SHA256SUMS line" 1 "only the 64-character digest" -- \
-  "$SCRIPTS/make-usb.sh" --iso "$REPO_ROOT/artifacts/bootia32.efi" --device /dev/null \
+expect_fail "make-media.sh rejects a pasted SHA256SUMS line" 1 "only the 64-character digest" -- \
+  "$SCRIPTS/make-media.sh" --iso "$REPO_ROOT/artifacts/bootia32.efi" --device /dev/null \
   --sha256 "d21e473e4f81716aae013720024755cd5ff89c9674ee5326fd3c4c6f7a84f0e7  bootia32.efi"
 
-expect_fail "make-usb.sh rejects a truncated digest" 1 "64 hex characters" -- \
-  "$SCRIPTS/make-usb.sh" --iso "$REPO_ROOT/artifacts/bootia32.efi" --device /dev/null \
+expect_fail "make-media.sh rejects a truncated digest" 1 "64 hex characters" -- \
+  "$SCRIPTS/make-media.sh" --iso "$REPO_ROOT/artifacts/bootia32.efi" --device /dev/null \
   --sha256 d21e473e
 
-expect_fail "make-usb.sh rejects an over-long FAT32 label" 1 "11 characters at most" -- \
-  "$SCRIPTS/make-usb.sh" --iso "$REPO_ROOT/artifacts/bootia32.efi" --device /dev/null \
+expect_fail "make-media.sh rejects an over-long FAT32 label" 1 "11 characters at most" -- \
+  "$SCRIPTS/make-media.sh" --iso "$REPO_ROOT/artifacts/bootia32.efi" --device /dev/null \
   --label THIS_LABEL_IS_TOO_LONG
 
 # ---------------------------------------------------------------------------
 group "FAT32 size boundary"
 
 # FAT32 stores files up to 4 GiB - 1. The check must accept exactly that and
-# reject exactly one byte more; make-usb.sh uses find -size +Nc, which is
+# reject exactly one byte more; make-media.sh uses find -size +Nc, which is
 # "strictly greater than", so the constant is the largest legal size.
 sizedir=$(mktemp -d)
 trap 'rm -rf "$sizedir"' EXIT
@@ -255,12 +255,12 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-group "make-usb.sh end to end (virtual disk)"
+group "make-media.sh end to end (virtual disk)"
 
 if [ "$(id -u)" -ne 0 ]; then
   skip "end-to-end build" "needs root; re-run with sudo"
 else
-  if "$REPO_ROOT/tests/e2e-make-usb.sh"; then
+  if "$REPO_ROOT/tests/e2e-make-media.sh"; then
     pass "end-to-end build"
   else
     fail "end-to-end build"

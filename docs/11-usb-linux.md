@@ -96,7 +96,7 @@ You want the whole disk (`/dev/sdb`), not a partition (`/dev/sdb1`).
 **3. Build it:**
 
 ```sh
-sudo ./scripts/make-usb.sh \
+sudo ./scripts/make-media.sh \
   --iso ~/Downloads/lubuntu-26.04-desktop-amd64.iso \
   --sha256 <the digest from the distribution's SHA256SUMS> \
   --device /dev/sdb

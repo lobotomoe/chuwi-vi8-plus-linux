@@ -44,13 +44,13 @@ IA32 hardware, so if an image misbehaves, fall back to Option A for that image.
 
 ## Option C: the PowerShell script
 
-`scripts\make-usb.ps1` is the scripted equivalent of Option A. From an
+`scripts\make-media.ps1` is the scripted equivalent of Option A. From an
 **elevated** PowerShell:
 
 ```powershell
 Get-Disk                                    # find the disk number of the stick
 
-.\scripts\make-usb.ps1 `
+.\scripts\make-media.ps1 `
     -IsoPath C:\Users\you\Downloads\lubuntu-26.04-desktop-amd64.iso `
     -Sha256 <the digest from the distribution's SHA256SUMS> `
     -DiskNumber 2

@@ -110,7 +110,7 @@ if [ "$ia32" = yes ]; then
 elif [ "$grubcfg" = yes ]; then
   log "Verdict: needs artifacts/bootia32.efi copied to EFI/BOOT/ on the stick."
   log "         Because the ISO is read-only once written with dd, build the stick"
-  log "         with scripts/make-usb.sh (FAT32 + copied contents) instead."
+  log "         with scripts/make-media.sh (FAT32 + copied contents) instead."
 else
   log "Verdict: no 32-bit bootloader and no GRUB menu at /boot/grub/grub.cfg."
   log "         artifacts/bootia32.efi would start and find nothing to load."

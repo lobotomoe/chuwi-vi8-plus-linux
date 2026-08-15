@@ -12,6 +12,12 @@
 # The ISO is copied, not dd-ed, because a dd-written ISO9660 filesystem is
 # read-only and bootia32.efi could never be added to it. See docs/02-boot-problem.md.
 #
+# --boot-only builds the small half of a split-media install: the bootloader, the
+# kernel and the initrd, and nothing else. The live filesystem then comes from a
+# second medium - on this tablet, the microSD card in its own slot, which the
+# kernel reads over the SD controller instead of over USB. See
+# docs/13-split-media.md for why that is worth doing.
+#
 # Runs on macOS and Linux. Needs root. DESTROYS the target device.
 
 # shellcheck source-path=SCRIPTDIR source=lib.sh
@@ -19,12 +25,19 @@ source "$(dirname -- "${BASH_SOURCE[0]}")/lib.sh"
 
 LABEL=VI8PLUS
 FAT32_MAX_FILE_BYTES=$((4 * 1024 * 1024 * 1024 - 1))
+# Covers the GRUB menu, the font and FAT32's own overhead. The kernel, the initrd
+# and the bootloader are measured rather than guessed.
+BOOT_ONLY_SLACK_BYTES=$((16 * 1024 * 1024))
 
 bootia32=$REPO_ROOT/artifacts/bootia32.efi
 iso=
 iso_sha256=
 device=
 force=no
+boot_only=no
+boot_kernel=
+boot_initrd=
+label_given=no
 scratch=${TMPDIR:-/tmp}
 
 usage() {
@@ -39,6 +52,9 @@ Usage: sudo ${0##*/} --iso PATH.iso --device DEVICE [options]
   --label NAME      FAT32 volume label, 11 chars max (default: $LABEL)
   --scratch DIR     Where to unpack the ISO on macOS; needs as much free space
                     as the ISO is big (default: \$TMPDIR, currently $scratch)
+  --boot-only       Write only the bootloader, kernel and initrd - no live
+                    filesystem. Pair it with a second medium built without this
+                    flag. See docs/13-split-media.md
   --force           Skip the removable-device safety check
 
 Find the device first:
@@ -69,7 +85,12 @@ while [ $# -gt 0 ]; do
     ;;
   --label)
     LABEL=${2:?--label needs a value}
+    label_given=yes
     shift 2
+    ;;
+  --boot-only)
+    boot_only=yes
+    shift
     ;;
   --scratch)
     scratch=${2:?--scratch needs a path}
@@ -93,6 +114,13 @@ done
 }
 [ -f "$iso" ] || die "no such ISO: $iso"
 [ -f "$bootia32" ] || die "no such bootia32: $bootia32"
+
+# The two halves of a split-media pair end up plugged into the same machine while
+# being built, and mixing them up wastes a rebuild. Give them different names
+# unless the operator asked for something specific.
+if [ "$boot_only" = yes ] && [ "$label_given" = no ]; then
+  LABEL=VI8BOOT
+fi
 [ ${#LABEL} -le 11 ] || die "FAT32 labels are 11 characters at most: $LABEL"
 
 # Argument shape is checked before privileges: someone who mistyped a digest
@@ -144,7 +172,7 @@ else
 fi
 
 os=$(host_os)
-[ "$os" != unsupported ] || die "only macOS and Linux are supported (Windows: use make-usb.ps1)"
+[ "$os" != unsupported ] || die "only macOS and Linux are supported (Windows: use make-media.ps1)"
 require_cmd rsync find
 
 mnt_iso=$(mktemp -d)
@@ -261,25 +289,34 @@ device_size_bytes() {
 log "Target device:"
 describe_and_check_device
 
-# The ISO also has to fit. Cheap to check, and checking it now means a stick that
-# was never big enough does not get erased for nothing.
+# The payload also has to fit. Cheap to check, and checking it now means a stick
+# that was never big enough does not get erased for nothing.
 iso_bytes=$(wc -c <"$iso")
 device_bytes=$(device_size_bytes)
-case $device_bytes in
-'' | *[!0-9]*)
-  warn "could not read the size of $device; not checking that the ISO fits"
-  ;;
-*)
+
+check_fits() {
+  local needed=$1 what=$2
+  case $device_bytes in
+  '' | *[!0-9]*)
+    warn "could not read the size of $device; not checking that $what fits"
+    return 0
+    ;;
+  esac
   # FAT32 metadata and per-file slack make the usable space meaningfully smaller
   # than the raw device, so ask for real headroom rather than a bare fit.
-  if [ "$iso_bytes" -gt $((device_bytes * 95 / 100)) ]; then
-    die "the ISO does not fit on $device.
-  ISO:    $((iso_bytes / 1024 / 1024)) MiB
+  if [ "$needed" -gt $((device_bytes * 95 / 100)) ]; then
+    die "$what does not fit on $device.
+  needed: $((needed / 1024 / 1024)) MiB
   device: $((device_bytes / 1024 / 1024)) MiB
 Use a larger stick. Nothing has been erased."
   fi
-  ;;
-esac
+}
+
+# How much a boot-only medium needs cannot be known until the image is open, so
+# that check happens further down - still before anything is erased.
+if [ "$boot_only" = no ]; then
+  check_fits "$iso_bytes" "the ISO"
+fi
 
 # --------------------------------------------------------------------------
 # Open the ISO and check it can actually go onto FAT32.
@@ -294,20 +331,50 @@ if [ "$os" = macos ]; then
   # macOS cannot mount a hybrid Linux ISO ("no mountable file systems"), so the
   # tree is unpacked to scratch space first. libarchive reads ISO9660/Rock Ridge.
   require_cmd tar
-  log "Unpacking the ISO to $workdir (macOS cannot mount hybrid ISOs)..."
-  tar -xf "$iso" -C "$workdir" || die "could not unpack $iso"
+  if [ "$boot_only" = yes ]; then
+    # Unpacking the whole image to pick four files out of it costs several GiB of
+    # scratch and the better part of ten minutes. Ask for the members instead.
+    # Which of these exist depends on the distribution, so a pattern that matches
+    # nothing is not an error - the kernel and initrd check below is the real guard.
+    log "Unpacking the boot files from the ISO..."
+    for member in 'boot/grub' 'EFI' \
+      'casper/vmlinuz*' 'casper/initrd*' 'live/vmlinuz*' 'live/initrd*'; do
+      tar -xf "$iso" -C "$workdir" "$member" 2>/dev/null || true
+    done
+  else
+    log "Unpacking the ISO to $workdir (macOS cannot mount hybrid ISOs)..."
+    tar -xf "$iso" -C "$workdir" || die "could not unpack $iso"
+  fi
   src=$workdir
 else
   mount -o loop,ro "$iso" "$mnt_iso" || die "could not mount $iso"
   src=$mnt_iso
 fi
 
-oversized=$(find "$src" -type f -size +"$FAT32_MAX_FILE_BYTES"c 2>/dev/null | head -3 || true)
-if [ -n "$oversized" ]; then
-  log "$oversized"
-  die "the image contains files larger than 4 GiB, which FAT32 cannot store.
+# Only matters when the whole image is being copied; a boot-only medium never
+# carries the squashfs that trips this.
+if [ "$boot_only" = no ]; then
+  oversized=$(find "$src" -type f -size +"$FAT32_MAX_FILE_BYTES"c 2>/dev/null | head -3 || true)
+  if [ -n "$oversized" ]; then
+    log "$oversized"
+    die "the image contains files larger than 4 GiB, which FAT32 cannot store.
 Use Ventoy (docs/11-usb-linux.md, docs/12-usb-windows.md) or pick a smaller image.
 The stick has not been touched."
+  fi
+fi
+
+# Now that the image is open, a boot-only medium can be measured instead of
+# guessed at - and an image with no kernel in it can be rejected while the target
+# is still untouched.
+if [ "$boot_only" = yes ]; then
+  boot_kernel=$(find "$src" -maxdepth 2 -type f -name 'vmlinuz*' -print -quit)
+  boot_initrd=$(find "$src" -maxdepth 2 -type f -name 'initrd*' -print -quit)
+  [ -n "$boot_kernel" ] || die "no kernel (vmlinuz*) found in $iso"
+  [ -n "$boot_initrd" ] || die "no initrd (initrd*) found in $iso"
+  check_fits "$((
+    $(wc -c <"$boot_kernel") + $(wc -c <"$boot_initrd") +
+      $(wc -c <"$bootia32") + BOOT_ONLY_SLACK_BYTES
+  ))" "the boot files"
 fi
 
 log ""
@@ -358,14 +425,68 @@ if [ "$os" = macos ]; then partition_macos; else partition_linux; fi
 # Copy the ISO contents
 # --------------------------------------------------------------------------
 
-copy_kib=$(du -sk "$src" | awk '{ print $1 }')
-log "Copying $((copy_kib / 1024)) MiB to the stick (this is the slow part)..."
-start_progress "$mnt_usb" "$copy_kib"
-# -r without -l: symlinks are skipped, and hard links become independent copies.
-# FAT32 supports neither, and no distribution needs them to boot or install.
-rsync -rt "$src"/ "$mnt_usb"/ || die "copy failed"
-stop_progress
-log "Copied."
+# Everything the firmware and GRUB have to read before the kernel is running, and
+# nothing else. The live filesystem is on the other medium.
+#
+# The kernel and initrd go to the ROOT of the volume, deliberately not under
+# casper/ or live/. Those are the directory names the live-boot scripts scan for
+# when they go looking for a root filesystem, and a directory that looks like a
+# live medium but contains no squashfs is exactly the kind of thing that gets
+# picked and then fails. Putting the kernel at the root makes choosing this medium
+# by mistake impossible rather than merely unlikely - which matters, because the
+# whole point of splitting the media is that this one is the unreliable half.
+copy_boot_only() {
+  local kernel=$boot_kernel initrd=$boot_initrd cfg font
+
+  cp "$kernel" "$mnt_usb/${kernel##*/}" || die "could not copy ${kernel##*/}"
+  cp "$initrd" "$mnt_usb/${initrd##*/}" || die "could not copy ${initrd##*/}"
+
+  cfg=$(find "$src" -maxdepth 3 -type f -path '*/grub/grub.cfg' -print -quit)
+  [ -n "$cfg" ] || die "no boot/grub/grub.cfg found in $iso"
+
+  mkdir -p "$mnt_usb/boot/grub"
+  font=$(find "$src" -type f -name 'unicode.pf2' -print -quit)
+  if [ -n "$font" ]; then
+    mkdir -p "$mnt_usb/boot/grub/fonts"
+    cp "$font" "$mnt_usb/boot/grub/fonts/unicode.pf2"
+  else
+    # loadfont is not fatal in GRUB, but the menu comes out in a fallback face.
+    warn "no unicode.pf2 in the image; the GRUB menu will look plain"
+  fi
+
+  # The distribution's own menu is kept, because it carries the kernel arguments
+  # that distribution expects. Only two things change:
+  #
+  #   - the kernel and initrd paths lose their directory, matching the layout above
+  #   - "search" lines are dropped: they set $root by hunting for the ISO's label,
+  #     which does not exist here, whereas $root already IS this volume - GRUB just
+  #     loaded this file from it
+  {
+    printf '# Generated by %s --boot-only from %s\n' "${0##*/}" "${iso##*/}"
+    printf '# Kernel and initrd are at the root of this volume; the live\n'
+    printf '# filesystem is on the other medium. See docs/13-split-media.md\n\n'
+    sed -e '/^[[:space:]]*search[[:space:]]/d' \
+      -e 's,/[A-Za-z0-9_.-]*/vmlinuz,/vmlinuz,g' \
+      -e 's,/[A-Za-z0-9_.-]*/initrd,/initrd,g' \
+      "$cfg"
+  } >"$mnt_usb/boot/grub/grub.cfg" || die "could not write grub.cfg"
+
+  log "Boot files: ${kernel##*/}, ${initrd##*/}, boot/grub/grub.cfg"
+}
+
+if [ "$boot_only" = yes ]; then
+  log "Writing boot files only (the live filesystem goes on the other medium)..."
+  copy_boot_only
+else
+  copy_kib=$(du -sk "$src" | awk '{ print $1 }')
+  log "Copying $((copy_kib / 1024)) MiB to the stick (this is the slow part)..."
+  start_progress "$mnt_usb" "$copy_kib"
+  # -r without -l: symlinks are skipped, and hard links become independent copies.
+  # FAT32 supports neither, and no distribution needs them to boot or install.
+  rsync -rt "$src"/ "$mnt_usb"/ || die "copy failed"
+  stop_progress
+  log "Copied."
+fi
 
 # --------------------------------------------------------------------------
 # Install the 32-bit bootloader
@@ -421,5 +542,11 @@ if [ "$os" = macos ]; then
 fi
 
 log ""
-log "Done. Stick is ready."
-log "Next: docs/20-uefi-setup.md - disable Secure Boot, then boot it from the tablet."
+if [ "$boot_only" = yes ]; then
+  log "Done. Boot medium ($LABEL) is ready - it carries no live filesystem."
+  log "It is half of a pair. Build the other half without --boot-only, put it in"
+  log "the tablet's microSD slot, and boot this one. See docs/13-split-media.md."
+else
+  log "Done. Stick is ready."
+  log "Next: docs/20-uefi-setup.md - disable Secure Boot, then boot it from the tablet."
+fi

@@ -18,7 +18,7 @@
 
 .EXAMPLE
     Get-Disk
-    .\make-usb.ps1 -IsoPath C:\iso\lubuntu-26.04-desktop-amd64.iso -DiskNumber 2 -Sha256 abc123...
+    .\make-media.ps1 -IsoPath C:\iso\lubuntu-26.04-desktop-amd64.iso -DiskNumber 2 -Sha256 abc123...
 #>
 
 [CmdletBinding()]
@@ -245,7 +245,7 @@ if (Test-Path -LiteralPath (Join-Path $usbRoot 'boot\grub\grub.cfg')) {
     New-Item -ItemType Directory -Path $redirectDir -Force | Out-Null
     # Written with an explicit LF: Set-Content would end the line with CRLF, and
     # a stray carriage return becomes part of the path GRUB tries to source.
-    # This also keeps the stick byte-identical to one built by make-usb.sh.
+    # This also keeps the stick byte-identical to one built by make-media.sh.
     [System.IO.File]::WriteAllText(
         (Join-Path $redirectDir 'grub.cfg'),
         "source /boot/grub/grub.cfg`n",
