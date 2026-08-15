@@ -33,8 +33,12 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-# Windows' own FAT32 formatter refuses volumes above this size.
+# Windows' own FAT32 formatter refuses to create volumes above 32 GB. That is a
+# limit on the volume, not on the stick: a larger stick is used by partitioning a
+# slice under the limit and leaving the remainder unallocated. 31 GB keeps a
+# margin below the threshold, and no installer image comes close to filling it.
 $FAT32_MAX_VOLUME_BYTES = 32GB
+$FAT32_SLICE_BYTES = 31GB
 
 function Assert-Admin {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -53,13 +57,41 @@ if ($Label.Length -gt 11) { throw "FAT32 labels are 11 characters at most: $Labe
 $IsoPath = (Resolve-Path -LiteralPath $IsoPath).Path
 $Bootia32Path = (Resolve-Path -LiteralPath $Bootia32Path).Path
 
+# The committed artifact has a recorded checksum, and a stick built from a damaged
+# copy boots nothing at all. Only the repository's own file is checked: a
+# -Bootia32Path the operator supplied is theirs to vouch for.
+$defaultBootia32 = (Join-Path $PSScriptRoot '..\artifacts\bootia32.efi')
+$sha256Sums = (Join-Path $PSScriptRoot '..\artifacts\SHA256SUMS')
+if ((Test-Path -LiteralPath $defaultBootia32) -and
+    $Bootia32Path -eq (Resolve-Path -LiteralPath $defaultBootia32).Path -and
+    (Test-Path -LiteralPath $sha256Sums)) {
+    $recorded = Select-String -LiteralPath $sha256Sums -Pattern '^\s*([0-9A-Fa-f]{64})\s+\*?bootia32\.efi\s*$' |
+        Select-Object -First 1
+    if ($recorded) {
+        $expectedBoot = $recorded.Matches[0].Groups[1].Value.ToUpperInvariant()
+        $actualBoot = (Get-FileHash -LiteralPath $Bootia32Path -Algorithm SHA256).Hash
+        if ($actualBoot -ne $expectedBoot) {
+            throw ("artifacts\bootia32.efi does not match artifacts\SHA256SUMS.`n" +
+                   "  expected: $expectedBoot`n  actual:   $actualBoot`n" +
+                   'Check the file out again, or re-derive it with scripts/fetch-bootia32.sh.')
+        }
+    }
+}
+
 # The ISO is the one thing here that ends up executing as root on the tablet, so
 # check it before the stick is destroyed rather than after.
 if ($Sha256) {
+    # Reject anything that is not a bare digest up front. Pasting a whole
+    # SHA256SUMS line is the common slip, and comparing it would raise a
+    # tampering alarm over what is really a copy-paste mistake.
+    $expected = $Sha256.Trim()
+    if ($expected -notmatch '^[0-9A-Fa-f]{64}$') {
+        throw "-Sha256 takes only the 64-character digest, not the whole SHA256SUMS line: $Sha256"
+    }
     Write-Host 'Verifying the ISO checksum (reads the whole image)...'
     $actual = (Get-FileHash -LiteralPath $IsoPath -Algorithm SHA256).Hash
-    if ($actual -ne $Sha256.Trim().ToUpperInvariant()) {
-        throw "SHA-256 mismatch - do not use this image.`n  expected: $Sha256`n  actual:   $actual"
+    if ($actual -ne $expected.ToUpperInvariant()) {
+        throw "SHA-256 mismatch - do not use this image.`n  expected: $expected`n  actual:   $actual"
     }
     Write-Host 'ISO checksum OK.'
 }
@@ -81,9 +113,30 @@ if ($disk.IsBoot -or $disk.IsSystem) {
 if (-not $Force -and $disk.BusType -ne 'USB') {
     throw "Disk $DiskNumber is not USB-attached (BusType: $($disk.BusType)). Use -Force if you are certain."
 }
-if ($disk.Size -gt $FAT32_MAX_VOLUME_BYTES) {
-    throw ("Disk $DiskNumber is {0:N0} bytes. Windows cannot format FAT32 volumes above 32 GB. " +
-           'Use a smaller stick, or use Rufus (docs\12-usb-windows.md).') -f $disk.Size
+# Sticks are rarely smaller than 64 GB now, so refusing them outright would make
+# this script useless on the common case. Take a slice instead.
+$useMaximumSize = $disk.Size -le $FAT32_MAX_VOLUME_BYTES
+if (-not $useMaximumSize) {
+    $sliceMessage = (
+        'Disk is {0:N1} GB. Windows cannot format FAT32 above 32 GB, so a {1:N0} GB ' +
+        'partition will be created and the remainder left unallocated - ample for any ' +
+        'installer image. Use Rufus or Ventoy if you want the whole stick as one volume.'
+    ) -f ($disk.Size / 1GB), ($FAT32_SLICE_BYTES / 1GB)
+    Write-Host $sliceMessage
+}
+
+# Whichever of the two it is, the ISO still has to fit in it. Checked here, while
+# the stick is untouched, rather than discovered when the copy runs out of room.
+if ($useMaximumSize) { $capacityBytes = $disk.Size } else { $capacityBytes = $FAT32_SLICE_BYTES }
+$isoBytes = (Get-Item -LiteralPath $IsoPath).Length
+# FAT32 metadata and per-file slack make the usable space meaningfully smaller
+# than the partition, so require real headroom rather than a bare fit.
+if ($isoBytes -gt ($capacityBytes * 0.95)) {
+    $fitMessage = (
+        'The ISO is {0:N1} GB and the FAT32 partition would be {1:N1} GB. ' +
+        'It will not fit. Use a larger stick.'
+    ) -f ($isoBytes / 1GB), ($capacityBytes / 1GB)
+    throw $fitMessage
 }
 
 Write-Host "Everything on disk $DiskNumber will be destroyed."
@@ -103,7 +156,12 @@ if ($disk.PartitionStyle -ne 'RAW') {
 }
 Initialize-Disk -Number $DiskNumber -PartitionStyle GPT -Confirm:$false
 
-$partition = New-Partition -DiskNumber $DiskNumber -UseMaximumSize -AssignDriveLetter
+$partition = if ($useMaximumSize) {
+    New-Partition -DiskNumber $DiskNumber -UseMaximumSize -AssignDriveLetter
+}
+else {
+    New-Partition -DiskNumber $DiskNumber -Size $FAT32_SLICE_BYTES -AssignDriveLetter
+}
 Format-Volume -Partition $partition -FileSystem FAT32 -NewFileSystemLabel $Label -Confirm:$false | Out-Null
 
 # The object New-Partition returns is a snapshot: the mount manager assigns the
@@ -141,8 +199,17 @@ try {
     }
 
     Write-Host 'Copying to the stick (this is the slow part)...'
-    robocopy $isoRoot $usbRoot /E /NFL /NDL /NJH /NJS /R:1 /W:1 | Out-Null
-    # robocopy uses exit codes 0-7 for success, 8 and above for failure.
+    # robocopy uses exit codes 0-7 for success (1 = "files were copied", the
+    # normal outcome here). PowerShell 7.4+ defaults
+    # $PSNativeCommandUseErrorActionPreference to $true, which turns any non-zero
+    # exit into a terminating error under $ErrorActionPreference = 'Stop' - so a
+    # successful copy would throw. Suppress that for this one call and judge the
+    # exit code ourselves. Setting the variable is harmless on Windows PowerShell
+    # 5.1, where it does not exist.
+    & {
+        $PSNativeCommandUseErrorActionPreference = $false
+        robocopy $isoRoot $usbRoot /E /NFL /NDL /NJH /NJS /R:1 /W:1 | Out-Null
+    }
     if ($LASTEXITCODE -ge 8) { throw "robocopy failed with exit code $LASTEXITCODE" }
 }
 finally {
@@ -173,8 +240,13 @@ else {
 if (Test-Path -LiteralPath (Join-Path $usbRoot 'boot\grub\grub.cfg')) {
     $redirectDir = Join-Path $usbRoot 'boot\grub\i386-efi'
     New-Item -ItemType Directory -Path $redirectDir -Force | Out-Null
-    Set-Content -LiteralPath (Join-Path $redirectDir 'grub.cfg') `
-        -Value 'source /boot/grub/grub.cfg' -Encoding ascii -NoNewline:$false
+    # Written with an explicit LF: Set-Content would end the line with CRLF, and
+    # a stray carriage return becomes part of the path GRUB tries to source.
+    # This also keeps the stick byte-identical to one built by make-usb.sh.
+    [System.IO.File]::WriteAllText(
+        (Join-Path $redirectDir 'grub.cfg'),
+        "source /boot/grub/grub.cfg`n",
+        [System.Text.UTF8Encoding]::new($false))
 }
 
 Get-ChildItem -LiteralPath $efiBoot | Format-Table Name, Length | Out-String | Write-Host

@@ -62,8 +62,11 @@ the boot/system disk and anything that is not USB-attached, and makes you type
 partitions GPT + FAT32, mounts the ISO, copies with `robocopy`, and installs
 `bootia32.efi`.
 
-One hard limit: Windows' own FAT32 formatter refuses volumes above 32 GB, so
-the script does too. With a larger stick, use Rufus.
+Windows' own FAT32 formatter refuses to create volumes above 32 GB. That is a
+limit on the *volume*, not on the stick: with a larger stick the script creates a
+31 GB FAT32 partition and leaves the rest unallocated, which is far more than any
+installer image needs. It tells you when it does this. If you want the whole
+stick usable as one volume, use Rufus or Ventoy instead.
 
 ---
 
