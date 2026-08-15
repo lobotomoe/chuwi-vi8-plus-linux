@@ -107,8 +107,26 @@ depend on having a working OS.
 
 ## The tablet does not list the USB stick at all
 
-The single most common cause is a missing `bootia32.efi`. Put the stick back in
-your computer and check:
+**First, find out whether the firmware sees the stick as a device at all.** These
+are two different faults with opposite fixes, and the setup menu will tell you
+which one you have:
+
+`Advanced` -> `USB Configuration` -> the `USB Devices:` line
+
+```
+USB Devices:  1 Drive, 1 Keyboard, 1 Mouse, 2 Hubs      <- seen; read on below
+USB Devices:  1 Keyboard, 1 Mouse, 2 Hubs               <- not seen at all
+```
+
+If the stick is **not listed there**, nothing about its filesystem, partitioning
+or bootloader matters — rebuilding it will change nothing. Skip to
+[the stick is not enumerated](#the-stick-is-not-enumerated-at-all) below.
+
+If it **is** listed but still absent from `Boot Override`, the loader is the
+problem and the rest of this section applies.
+
+The single most common cause is then a missing `bootia32.efi`. Put the stick back
+in your computer and check:
 
 ```sh
 ls /Volumes/VI8PLUS/EFI/BOOT/          # macOS
@@ -129,6 +147,37 @@ Then, in order:
 4. **Windows Fast Startup.** `powercfg /h off` in Windows, then a real shutdown.
 5. **A picky partition type.** Rebuild from Linux with the partition typed
    `ef00`, or with Rufus (GPT / UEFI non-CSM).
+
+## The stick is not enumerated at all
+
+`USB Configuration` lists the keyboard and the hub but no drive. The firmware is
+not seeing the device, so it never gets as far as reading a partition table.
+
+**A lit activity LED on the stick does not mean it enumerated** — that is bus
+power, which arrives long before any USB transaction succeeds.
+
+In order:
+
+1. **Try a USB 2.0 stick.** This tablet's port is USB 2.0 and its firmware dates
+   from 2015 with a single XHCI controller. A USB 3.0 stick behind a USB 3.0 hub
+   on a USB 2.0 host is a combination old firmware frequently fails to enumerate,
+   while low-speed HID devices on the same hub keep working perfectly — which
+   makes it look like the stick is at fault when it is the negotiation. An
+   unremarkable 8-32 GB USB 2.0 stick sidesteps the whole question.
+2. **Power the hub.** With a hub attached this tablet runs on battery, and a stick
+   draws far more than a keyboard. If your hub has a Type-C Power Delivery input,
+   put a charger in it.
+3. **Remove anything you do not need**, starting with the mouse. The volume keys
+   and a keyboard are enough for everything in this guide.
+4. **Try the hub's SD card reader** if it has one, with a microSD carrying the
+   install image. A card reader presents as USB mass storage, so unlike the
+   tablet's own microSD slot — which the firmware cannot boot from at all — it is
+   an ordinary bootable USB device as far as the firmware is concerned.
+5. **Try a different hub**, ideally a plain USB 2.0 one.
+
+Confirm each attempt in `USB Configuration` rather than by trying to boot: the
+device appearing on the `USB Devices:` line is the signal, and it takes seconds
+instead of a ten-minute wait on the splash screen.
 
 ## The stick boots to a `grub>` prompt instead of a menu
 

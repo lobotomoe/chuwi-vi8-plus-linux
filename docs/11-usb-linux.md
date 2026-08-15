@@ -12,26 +12,21 @@ Skip to [the script section](#the-script) below.
 
 ---
 
-## Option B: Ventoy — did not work on this tablet
+## Option B: Ventoy — unproven on this tablet
 
-> **Tested and failed, August 2026.** A Ventoy stick written with `-g` (GPT) and
-> carrying a Linux ISO **did not appear under `Boot Override`** on a Chuwi Vi8
-> Plus with Secure Boot off and `Fast Boot` disabled. The firmware listed only
-> `Windows Boot Manager`, which is its way of saying it found nothing bootable on
-> the stick — so the tablet fell through to Windows instead. Ventoy's IA32
-> loader was never reached.
+> **Not known to work, and not known to fail.** An attempt here never got far
+> enough to find out: the firmware did not enumerate the stick as a USB device at
+> all, so Ventoy's loader was never reached. See
+> [90-references.md](90-references.md#ventoy-ia32-on-this-tablet-still-unknown-and-here-is-why).
 >
-> This is a single unit and a single Ventoy version, so it is a report rather
-> than a proof that Ventoy can never work here. But nothing anywhere corroborates
-> Ventoy IA32 on a Vi8 Plus, and Option A is known to work — so there is no reason
-> to spend the evening on this one.
+> Ventoy labels its IA32 support experimental and its author develops it without
+> IA32 hardware. Option A is the path this repository is built around and the one
+> its scripts and tests cover, so prefer it unless you specifically want to carry
+> several ISOs.
 
-Why it plausibly fails: Ventoy lays down two partitions — a large exFAT data
-partition first, and a small FAT16 `VTOYEFI` partition carrying the loaders. A
-firmware that only inspects the first partition, or that will not read exFAT,
-finds nothing bootable and offers you nothing. The script instead produces a
-single FAT32 partition with `\EFI\BOOT\bootia32.efi` on it, which is the layout
-this firmware's removable-media fallback is looking for.
+If you do try Ventoy and the stick does not show up under `Boot Override`, check
+`Advanced` -> `USB Configuration` **before** blaming the bootloader — if the
+device is not listed there, the problem is upstream of anything Ventoy does.
 
 [Ventoy](https://www.ventoy.net/) installs its own bootloader on the stick and
 then boots ISO files you simply copy on. It has carried IA32 UEFI support since

@@ -216,21 +216,40 @@ and reachable by paging to `&st=` in multiples of 20.
   this tablet. Nothing in the thread confirms Ventoy's IA32 loader on a Vi8 Plus,
   and testing here found it does not work — see below.
 
-## Ventoy IA32 on this tablet: tested, does not work
+## Ventoy IA32 on this tablet: still unknown, and here is why
 
-Not documented anywhere else, so recorded here. A Ventoy stick written with `-g`
-(GPT layout) and carrying a Linux ISO, plugged in before power-on, **did not
-appear under `Boot Override`** on a Chuwi Vi8 Plus (BIOS `1ATFG007`) with Secure
-Boot off, `Fast Boot` disabled and `SHOW ALL ITEM` enabled. The list showed only
-`Windows Boot Manager`, so the firmware found nothing bootable on the stick and
-fell through to Windows — which also explains an earlier four-minute wait on the
-CHUWI splash that looked like a hang and was in fact Windows starting.
+An earlier revision of this file claimed Ventoy had been tested here and did not
+work. **That claim was wrong and is retracted.** What actually happened is worth
+recording, because it is a trap anyone debugging this hardware can fall into.
+
+A Ventoy stick carrying a Linux ISO, plugged in before power-on, did not appear
+under `Boot Override` on a Chuwi Vi8 Plus (BIOS `1ATFG007`) with Secure Boot off
+and `Fast Boot` disabled. The obvious reading — Ventoy's IA32 loader is not being
+found — is what got written down.
+
+Then `Advanced` -> `USB Configuration` showed:
+
+```
+USB Devices:  1 Keyboard, 1 Mouse, 2 Hubs
+```
+
+**No mass-storage device at all**, with `USB Mass Storage Driver Support
+[Enabled]`, across every port of the hub, while the keyboard hot-plugged and
+responded instantly. The firmware was never enumerating the stick as a USB
+device, so it never reached the point of looking at its partitions, filesystem or
+`\EFI\BOOT\`. Nothing about Ventoy's layout — exFAT data partition, loaders on a
+second partition — can influence whether a device enumerates, because enumeration
+happens below all of that.
+
+So this tells us nothing about Ventoy IA32 on a Vi8 Plus. The remaining
+candidates are the OTG power budget (this tablet runs on battery whenever a hub
+is attached, and a stick draws far more than a keyboard) and the stick itself.
 — **verified from photographs of the setup menu, August 2026**
 
-One unit, one Ventoy version: a report, not a proof that it can never work. But
-Ventoy labels its IA32 support experimental and its author develops it without
-IA32 hardware, so this repository's own `scripts/make-usb.sh` is the recommended
-path and Ventoy is documented as the fallback that did not pan out.
+The lesson generalises: **before concluding anything about a bootloader, confirm
+in `USB Configuration` that the firmware sees the device at all.** An absent
+entry under `Boot Override` has two very different causes and they need opposite
+fixes.
 
 ## Recovery, and corroboration from outside 4PDA
 
