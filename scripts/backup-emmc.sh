@@ -25,6 +25,10 @@ Produces in DIR:
   emmc-<host>-<date>.img.zst   full block image, zstd compressed
   emmc-<host>-<date>.sfdisk    partition table, for a quick table-only restore
   emmc-<host>-<date>.sha256    checksum of the image
+  emmc-<host>-<date>.size      size of the source device, in bytes
+
+Keep all four together. restore-emmc.sh reads the last two to verify the image
+and to refuse a target it would not fit on.
 EOF
 }
 
@@ -63,6 +67,25 @@ dest_src=$(df -P "$dest_dir" | awk 'NR == 2 { print $1 }')
 case $dest_src in
 "$source_dev"*) die "$dest_dir is on $source_dev. Write the backup somewhere else." ;;
 esac
+
+# A whole-disk node, not a partition. An image of /dev/mmcblk0p3 has no partition
+# table, so restore-emmc.sh will refuse to write it back - which is a discovery
+# best made now rather than when Windows is already gone.
+if [ -e "/sys/class/block/$(basename -- "$source_dev")/partition" ]; then
+  die "$source_dev is a partition. Image the whole disk (e.g. /dev/mmcblk0) so the
+partition table is captured and the image can actually be restored."
+fi
+
+# Imaging a mounted filesystem captures it mid-write: the image is restorable but
+# the filesystem inside it is dirty. Windows partitions get mounted by the live
+# session's file manager as soon as anyone clicks them.
+mounted=$(lsblk -nro MOUNTPOINT "$source_dev" | grep -v '^$' || true)
+if [ -n "$mounted" ]; then
+  log "Still mounted from $source_dev:"
+  printf '%s\n' "$mounted" >&2
+  die "unmount everything on $source_dev first - an image taken under a live mount
+contains an inconsistent filesystem."
+fi
 
 size_bytes=$(blockdev --getsize64 "$source_dev")
 free_kb=$(df -Pk "$dest_dir" | awk 'NR == 2 { print $4 }')
@@ -116,6 +139,11 @@ sync
 log ""
 log "Checksumming..."
 sha256_of "$base.img.$ext" >"$base.sha256"
+
+# The compressed stream carries no decompressed size (dd is piped into the
+# compressor, so the frame header cannot know it). Record it here so a restore
+# can rule out a too-small target before it starts overwriting one.
+printf '%s\n' "$size_bytes" >"$base.size"
 
 log ""
 log "Done:"

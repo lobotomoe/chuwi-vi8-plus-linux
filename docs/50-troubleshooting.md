@@ -178,10 +178,14 @@ sudo ./scripts/restore-emmc.sh \
   --target /dev/mmcblk0
 ```
 
-The script verifies the image against its `.sha256` sidecar before it writes
-anything, refuses a partition or a still-mounted device, and makes you type
-`RESTORE /dev/mmcblk0` back. Do not shortcut it with a bare `dd` — a typo in
-`of=` on this path destroys the disk you are restoring onto.
+The script verifies the image against its `.sha256` sidecar, refuses a target the
+image would not fit on (from the `.size` sidecar), refuses a partition or a
+still-mounted device, and makes you type `RESTORE /dev/mmcblk0` back — all before
+it writes anything. Do not shortcut it with a bare `dd` — a typo in `of=` on this
+path destroys the disk you are restoring onto.
+
+Images made before the `.size` sidecar existed still restore; the script warns
+that it cannot check the fit rather than refusing.
 
 Then reboot. The licence key is in the firmware's ACPI `MSDM` table, so a clean
 Windows install activates itself too — but a clean Windows install on this

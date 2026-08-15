@@ -128,6 +128,28 @@ fi
 # ---------------------------------------------------------------------------
 
 target_bytes=$(blockdev --getsize64 "$target")
+
+# An image larger than the target fails with ENOSPC at the very end of the write,
+# after the partition table and every filesystem on the target are already gone.
+# backup-emmc.sh records the source size precisely so that can be refused here.
+sizecar=${image%.img.*}.size
+[ -f "$sizecar" ] || sizecar=${image%.img}.size
+if [ -f "$sizecar" ]; then
+  image_bytes=$(awk 'NR == 1 { print $1; exit }' "$sizecar")
+  case $image_bytes in
+  '' | *[!0-9]*) warn "$sizecar does not hold a byte count; cannot check the image fits" ;;
+  *)
+    [ "$image_bytes" -le "$target_bytes" ] ||
+      die "the image is larger than $target and cannot fit.
+  image:  $image_bytes bytes ($((image_bytes / 1024 / 1024 / 1024)) GiB)
+  target: $target_bytes bytes ($((target_bytes / 1024 / 1024 / 1024)) GiB)
+Restoring anyway would destroy $target and then run out of space."
+    ;;
+  esac
+else
+  warn "no .size sidecar next to $image - cannot confirm it fits $target before writing"
+fi
+
 log ""
 log "Image:  $image ($(($(wc -c <"$image") / 1024 / 1024)) MiB compressed)"
 log "Target: $target ($((target_bytes / 1024 / 1024 / 1024)) GiB) - contents below will be gone"

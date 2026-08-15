@@ -29,9 +29,16 @@ firmware's ACPI `MSDM` table, not on the disk, so a future Windows install
 activates itself. Confirm it is there before you rely on it — from the live
 session:
 
+The kernel exposes every ACPI table it found, so this needs nothing installed:
+
 ```sh
-sudo apt install -y acpica-tools     # or: pacman -S acpica
-sudo acpidump -n MSDM | acpixtract -a - >/dev/null 2>&1 && echo "MSDM present"
+ls -l /sys/firmware/acpi/tables/MSDM     # exists = the key is in firmware
+```
+
+If you want to see the key itself:
+
+```sh
+sudo strings /sys/firmware/acpi/tables/MSDM | tail -1
 ```
 
 **Partition table only.** Cheap and fast, enough to reconstruct the layout:
@@ -49,14 +56,21 @@ sudo ./scripts/backup-emmc.sh --source /dev/mmcblk0 --dest /media/usb-disk
 
 Check the device name with `lsblk` first — the eMMC is the roughly 29 GiB
 `mmcblk` device, and the microSD card is the other one. The script refuses to
-write the backup onto the disk it is reading, stops if the destination is too
-small for the image, saves the partition table alongside the image, and
-checksums the result.
+write the backup onto the disk it is reading, refuses a partition or a
+still-mounted device, stops if the destination is too small for the image, saves
+the partition table alongside the image, and checksums the result.
 
-**Keep the `.sha256` file next to the image.** Restoring later goes through
-`scripts/restore-emmc.sh`, which verifies against that sidecar before it writes
-a single byte — see
-[50-troubleshooting.md](50-troubleshooting.md#getting-back-to-windows).
+**Keep all four output files together.** The backup is four files:
+
+| File | What restoring needs it for |
+|---|---|
+| `.img.zst` | the image itself |
+| `.sha256` | proves the image is undamaged before anything is overwritten |
+| `.size` | proves the image fits the target before anything is overwritten |
+| `.sfdisk` | the partition table, for a quick table-only repair |
+
+`scripts/restore-emmc.sh` reads the middle two before it writes a single byte —
+see [50-troubleshooting.md](50-troubleshooting.md#getting-back-to-windows).
 
 Chuwi's own forum also hosts factory Windows and Android images for the Vi8
 Plus, though they are user-uploaded MediaFire folders of uncertain provenance

@@ -93,8 +93,38 @@ done
 }
 [ -f "$iso" ] || die "no such ISO: $iso"
 [ -f "$bootia32" ] || die "no such bootia32: $bootia32"
-[ "$(id -u)" -eq 0 ] || die "must run as root (partitioning and mounting)"
 [ ${#LABEL} -le 11 ] || die "FAT32 labels are 11 characters at most: $LABEL"
+
+# Argument shape is checked before privileges: someone who mistyped a digest
+# should hear about it now, not after re-running the whole thing under sudo.
+# Pasting a whole SHA256SUMS line is the common slip, and comparing it raises a
+# tampering alarm over what is really a copy-paste mistake.
+if [ -n "$iso_sha256" ]; then
+  case $iso_sha256 in
+  *[!0-9A-Fa-f]*) die "--sha256 takes only the 64-character digest, not the whole
+SHA256SUMS line: $iso_sha256" ;;
+  esac
+  [ ${#iso_sha256} -eq 64 ] ||
+    die "--sha256 must be 64 hex characters, got ${#iso_sha256}: $iso_sha256"
+fi
+
+[ "$(id -u)" -eq 0 ] || die "must run as root (partitioning and mounting)"
+
+# The committed artifact has a recorded checksum, and a stick built from a damaged
+# copy boots nothing at all. Only the repository's own file is checked: a
+# --bootia32 the operator supplied is theirs to vouch for.
+sha256sums=$REPO_ROOT/artifacts/SHA256SUMS
+if [ "$bootia32" = "$REPO_ROOT/artifacts/bootia32.efi" ] && [ -f "$sha256sums" ]; then
+  expected_bootia32=$(awk '$2 == "bootia32.efi" { print tolower($1); exit }' "$sha256sums")
+  if [ -n "$expected_bootia32" ]; then
+    actual_bootia32=$(sha256_of "$bootia32")
+    [ "$actual_bootia32" = "$expected_bootia32" ] ||
+      die "artifacts/bootia32.efi does not match artifacts/SHA256SUMS.
+  expected: $expected_bootia32
+  actual:   $actual_bootia32
+Check the file out again, or re-derive it with scripts/fetch-bootia32.sh."
+  fi
+fi
 
 # The ISO is the one thing here that ends up executing as root on the tablet, so
 # check it before the stick is destroyed rather than after.
@@ -146,7 +176,11 @@ cleanup() {
 trap cleanup EXIT
 
 # --------------------------------------------------------------------------
-# Safety: describe the target and make the operator type it back.
+# Safety: check the target is a device we are willing to erase.
+#
+# This runs before the unpack so that a mistyped --device fails in a second
+# rather than after ten minutes of work. The confirmation prompt is deliberately
+# further down, immediately before the erase.
 # --------------------------------------------------------------------------
 
 describe_and_check_device() {
@@ -171,8 +205,69 @@ describe_and_check_device() {
   fi
 }
 
+device_size_bytes() {
+  if [ "$os" = macos ]; then
+    # "Disk Size: 32.0 GB (32017047552 Bytes) (exactly 62533296 512-Byte-Units)"
+    diskutil info "$device" |
+      awk -F'[()]' '/(Disk|Total) Size/ { print $2; exit }' |
+      awk '{ print $1 }'
+  else
+    blockdev --getsize64 "$device" 2>/dev/null || true
+  fi
+}
+
 log "Target device:"
 describe_and_check_device
+
+# The ISO also has to fit. Cheap to check, and checking it now means a stick that
+# was never big enough does not get erased for nothing.
+iso_bytes=$(wc -c <"$iso")
+device_bytes=$(device_size_bytes)
+case $device_bytes in
+'' | *[!0-9]*)
+  warn "could not read the size of $device; not checking that the ISO fits"
+  ;;
+*)
+  # FAT32 metadata and per-file slack make the usable space meaningfully smaller
+  # than the raw device, so ask for real headroom rather than a bare fit.
+  if [ "$iso_bytes" -gt $((device_bytes * 95 / 100)) ]; then
+    die "the ISO does not fit on $device.
+  ISO:    $((iso_bytes / 1024 / 1024)) MiB
+  device: $((device_bytes / 1024 / 1024)) MiB
+Use a larger stick. Nothing has been erased."
+  fi
+  ;;
+esac
+
+# --------------------------------------------------------------------------
+# Open the ISO and check it can actually go onto FAT32.
+#
+# All of this happens before the stick is touched. An image with a >4 GiB file
+# cannot be written this way at all, and finding that out after the erase leaves
+# the operator with a wiped stick, no install medium and nothing to show for the
+# unpack. Nothing below this point is destructive.
+# --------------------------------------------------------------------------
+
+if [ "$os" = macos ]; then
+  # macOS cannot mount a hybrid Linux ISO ("no mountable file systems"), so the
+  # tree is unpacked to scratch space first. libarchive reads ISO9660/Rock Ridge.
+  require_cmd tar
+  log "Unpacking the ISO to $workdir (macOS cannot mount hybrid ISOs)..."
+  tar -xf "$iso" -C "$workdir" || die "could not unpack $iso"
+  src=$workdir
+else
+  mount -o loop,ro "$iso" "$mnt_iso" || die "could not mount $iso"
+  src=$mnt_iso
+fi
+
+oversized=$(find "$src" -type f -size +"$FAT32_MAX_FILE_BYTES"c 2>/dev/null | head -3 || true)
+if [ -n "$oversized" ]; then
+  log "$oversized"
+  die "the image contains files larger than 4 GiB, which FAT32 cannot store.
+Use Ventoy (docs/11-usb-linux.md, docs/12-usb-windows.md) or pick a smaller image.
+The stick has not been touched."
+fi
+
 log ""
 confirm_exact "ERASE $device" \
   "Everything on $device will be destroyed."
@@ -215,25 +310,6 @@ if [ "$os" = macos ]; then partition_macos; else partition_linux; fi
 # --------------------------------------------------------------------------
 # Copy the ISO contents
 # --------------------------------------------------------------------------
-
-if [ "$os" = macos ]; then
-  # macOS cannot mount a hybrid Linux ISO ("no mountable file systems"), so the
-  # tree is unpacked to scratch space first. libarchive reads ISO9660/Rock Ridge.
-  require_cmd tar
-  log "Unpacking the ISO to $workdir (macOS cannot mount hybrid ISOs)..."
-  tar -xf "$iso" -C "$workdir" || die "could not unpack $iso"
-  src=$workdir
-else
-  mount -o loop,ro "$iso" "$mnt_iso" || die "could not mount $iso"
-  src=$mnt_iso
-fi
-
-oversized=$(find "$src" -type f -size +"$FAT32_MAX_FILE_BYTES"c 2>/dev/null | head -3 || true)
-if [ -n "$oversized" ]; then
-  log "$oversized"
-  die "the image contains files larger than 4 GiB, which FAT32 cannot store.
-Use Ventoy (docs/11-usb-linux.md, docs/12-usb-windows.md) or pick a smaller image."
-fi
 
 log "Copying to the stick (this is the slow part)..."
 # -r without -l: symlinks are skipped, and hard links become independent copies.
