@@ -64,7 +64,17 @@ from the one above — that is expected, and the script prints the version it us
 
 ## License
 
-GRUB is GNU GPL v3 or later. Redistributing this binary carries the obligation to make
-the corresponding source available; Debian does so at
-<https://sources.debian.org/src/grub2/> and via
-`https://deb.debian.org/debian/pool/main/g/grub2/`.
+GRUB is GNU GPL v3 or later, and `bootia32.efi` is therefore **not** covered by this
+repository's MIT licence — see the note at the end of [`../LICENSE`](../LICENSE).
+
+Redistributing the binary carries the obligation to make the corresponding source
+available. It is the unmodified Debian build of `grub2` `2.12-9+deb13u2`, whose exact
+corresponding source is:
+
+- <https://deb.debian.org/debian/pool/main/g/grub2/grub2_2.12-9+deb13u2.dsc>
+- <https://deb.debian.org/debian/pool/main/g/grub2/grub2_2.12.orig.tar.xz>
+- <https://deb.debian.org/debian/pool/main/g/grub2/grub2_2.12-9+deb13u2.debian.tar.xz>
+
+Browsable at <https://sources.debian.org/src/grub2/2.12-9+deb13u2/>. If those URLs have
+since been rotated out of the active pool, the same version is kept permanently at
+<https://snapshot.debian.org/package/grub2/>.

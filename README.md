@@ -128,6 +128,10 @@ scripts/      build the stick, inspect ISOs, back up the eMMC, repair GRUB, tune
 docs/         the actual guide, split by host OS and by distribution
 ```
 
+Docs and scripts are MIT. `artifacts/bootia32.efi` is an unmodified Debian GRUB binary
+and stays under the GPL v3+ — [`LICENSE`](LICENSE),
+[`artifacts/PROVENANCE.md`](artifacts/PROVENANCE.md).
+
 | Script | Runs on | What it does |
 |---|---|---|
 | `make-usb.sh` | macOS, Linux | Builds the install stick: GPT + FAT32, ISO contents, `bootia32.efi` |

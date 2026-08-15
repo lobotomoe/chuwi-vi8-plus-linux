@@ -23,3 +23,12 @@ SOFTWARE.
 Note: `artifacts/bootia32.efi` is a redistributed binary from the Debian
 `grub-efi-ia32-unsigned` package and is covered by the GNU GPL v3 or later,
 not by the MIT license above. See `artifacts/PROVENANCE.md`.
+
+---
+
+The MIT licence above covers the documentation and scripts in this repository.
+
+It does NOT cover `artifacts/bootia32.efi`, which is an unmodified binary from
+Debian's `grub-efi-ia32-unsigned` package. GRUB is licensed under the GNU General
+Public License, version 3 or later. That binary is redistributed under the GPL,
+and the corresponding source is identified in `artifacts/PROVENANCE.md`.
