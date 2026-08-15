@@ -119,6 +119,28 @@ User Password
 Open **`Secure Boot menu`** with **Enter** — the `▶` marks a submenu, so `+/-`
 does nothing on it. The `Secure Boot` value lives inside.
 
+**On the unit this guide was written against there was nothing to change.** The
+submenu read:
+
+```
+System Mode        Setup
+Secure Boot        Not Active
+Vendor Keys        Not Active
+
+Secure Boot        [Disabled]
+Secure Boot Mode   [Custom]
+▶ Key Management
+```
+
+`System Mode: Setup` means no Platform Key is enrolled, and the submenu's own
+help spells out the consequence: Secure Boot can only be enabled with a PK
+enrolled and CSM disabled. With no keys in the firmware it cannot engage at all,
+whatever the setting says. This tablet appears to ship that way, so treat this
+step as *confirm*, not *change*.
+
+Stay out of `Key Management`. Enrolling keys is the one action on this screen
+that can make the machine harder to boot, and nothing here needs it.
+
 `Secure Flash update` is the neighbouring trap: it is a read-only report on the
 firmware's own update policy (`Signed BIOS update`, `Public Key store`,
 `Signature algorithm`, `BIOS flash method`, `Flash write-protection`). Nothing in
