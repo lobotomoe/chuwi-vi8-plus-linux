@@ -88,7 +88,7 @@ unless you know exactly which way your unit boots; owners who tried to move a
 | RAM | 2 GB DDR3L, soldered |
 | Storage | 32 GB eMMC + microSD slot |
 | Display | 8.0" IPS, 1280x800, 10-point capacitive touch. Scanout orientation is probably **portrait** (800x1280) — the firmware setup renders upright with the tablet held portrait — and the kernel has no orientation quirk for this model, so expect to rotate it yourself. See [40-post-install.md](40-post-install.md#if-everything-starts-sideways) |
-| Firmware | **32-bit (IA32) UEFI**, no CSM/legacy boot — but see the revision note below; confirm with `fw_platform_size` before trusting it |
+| Firmware | **32-bit (IA32) UEFI**, no CSM/legacy boot — but see the revision note below; confirm with `fw_platform_size` before trusting it. The unit this guide was written against reports AMI Aptio `2.17.1249`, **BIOS version `1ATFG007`, dated 12/11/2015** |
 | Ports | 1x USB Type-C (USB 2.0, power + data, OTG), micro-HDMI 1.4, microSD, 3.5 mm |
 | Battery | Li-Po. **Sources disagree:** Notebookcheck's review says 5000 mAh, the 4PDA thread's specification header says Chuwi claims 4000 mAh with owners measuring 3900-4050 mAh. Read your own with `cat /sys/class/power_supply/*/energy_full_design` rather than trusting either |
 | Cameras | 2 MP front, 2 MP rear |

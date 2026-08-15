@@ -137,12 +137,13 @@ claim below is corroborated by more than one independent poster, that is noted.
 Post numbers are the thread's own (`#NNNN`, up to #4002), shown against each post
 and reachable by paging to `&st=` in multiples of 20.
 
-- **Esc enters setup; F7 is the one-off boot menu; Volume + also enters setup.**
-  Multiple independent reports (#636, #990, #993, #2719, and #318/#721 for
-  Volume +), corroborated outside 4PDA by techtablets #23272. **No entry route is
-  verified on the unit this guide was written against** — its setup menu was
-  reached and photographed, so getting in is plainly possible, but how was never
-  recorded. Everything this guide says about *which* key is owner report.
+- **Esc and Del enter setup — settled by the firmware itself.** With `Quiet Boot`
+  disabled, the POST screen reads *"Press <DEL> or <ESC> to enter setup."* above
+  `BIOS Date: 12/11/2015 21:15:52  Ver: 1ATFG007`. — **verified from a photograph
+  of the POST screen, August 2026.** The owner reports that pointed at Esc
+  (#636, #990, techtablets #23272) were right. `F7` as a one-off boot menu
+  (#993, #2719) and `Volume +` (#318, #721) remain owner report only — the POST
+  screen does not advertise either.
 - **The CHUWI splash sits for 5-10 minutes after you select a USB device, and
   that is normal.** Post #2719 gives the full working procedure for booting a
   Windows installer this way. Corroborated by owners who mistook it for a hang
@@ -184,7 +185,24 @@ and reachable by paging to `&st=` in multiples of 20.
   owners measuring 3900-4050 mAh, contradicting Notebookcheck's 5000 mAh.
   Unresolved; read `energy_full_design` on your own unit.
 - The Ventoy mention in the thread (#3997) is for a **Chuwi Hi10 CWI515**, not
-  this tablet. Nothing in the thread confirms Ventoy's IA32 loader on a Vi8 Plus.
+  this tablet. Nothing in the thread confirms Ventoy's IA32 loader on a Vi8 Plus,
+  and testing here found it does not work — see below.
+
+## Ventoy IA32 on this tablet: tested, does not work
+
+Not documented anywhere else, so recorded here. A Ventoy stick written with `-g`
+(GPT layout) and carrying a Linux ISO, plugged in before power-on, **did not
+appear under `Boot Override`** on a Chuwi Vi8 Plus (BIOS `1ATFG007`) with Secure
+Boot off, `Fast Boot` disabled and `SHOW ALL ITEM` enabled. The list showed only
+`Windows Boot Manager`, so the firmware found nothing bootable on the stick and
+fell through to Windows — which also explains an earlier four-minute wait on the
+CHUWI splash that looked like a hang and was in fact Windows starting.
+— **verified from photographs of the setup menu, August 2026**
+
+One unit, one Ventoy version: a report, not a proof that it can never work. But
+Ventoy labels its IA32 support experimental and its author develops it without
+IA32 hardware, so this repository's own `scripts/make-usb.sh` is the recommended
+path and Ventoy is documented as the fallback that did not pan out.
 
 ## Recovery, and corroboration from outside 4PDA
 

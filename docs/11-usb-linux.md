@@ -1,15 +1,41 @@
 # Building the install stick on Linux
 
-Two good options. Ventoy is less work and lets you carry several ISOs; the
-script gives you a plain, predictable stick with nothing extra on it.
+**Use the script.** It is Option A below, and it is the one that has actually
+booted this tablet. Ventoy looks like the easier route and is kept here as Option
+B, but see the warning on it first.
 
 ---
 
-## Option A: Ventoy (easiest, and you can try several distributions)
+## Option A: the script (one ISO, nothing else on the stick)
+
+Skip to [the script section](#the-script) below.
+
+---
+
+## Option B: Ventoy — did not work on this tablet
+
+> **Tested and failed, August 2026.** A Ventoy stick written with `-g` (GPT) and
+> carrying a Linux ISO **did not appear under `Boot Override`** on a Chuwi Vi8
+> Plus with Secure Boot off and `Fast Boot` disabled. The firmware listed only
+> `Windows Boot Manager`, which is its way of saying it found nothing bootable on
+> the stick — so the tablet fell through to Windows instead. Ventoy's IA32
+> loader was never reached.
+>
+> This is a single unit and a single Ventoy version, so it is a report rather
+> than a proof that Ventoy can never work here. But nothing anywhere corroborates
+> Ventoy IA32 on a Vi8 Plus, and Option A is known to work — so there is no reason
+> to spend the evening on this one.
+
+Why it plausibly fails: Ventoy lays down two partitions — a large exFAT data
+partition first, and a small FAT16 `VTOYEFI` partition carrying the loaders. A
+firmware that only inspects the first partition, or that will not read exFAT,
+finds nothing bootable and offers you nothing. The script instead produces a
+single FAT32 partition with `\EFI\BOOT\bootia32.efi` on it, which is the layout
+this firmware's removable-media fallback is looking for.
 
 [Ventoy](https://www.ventoy.net/) installs its own bootloader on the stick and
 then boots ISO files you simply copy on. It has carried IA32 UEFI support since
-v1.0.30, which is exactly what this tablet needs.
+v1.0.30, which on paper is exactly what this tablet needs.
 
 ```sh
 # Download and verify Ventoy from https://github.com/ventoy/Ventoy/releases
@@ -32,7 +58,9 @@ Caveats worth knowing:
 
 ---
 
-## Option B: the script (one ISO, nothing else on the stick)
+## The script
+
+One ISO, nothing else on the stick, and the layout this firmware expects.
 
 **1. Check what the ISO needs:**
 

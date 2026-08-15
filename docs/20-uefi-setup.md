@@ -43,25 +43,31 @@ With the tablet fully off and the keyboard attached through the hub: hold the
 power button to switch on and tap **Esc** repeatedly on the USB keyboard from
 the moment the screen lights up.
 
-**Esc is the key owners of this model report using** — 4PDA post #636 (*"заходим
-в биос (при включении зажать кнопку ESC)"*), post #990, and the techtablets
-thread on this exact tablet (*"I have managed to go in the bios by pressing 'esc'
-at startup"*, post #23272). It is **not** verified on the unit this guide was
-written against: that tablet's setup menu was reached and photographed, but which
-key opened it was never recorded. Treat Esc as well-attested, not as proven here.
+**The firmware tells you itself.** Turn `Quiet Boot` off and the POST screen ends
+with, verbatim:
 
-Note that one owner could not get in with Esc at all and used the volume keys
-instead (techtablets post #34717), so have the alternatives ready:
+```
+American Megatrends
+Version 2.17.1249. Copyright (C) 2015 American Megatrends, Inc.
+BIOS Date: 12/11/2015 21:15:52  Ver: 1ATFG007
+Press <DEL> or <ESC> to enter setup.
+```
 
-| Key | What it does |
-|---|---|
-| **Esc** | Firmware setup. The one to use. |
-| **F7** | One-off boot menu — goes straight to the device list |
-| **Del** | Setup, on some units |
-| **Volume +** | Setup, without a keyboard. Also the documented way back in when a bad setting leaves the tablet stuck on the logo — see [50-troubleshooting.md](50-troubleshooting.md#a-setting-you-changed-left-it-stuck-on-the-chuwi-logo) |
+So **Esc and Del both work** — **verified from the POST screen of the unit this
+guide was written against**. That is also the fastest way to settle the question
+on any unit: disable `Quiet Boot` once and the firmware announces its own keys.
 
-`F7` is worth knowing: it skips the setup menu entirely, which is what you want
-once Secure Boot is already sorted and you just need to pick the stick.
+Note that `F7` is **not** advertised there. Owners report it as a one-off boot
+menu (4PDA #993, #2719) and it may well work, but the firmware does not claim it.
+One owner could not get in with Esc at all and used the volume keys instead
+(techtablets #34717), so have the alternatives ready:
+
+| Key | What it does | Evidence |
+|---|---|---|
+| **Esc** | Firmware setup. The one to use. | The POST screen says so |
+| **Del** | Firmware setup, equally | The POST screen says so |
+| **F7** | One-off boot menu, skipping setup | Owner reports only |
+| **Volume +** | Setup, without a keyboard. Also the documented way back in when a bad setting leaves the tablet stuck on the logo — see [50-troubleshooting.md](50-troubleshooting.md#a-setting-you-changed-left-it-stuck-on-the-chuwi-logo) | Owner reports only |
 
 ## The firmware you will see
 
