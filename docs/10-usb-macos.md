@@ -18,7 +18,8 @@ around both.
 
 **1. Download an ISO.** [Lubuntu 26.04 LTS](https://lubuntu.me/downloads/) is
 the recommendation; see the [README](../README.md#which-distribution-and-why-not-plain-ubuntu).
-Verify the checksum against the one published next to the image.
+Note the SHA-256 published beside the image — pass it to the build script in
+step 4 and it will check it for you before the stick is touched.
 
 **2. Confirm what the ISO needs:**
 
@@ -43,11 +44,14 @@ Read carefully. You want the whole-disk node, `/dev/disk4`, not a slice like
 ```sh
 sudo ./scripts/make-usb.sh \
   --iso ~/Downloads/lubuntu-26.04-desktop-amd64.iso \
+  --sha256 <the digest from lubuntu.me> \
   --device /dev/disk4
 ```
 
-The script prints the device's details, then makes you type `ERASE /dev/disk4`
-before it does anything. It refuses internal disks outright.
+The script checks the ISO against that digest first, prints the device's
+details, then makes you type `ERASE /dev/disk4` before it does anything. It
+refuses internal disks outright. `--sha256` is optional but you will get a
+warning without it: this image is what boots the tablet as root.
 
 A 3.9 GB image takes about 10-15 minutes on a USB 2.0 stick, most of it in the
 copy. It ejects the stick when it is done.

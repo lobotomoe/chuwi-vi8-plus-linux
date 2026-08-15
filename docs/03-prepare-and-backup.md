@@ -49,8 +49,14 @@ sudo ./scripts/backup-emmc.sh --source /dev/mmcblk0 --dest /media/usb-disk
 
 Check the device name with `lsblk` first — the eMMC is the roughly 29 GiB
 `mmcblk` device, and the microSD card is the other one. The script refuses to
-write the backup onto the disk it is reading, checks free space, saves the
-partition table alongside the image, and checksums the result.
+write the backup onto the disk it is reading, stops if the destination is too
+small for the image, saves the partition table alongside the image, and
+checksums the result.
+
+**Keep the `.sha256` file next to the image.** Restoring later goes through
+`scripts/restore-emmc.sh`, which verifies against that sidecar before it writes
+a single byte — see
+[50-troubleshooting.md](50-troubleshooting.md#getting-back-to-windows).
 
 Chuwi's own forum also hosts factory Windows and Android images for the Vi8
 Plus, though they are user-uploaded MediaFire folders of uncertain provenance

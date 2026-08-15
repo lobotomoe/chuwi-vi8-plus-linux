@@ -43,8 +43,16 @@ inspecting the actual ISO — rather than taken from a forum post.
 
 - Lubuntu's Calamares configuration, `before_bootloader_context.conf` — the step
   that picks `grub-efi-ia32` vs `grub-efi-amd64-signed` from
-  `/sys/firmware/efi/fw_platform_size`, installing from the CD pool.
-  <https://github.com/lubuntu-team/calamares-settings-ubuntu/blob/main/common/modules/before_bootloader_context.conf> — **verified**
+  `/sys/firmware/efi/fw_platform_size`, after `apt-cdrom add` has pointed apt at
+  the medium.
+  <https://github.com/lubuntu-team/calamares-settings-ubuntu/blob/ubuntu/oracular/common/modules/before_bootloader_context.conf> — **verified**
+  *Caveat:* that repository's newest branch is `ubuntu/plucky` (25.04) and it was
+  last touched in January 2026, so it does **not** cover 26.04. The config is
+  byte-identical on `ubuntu/oracular` and `ubuntu/plucky`. The corroborating
+  evidence for 26.04 is the ISO itself, which carries `grub-efi-ia32`,
+  `grub-efi-ia32-bin` and `grub-efi-ia32-unsigned` in `pool/main/g/grub2/`
+  alongside `grub-efi-amd64-signed` — exactly the two halves of that conditional.
+  — **verified against `lubuntu-26.04-desktop-amd64.iso`**
 - Calamares' bootloader module, which maps 32-bit firmware to the `i386-efi`
   GRUB target.
   <https://github.com/calamares/calamares/blob/calamares/src/modules/bootloader/main.py> — **verified**

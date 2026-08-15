@@ -2,7 +2,7 @@
 
 This is the recommended path: it is Ubuntu, supported until April 2029, light
 enough for 2 GB of RAM, and — unlike every other Ubuntu flavour — its installer
-handles 32-bit firmware correctly and entirely offline.
+detects 32-bit firmware and installs a 32-bit GRUB by itself.
 
 ## Why this flavour and not Ubuntu or Xubuntu
 
@@ -15,12 +15,22 @@ apt install -y grub-efi-$(if grep -q 64 /sys/firmware/efi/fw_platform_size; \
                           then echo amd64-signed; else echo ia32; fi)
 ```
 
-It reads the firmware's word size and installs the matching GRUB. And because
-the same step first runs `apt-cdrom add` and strips the network sources, it
-pulls the package **from the ISO's own pool** — no Wi-Fi required. Verified on
-`lubuntu-26.04-desktop-amd64.iso`, which carries
-`grub-efi-ia32`, `grub-efi-ia32-bin` and `grub-efi-ia32-unsigned` in
-`pool/main/g/grub2/`.
+It reads the firmware's word size and installs the matching GRUB. The step before
+it runs `apt-cdrom add -m -d=/media/cdrom/` and deletes the `deb http` lines from
+`/etc/apt/sources.list`, the intent being to pull the package **from the ISO's own
+pool** rather than the network. The pool is definitely there:
+`lubuntu-26.04-desktop-amd64.iso` carries `grub-efi-ia32`, `grub-efi-ia32-bin`
+and `grub-efi-ia32-unsigned` in `pool/main/g/grub2/`.
+
+**Connect Wi-Fi before you install anyway.** What has been verified here is that
+the packages are on the ISO and that the installer asks for the right one. What
+has *not* been verified is that `apt-cdrom` finds the medium when the stick is a
+FAT32 copy of the ISO (what `make-usb.sh` builds) rather than a `dd`-written
+ISO9660 image — the two are not the same medium as far as `apt-cdrom` is
+concerned. With network available the step succeeds either way. If you must
+install offline, expect to run
+[postinstall-grub-ia32.sh](../scripts/postinstall-grub-ia32.sh) with
+`--offline-debs` afterwards, and build that payload beforehand.
 
 Ubuntu and Xubuntu use curtin, which picks the GRUB flavour from the *target
 architecture* rather than the firmware — there is no reference to

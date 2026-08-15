@@ -2,8 +2,12 @@
 #
 # Build a USB stick that a 32-bit UEFI tablet will actually boot.
 #
-#   GPT -> one FAT32 partition typed "EFI System" -> contents of the ISO copied
+#   GPT -> one FAT32 partition covering the device -> contents of the ISO copied
 #   onto it -> artifacts/bootia32.efi dropped into EFI/BOOT/
+#
+# On Linux the partition is typed "EFI System" (ef00); on macOS diskutil types it
+# "Microsoft Basic Data". Firmware scanning removable media for
+# \EFI\BOOT\BOOTIA32.EFI looks at FAT volumes either way.
 #
 # The ISO is copied, not dd-ed, because a dd-written ISO9660 filesystem is
 # read-only and bootia32.efi could never be added to it. See docs/02-boot-problem.md.
@@ -18,6 +22,7 @@ FAT32_MAX_FILE_BYTES=$((4 * 1024 * 1024 * 1024 - 1))
 
 bootia32=$REPO_ROOT/artifacts/bootia32.efi
 iso=
+iso_sha256=
 device=
 force=no
 scratch=${TMPDIR:-/tmp}
@@ -27,6 +32,8 @@ usage() {
 Usage: sudo ${0##*/} --iso PATH.iso --device DEVICE [options]
 
   --iso PATH        Distribution ISO to put on the stick
+  --sha256 HEX      Expected SHA-256 of the ISO, from the distribution's
+                    SHA256SUMS. Checked before the stick is touched.
   --device DEVICE   Whole-disk device node: /dev/diskN (macOS), /dev/sdX (Linux)
   --bootia32 PATH   32-bit GRUB to install (default: artifacts/bootia32.efi)
   --label NAME      FAT32 volume label, 11 chars max (default: $LABEL)
@@ -46,6 +53,10 @@ while [ $# -gt 0 ]; do
   case $1 in
   --iso)
     iso=${2:?--iso needs a path}
+    shift 2
+    ;;
+  --sha256)
+    iso_sha256=${2:?--sha256 needs a hex digest}
     shift 2
     ;;
   --device)
@@ -84,6 +95,23 @@ done
 [ -f "$bootia32" ] || die "no such bootia32: $bootia32"
 [ "$(id -u)" -eq 0 ] || die "must run as root (partitioning and mounting)"
 [ ${#LABEL} -le 11 ] || die "FAT32 labels are 11 characters at most: $LABEL"
+
+# The ISO is the one thing here that ends up executing as root on the tablet, so
+# check it before the stick is destroyed rather than after.
+if [ -n "$iso_sha256" ]; then
+  log "Verifying $iso against the digest you gave (reads the whole image)..."
+  # Digests get pasted from SHA256SUMS (lowercase) and from Windows' Get-FileHash
+  # or certutil (uppercase). Case is not a mismatch; treating it as one raises a
+  # tampering alarm over a copy-paste.
+  expected_sha256=$(printf '%s' "$iso_sha256" | tr 'A-F' 'a-f')
+  actual_sha256=$(sha256_of "$iso")
+  [ "$actual_sha256" = "$expected_sha256" ] || die "SHA-256 mismatch - do not use this image.
+  expected: $expected_sha256
+  actual:   $actual_sha256"
+  log "ISO checksum OK."
+else
+  warn "no --sha256 given; the ISO is being used unverified"
+fi
 
 os=$(host_os)
 [ "$os" != unsupported ] || die "only macOS and Linux are supported (Windows: use make-usb.ps1)"

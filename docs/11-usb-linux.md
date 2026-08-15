@@ -53,11 +53,15 @@ You want the whole disk (`/dev/sdb`), not a partition (`/dev/sdb1`).
 ```sh
 sudo ./scripts/make-usb.sh \
   --iso ~/Downloads/lubuntu-26.04-desktop-amd64.iso \
+  --sha256 <the digest from the distribution's SHA256SUMS> \
   --device /dev/sdb
 ```
 
-The script refuses any device that is neither removable nor USB-attached, prints
-what it found, and makes you type `ERASE /dev/sdb` before touching anything.
+The script checks the ISO against that digest before anything else, refuses any
+device that is neither removable nor USB-attached, prints what it found, and
+makes you type `ERASE /dev/sdb` before touching anything. `--sha256` is optional
+but you will get a warning without it: this image is what boots the tablet as
+root.
 
 Needs `sgdisk` (`gdisk` package), `mkfs.vfat` (`dosfstools`) and `rsync`.
 

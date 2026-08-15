@@ -169,12 +169,19 @@ zram helps materially; nothing else will change the shape of the machine.
 
 ## Getting back to Windows
 
-If you took a full image:
+If you took a full image, boot the live stick and restore it:
 
 ```sh
-zstd -dc emmc-*.img.zst | sudo dd of=/dev/mmcblk0 bs=4M status=progress
-sync
+lsblk                                   # confirm which device is the eMMC
+sudo ./scripts/restore-emmc.sh \
+  --image /media/usb-disk/emmc-tablet-20260815-120000.img.zst \
+  --target /dev/mmcblk0
 ```
+
+The script verifies the image against its `.sha256` sidecar before it writes
+anything, refuses a partition or a still-mounted device, and makes you type
+`RESTORE /dev/mmcblk0` back. Do not shortcut it with a bare `dd` — a typo in
+`of=` on this path destroys the disk you are restoring onto.
 
 Then reboot. The licence key is in the firmware's ACPI `MSDM` table, so a clean
 Windows install activates itself too — but a clean Windows install on this

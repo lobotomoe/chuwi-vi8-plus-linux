@@ -58,9 +58,9 @@ The firmware is an InsydeH2O/AMI tablet build. Menu names vary slightly between
 BIOS versions; the settings you want are:
 
 **1. Secure Boot -> Disabled.** Usually under `Security`, sometimes
-`Boot -> Secure Boot Option`. This is not optional: no distribution ships a
-Microsoft-signed 32-bit EFI bootloader for x86, so with Secure Boot on, nothing
-you build will start. See [02-boot-problem.md](02-boot-problem.md#secure-boot).
+`Boot -> Secure Boot Option`. This is not optional: no distribution publishes a
+Microsoft-signed 32-bit x86 shim, so with Secure Boot on, nothing you build will
+start. See [02-boot-problem.md](02-boot-problem.md#secure-boot).
 
 **2. Boot order.** Put USB ahead of the internal eMMC, or plan on using the
 one-off boot menu (`Boot Manager` in the setup, or F7/F12 at power-on) each

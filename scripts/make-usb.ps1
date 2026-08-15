@@ -18,13 +18,14 @@
 
 .EXAMPLE
     Get-Disk
-    .\make-usb.ps1 -IsoPath C:\iso\lubuntu-26.04-desktop-amd64.iso -DiskNumber 2
+    .\make-usb.ps1 -IsoPath C:\iso\lubuntu-26.04-desktop-amd64.iso -DiskNumber 2 -Sha256 abc123...
 #>
 
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$IsoPath,
     [Parameter(Mandatory = $true)][int]$DiskNumber,
+    [string]$Sha256,
     [string]$Bootia32Path = (Join-Path $PSScriptRoot '..\artifacts\bootia32.efi'),
     [string]$Label = 'VI8PLUS',
     [switch]$Force
@@ -51,6 +52,20 @@ if ($Label.Length -gt 11) { throw "FAT32 labels are 11 characters at most: $Labe
 
 $IsoPath = (Resolve-Path -LiteralPath $IsoPath).Path
 $Bootia32Path = (Resolve-Path -LiteralPath $Bootia32Path).Path
+
+# The ISO is the one thing here that ends up executing as root on the tablet, so
+# check it before the stick is destroyed rather than after.
+if ($Sha256) {
+    Write-Host 'Verifying the ISO checksum (reads the whole image)...'
+    $actual = (Get-FileHash -LiteralPath $IsoPath -Algorithm SHA256).Hash
+    if ($actual -ne $Sha256.Trim().ToUpperInvariant()) {
+        throw "SHA-256 mismatch - do not use this image.`n  expected: $Sha256`n  actual:   $actual"
+    }
+    Write-Host 'ISO checksum OK.'
+}
+else {
+    Write-Warning 'No -Sha256 given; the ISO is being used unverified.'
+}
 
 # ---------------------------------------------------------------------------
 # Safety: describe the target and make the operator type it back
@@ -81,13 +96,30 @@ if ($answer -ne "ERASE $DiskNumber") { throw "Aborted (got '$answer')" }
 
 Write-Host "Partitioning disk $DiskNumber (GPT, one FAT32 partition, label $Label)..."
 
-Clear-Disk -Number $DiskNumber -RemoveData -RemoveOEM -Confirm:$false
+# Clear-Disk throws on a disk that is already RAW, which is exactly what a
+# freshly wiped stick looks like. Only clear what there is to clear.
+if ($disk.PartitionStyle -ne 'RAW') {
+    Clear-Disk -Number $DiskNumber -RemoveData -RemoveOEM -Confirm:$false
+}
 Initialize-Disk -Number $DiskNumber -PartitionStyle GPT -Confirm:$false
 
 $partition = New-Partition -DiskNumber $DiskNumber -UseMaximumSize -AssignDriveLetter
 Format-Volume -Partition $partition -FileSystem FAT32 -NewFileSystemLabel $Label -Confirm:$false | Out-Null
 
-$usbRoot = "$($partition.DriveLetter):\"
+# The object New-Partition returns is a snapshot: the mount manager assigns the
+# drive letter asynchronously, so DriveLetter on it is often still empty. Re-read
+# the partition until the letter appears rather than building a path from NUL.
+$driveLetter = $null
+foreach ($attempt in 1..10) {
+    $driveLetter = (Get-Partition -DiskNumber $DiskNumber -PartitionNumber $partition.PartitionNumber).DriveLetter
+    if ($driveLetter -and $driveLetter -ne [char]0) { break }
+    Start-Sleep -Milliseconds 500
+}
+if (-not $driveLetter -or $driveLetter -eq [char]0) {
+    throw "Windows did not assign a drive letter to the new partition on disk $DiskNumber."
+}
+
+$usbRoot = "${driveLetter}:\"
 Write-Host "Stick mounted at $usbRoot"
 
 # ---------------------------------------------------------------------------

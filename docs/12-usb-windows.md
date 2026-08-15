@@ -52,11 +52,13 @@ Get-Disk                                    # find the disk number of the stick
 
 .\scripts\make-usb.ps1 `
     -IsoPath C:\Users\you\Downloads\lubuntu-26.04-desktop-amd64.iso `
+    -Sha256 <the digest from the distribution's SHA256SUMS> `
     -DiskNumber 2
 ```
 
-It prints the disk's details, refuses the boot/system disk and anything that is
-not USB-attached, and makes you type `ERASE 2` before it starts. Then it
+It checks the ISO against that digest first, prints the disk's details, refuses
+the boot/system disk and anything that is not USB-attached, and makes you type
+`ERASE 2` before it starts. Then it
 partitions GPT + FAT32, mounts the ISO, copies with `robocopy`, and installs
 `bootia32.efi`.
 

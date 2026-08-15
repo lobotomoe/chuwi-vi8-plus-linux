@@ -80,7 +80,7 @@ With 2 GB of RAM and 32 GB of eMMC, the desktop environment is not a matter of t
 
 | Option | Verdict |
 |---|---|
-| **Lubuntu 26.04 LTS** (LXQt) | **Recommended.** It is Ubuntu, supported to April 2029, and it is the only Ubuntu flavour whose installer detects 32-bit firmware and installs a 32-bit GRUB by itself — from the ISO's own package pool, so it works with no network. |
+| **Lubuntu 26.04 LTS** (LXQt) | **Recommended.** It is Ubuntu, supported to April 2029, and it is the only Ubuntu flavour whose installer detects 32-bit firmware and installs a 32-bit GRUB by itself. It tries to take the package from the ISO's own pool; have Wi-Fi connected anyway, see [docs/30](docs/30-install-lubuntu.md). |
 | Xubuntu 26.04 LTS (Xfce) | Fine desktop, but it uses the standard Ubuntu installer, which has no 32-bit-firmware handling. You must repair the bootloader by hand afterwards. |
 | Ubuntu 26.04 LTS (GNOME) | GNOME on 2 GB RAM is painful, and the ISO alone is bigger than what is comfortable here. Not recommended. |
 | **Debian 13 "trixie"** (LXQt/Xfce) | The most dependable path. The installer detects 32-bit firmware and pulls `grub-efi-ia32` **from the ISO itself**, so it works with no network at all. Pick this if the Lubuntu install fights you. |
@@ -137,12 +137,14 @@ docs/         the actual guide, split by host OS and by distribution
 | `fetch-offline-payload.sh` | macOS, Linux | Downloads `grub-efi-ia32-bin` to carry on the stick |
 | `collect-hw-report.sh` | tablet | One file with DMI, firmware bitness, drivers, audio, power |
 | `backup-emmc.sh` | tablet | Compressed image of the eMMC to an external disk, before wiping |
+| `restore-emmc.sh` | tablet | Writes that image back, checksum-verified, to get Windows back |
 | `postinstall-grub-ia32.sh` | tablet | Installs a 32-bit GRUB into the installed system's ESP |
 | `postinstall-tune.sh` | tablet | zram, TRIM, rotation daemon, journal cap — reports before it acts |
 
 Shell scripts are `bash`, pass `shellcheck` cleanly, and depend only on what the OS
 ships. Every script that can destroy data prints what it found and refuses to continue
-until you type the target device back.
+until you type the target device back — including the restore path, which is why it is
+a script and not a `dd` line to copy out of a document.
 
 ---
 
@@ -152,8 +154,9 @@ until you type the target device back.
   leaves under 18 GB free. Back it up first if you might want it back.
 - **You cannot charge during the install.** One USB-C port, and it is occupied by the
   OTG hub. Start at 100 %; the install takes 20-40 minutes.
-- **Secure Boot must stay off.** No distribution ships a Microsoft-signed 32-bit EFI
-  bootloader for x86, so there is nothing to sign the chain with.
+- **Secure Boot must stay off.** No distribution publishes a Microsoft-signed 32-bit
+  x86 shim, so there is nothing to start a signed chain from —
+  [details](docs/02-boot-problem.md#secure-boot).
 - **This tablet is from 2016.** Cherry Trail is slow and its Linux support, while
   complete, is maintained by very few people. Expect a usable browsing/media/terminal
   machine, not a fast one.

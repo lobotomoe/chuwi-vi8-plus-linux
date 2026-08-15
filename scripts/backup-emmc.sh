@@ -75,10 +75,18 @@ log ""
 log "Destination: $dest_dir on $dest_src"
 log "  free:      $((free_kb / 1024)) MiB"
 log "  estimated: $((need_kb / 1024)) MiB (a full 32 GB eMMC usually lands near half)"
-[ "$free_kb" -gt "$need_kb" ] ||
-  warn "the destination may be too small - the image will fail partway through"
-
 log ""
+if [ "$free_kb" -le "$need_kb" ]; then
+  # Imaging takes 25-60 minutes, on battery, on a tablet that cannot charge with
+  # the OTG hub attached. Running out of space halfway wastes the whole charge,
+  # so this needs a deliberate second answer rather than a warning nobody reads.
+  warn "the destination is smaller than the image is likely to need"
+  warn "this only works out if the eMMC is mostly empty (a mostly-full 32 GB"
+  warn "Windows install lands near $((need_kb / 1024)) MiB compressed)"
+  confirm_exact "SMALL" \
+    "Continue only if you know this eMMC is largely empty."
+fi
+
 confirm_exact "BACKUP $source_dev" \
   "This reads $source_dev and writes a compressed image into $dest_dir."
 
@@ -113,6 +121,7 @@ log ""
 log "Done:"
 ls -lh "$base".* >&2
 log ""
+log "Keep the .sha256 next to the image - restore-emmc.sh verifies against it."
+log ""
 log "To restore later (this overwrites the eMMC completely):"
-log "  $compressor -dc $base.img.$ext | dd of=$source_dev bs=4M status=progress"
-log "  sync"
+log "  sudo ./scripts/restore-emmc.sh --image $base.img.$ext --target $source_dev"

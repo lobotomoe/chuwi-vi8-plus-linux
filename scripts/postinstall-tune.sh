@@ -9,6 +9,7 @@
 source "$(dirname -- "${BASH_SOURCE[0]}")/lib.sh"
 
 apply=no
+failures=0
 
 usage() {
   cat <<EOF
@@ -53,10 +54,16 @@ fi
 step() { log ""; log "--- $1"; }
 would() { log "    would run: $*"; }
 
+# A failed step is recorded, not swallowed: the remaining steps are independent
+# and still worth attempting, but the script must not exit 0 pretending it
+# succeeded. The tally is reported and turned into a non-zero exit at the end.
 run() {
   if [ "$apply" = yes ]; then
     log "    $*"
-    "$@" || warn "failed: $*"
+    if ! "$@"; then
+      warn "failed: $*"
+      failures=$((failures + 1))
+    fi
   else
     would "$@"
   fi
@@ -150,4 +157,10 @@ log "  video=1280x800@60 to GRUB_CMDLINE_LINUX_DEFAULT in /etc/default/grub."
 log ""
 if [ "$apply" = no ]; then
   log "Nothing was changed. Re-run with --apply."
+elif [ "$failures" -gt 0 ]; then
+  die "$failures step(s) failed - see the 'warning:' lines above.
+Whatever succeeded is in place; nothing was rolled back. Fix the cause and
+re-run: every step checks whether it is already done before acting."
+else
+  log "All steps completed."
 fi

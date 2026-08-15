@@ -100,10 +100,19 @@ covered in those two guides. There is no macOS build of Ventoy.
 
 Turn it off, and leave it off.
 
-Neither Ubuntu nor Arch ships a Microsoft-signed 32-bit EFI bootloader for x86 — Ubuntu
-has `grub-efi-ia32-unsigned` but no `grub-efi-ia32-signed`, and the corresponding
-Launchpad bug has been open since 2018. Debian does sign an ia32 GRUB, but the shim
-chain on this firmware is not worth the trouble when you are wiping the device anyway.
+The chain that Secure Boot needs is *Microsoft-signed shim -> distro-signed GRUB*, and
+on 32-bit x86 the first link is missing from the archives:
+
+- **Ubuntu** has `grub-efi-ia32-unsigned` and no `grub-efi-ia32-signed` at all. The
+  Launchpad bug has been open since 2018.
+- **Debian** does ship `grub-efi-ia32-signed`, but it is signed by the *Debian UEFI CA*,
+  not by Microsoft, and it is meant to be chain-loaded by shim. Debian's
+  Microsoft-signed `shim-signed` package is published for `amd64` and `arm64` only, so
+  there is no signed first stage to start the ia32 chain from.
+- **Arch** does not sign anything.
+
+Enrolling Debian's CA into the firmware's key store by hand would in principle work, but
+it is not worth the trouble on a device you are wiping anyway.
 
 [docs/20-uefi-setup.md](20-uefi-setup.md) covers where the setting lives.
 
