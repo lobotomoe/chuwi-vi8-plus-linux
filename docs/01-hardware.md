@@ -34,6 +34,37 @@ UEFI works the same way), but the per-device quirks in the table below will not.
 `scripts/collect-hw-report.sh`, run from a live session, dumps all of this plus the
 driver state in one file.
 
+### Not every Vi8 Plus has 32-bit firmware
+
+This matters more than anything else in this document, because the whole premise of
+this repository rests on it.
+
+Chuwi shipped this model in several revisions, and owners on the 4PDA thread report
+firmware that is **not** 32-bit:
+
+- The common Windows-only units are 32-bit UEFI running 32-bit Windows 10. That is
+  what this guide targets.
+- **Dual-boot (Android + Windows) units behave differently.** One owner reports BIOS
+  `D2D3_Vi8A1.232` presenting as 32-bit when booting Windows and **64-bit when
+  booting Android**, with `x64` appended to the version string in the menu
+  (post #36155). Those units expose a **`Boot architecture`** setting the 32-bit
+  units do not have (posts #33087, #33636).
+- BIOS revision **1608** is reported as 64-bit when booting Windows (post #37112).
+
+So "the Vi8 Plus has 32-bit UEFI" is true of this model in general and **not
+guaranteed of your unit**. Check before you build anything:
+
+```sh
+cat /sys/firmware/efi/fw_platform_size      # 32 -> this guide applies
+```
+
+If it reports `64`, you do not have this repository's problem at all — install
+normally with the distribution's own 64-bit media and ignore everything here about
+`bootia32.efi`. If your firmware has a `Boot architecture` item, leave it alone
+unless you know exactly which way your unit boots; owners who tried to move a
+32-bit unit to 64-bit firmware bricked it, and there is no software path back
+(post #33310).
+
 ## Base specification
 
 | | |
@@ -44,9 +75,9 @@ driver state in one file.
 | RAM | 2 GB DDR3L, soldered |
 | Storage | 32 GB eMMC + microSD slot |
 | Display | 8.0" IPS, 1280x800, 10-point capacitive touch. Scanout orientation is probably **portrait** (800x1280) — the firmware setup renders upright with the tablet held portrait — and the kernel has no orientation quirk for this model, so expect to rotate it yourself. See [40-post-install.md](40-post-install.md#if-everything-starts-sideways) |
-| Firmware | **32-bit (IA32) UEFI**, no CSM/legacy boot |
+| Firmware | **32-bit (IA32) UEFI**, no CSM/legacy boot — but see the revision note below; confirm with `fw_platform_size` before trusting it |
 | Ports | 1x USB Type-C (USB 2.0, power + data, OTG), micro-HDMI 1.4, microSD, 3.5 mm |
-| Battery | 5000 mAh Li-Po |
+| Battery | Li-Po. **Sources disagree:** Notebookcheck's review says 5000 mAh, the 4PDA thread's specification header says Chuwi claims 4000 mAh with owners measuring 3900-4050 mAh. Read your own with `cat /sys/class/power_supply/*/energy_full_design` rather than trusting either |
 | Cameras | 2 MP front, 2 MP rear |
 
 The 64-bit CPU with 32-bit-only firmware is the single most important fact about this
