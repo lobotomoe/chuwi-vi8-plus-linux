@@ -43,10 +43,15 @@ With the tablet fully off and the keyboard attached through the hub: hold the
 power button to switch on and tap **Esc** repeatedly on the USB keyboard from
 the moment the screen lights up.
 
-**Esc is the right key on this tablet** — confirmed on the unit this guide was
-written against, and independently by several owners on the 4PDA thread
-(post #636: *"заходим в биос (при включении зажать кнопку ESC)"*, post #990).
-Two alternatives are also confirmed there:
+**Esc is the key owners of this model report using** — 4PDA post #636 (*"заходим
+в биос (при включении зажать кнопку ESC)"*), post #990, and the techtablets
+thread on this exact tablet (*"I have managed to go in the bios by pressing 'esc'
+at startup"*, post #23272). It is **not** verified on the unit this guide was
+written against: that tablet's setup menu was reached and photographed, but which
+key opened it was never recorded. Treat Esc as well-attested, not as proven here.
+
+Note that one owner could not get in with Esc at all and used the volume keys
+instead (techtablets post #34717), so have the alternatives ready:
 
 | Key | What it does |
 |---|---|

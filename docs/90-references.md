@@ -139,8 +139,10 @@ and reachable by paging to `&st=` in multiples of 20.
 
 - **Esc enters setup; F7 is the one-off boot menu; Volume + also enters setup.**
   Multiple independent reports (#636, #990, #993, #2719, and #318/#721 for
-  Volume +). Esc is separately **verified on the unit this guide was written
-  against**.
+  Volume +), corroborated outside 4PDA by techtablets #23272. **No entry route is
+  verified on the unit this guide was written against** — its setup menu was
+  reached and photographed, so getting in is plainly possible, but how was never
+  recorded. Everything this guide says about *which* key is owner report.
 - **The CHUWI splash sits for 5-10 minutes after you select a USB device, and
   that is normal.** Post #2719 gives the full working procedure for booting a
   Windows installer this way. Corroborated by owners who mistook it for a hang
