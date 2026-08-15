@@ -1,0 +1,15 @@
+# Downloaded ISOs and offline package payloads - never commit these
+downloads/
+payload/
+*.iso
+*.deb
+*.img
+*.img.zst
+
+# Hardware reports and backups produced by the scripts
+reports/
+backups/
+
+# Editor / OS noise
+.DS_Store
+*.swp

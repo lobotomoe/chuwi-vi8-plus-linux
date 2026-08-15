@@ -1,0 +1,110 @@
+# References
+
+Sources for the claims made in this repository. Everything marked **verified**
+was checked directly — against the kernel or distribution source, or by
+inspecting the actual ISO — rather than taken from a forum post.
+
+## The 32-bit UEFI problem
+
+- Linux kernel, `arch/x86/Kconfig` — `CONFIG_EFI_MIXED` and
+  `CONFIG_EFI_HANDOVER_PROTOCOL`, including the note that a mixed-mode kernel
+  **cannot** be booted via the EFI stub.
+  <https://github.com/torvalds/linux/blob/master/arch/x86/Kconfig> — **verified**
+- Ubuntu 26.04 LTS kernel configuration (`linux-buildinfo-7.0.0-31-generic`):
+  `CONFIG_EFI_MIXED=y`, `CONFIG_EFI_HANDOVER_PROTOCOL=y`,
+  `CONFIG_EFI_EMBEDDED_FIRMWARE=y`, `CONFIG_TOUCHSCREEN_CHIPONE_ICN8505=m`,
+  `CONFIG_SND_SOC_INTEL_BYTCR_RT5651_MACH=m`, `CONFIG_BRCMFMAC_SDIO=y`.
+  <http://archive.ubuntu.com/ubuntu/pool/main/l/linux/> — **verified**
+- Debian wiki, UEFI: 32-bit firmware detection and `grub-efi-ia32`.
+  <https://wiki.debian.org/UEFI>
+  *Correction:* that page states the amd64 installation media carry bootloaders
+  for both i386 and amd64. As of `debian-13.6.0-amd64-netinst.iso` this is not
+  true — its ESP contains only `bootx64.efi` and `grubx64.efi`, with 14 KB free.
+  The **installed system** does get `grub-efi-ia32`; the **boot media** does not.
+  — **verified by inspecting the ISO**
+- Ubuntu bug 1793894, "bootia32.efi + 32bit UEFI + SecureBoot => not signed" —
+  why Secure Boot cannot work here.
+  <https://bugs.launchpad.net/bugs/1793894>
+- Ubuntu bug 1341944, "32-Bit UEFI bootloader support needed".
+  <https://bugs.launchpad.net/ubuntu/+source/grub2/+bug/1341944>
+- Ventoy IA32 UEFI support (experimental since v1.0.30).
+  <https://www.ventoy.net/en/doc_ia32.html>
+- systemd-boot's x86 EFI handover implementation, including the mixed-mode
+  comment and `XLF_EFI_HANDOVER_32`.
+  <https://github.com/systemd/systemd/blob/main/src/boot/linux_x86.c> — **verified**
+- `bootctl`'s firmware-architecture detection, which reads
+  `/sys/firmware/efi/fw_platform_size` and returns `ia32` on mixed-mode systems.
+  <https://github.com/systemd/systemd/blob/main/src/bootctl/bootctl-util.c> — **verified**
+- archiso `mkarchiso`, which builds `BOOTIA32.EFI` alongside the x64 loader.
+  <https://github.com/archlinux/archiso> — **verified against
+  `archlinux-2026.08.01-x86_64.iso`, which ships systemd-boot 261.2 (ia32)**
+
+## Installer behaviour
+
+- Lubuntu's Calamares configuration, `before_bootloader_context.conf` — the step
+  that picks `grub-efi-ia32` vs `grub-efi-amd64-signed` from
+  `/sys/firmware/efi/fw_platform_size`, installing from the CD pool.
+  <https://github.com/lubuntu-team/calamares-settings-ubuntu/blob/main/common/modules/before_bootloader_context.conf> — **verified**
+- Calamares' bootloader module, which maps 32-bit firmware to the `i386-efi`
+  GRUB target.
+  <https://github.com/calamares/calamares/blob/calamares/src/modules/bootloader/main.py> — **verified**
+- curtin's `install_grub.py`, which selects `grub-efi-ia32` from the *target
+  architecture* and never consults `fw_platform_size` — the reason Ubuntu's and
+  Xubuntu's installers leave this tablet unbootable.
+  <https://github.com/canonical/curtin/blob/master/curtin/commands/install_grub.py> — **verified**
+
+## Chuwi Vi8 Plus hardware in the kernel
+
+- Touchscreen: `chuwi_vi8_plus_data` in `drivers/platform/x86/touchscreen_dmi.c`,
+  Chipone ICN8505, firmware `chipone/icn8505-HAMP0002.fw` extracted from the
+  tablet's own UEFI. — **verified**
+- The patch series that added it, with the firmware's size and SHA-256:
+  <https://patchwork.kernel.org/project/linux-input/patch/20200111145703.533809-11-hdegoede@redhat.com/>
+- Audio: the `Hampoo` / `D2D3_Vi8A1` quirk in
+  `sound/soc/intel/boards/bytcr_rt5651.c` —
+  `BYT_RT5651_IN2_MAP | BYT_RT5651_HP_LR_SWAPPED | BYT_RT5651_MONO_SPEAKER`.
+  <https://github.com/torvalds/linux/blob/master/sound/soc/intel/boards/bytcr_rt5651.c> — **verified**
+- Wi-Fi: the Vi8 Plus's AmPak AP6212 (BCM43430) NVRAM,
+  `brcm/brcmfmac43430-sdio.Hampoo-D2D3_Vi8A1.txt`, shipped in `linux-firmware`;
+  referenced in `drivers/net/wireless/broadcom/brcm80211/brcmfmac/dmi.c`. — **verified**
+- Accelerometer mount matrix, systemd `hwdb.d/60-sensor.hwdb`:
+  `sensor:modalias:acpi:BOSC0200:*:dmi:*:svnHampoo:pnD2D3_Vi8A1:*`.
+  <https://github.com/systemd/systemd/blob/main/hwdb.d/60-sensor.hwdb> — **verified**
+
+## The device itself
+
+- Notebookcheck review of the Chuwi Vi8 Plus (CWI519) — ports, the single USB-C
+  that cannot charge while hosting, 2.4 GHz-only Wi-Fi, panel, battery.
+  <https://www.notebookcheck.net/Chuwi-Vi8-Plus-CWI519-Tablet-Review.159094.0.html>
+- Chuwi's own forum, Vi8 Plus firmware threads. User-uploaded MediaFire folders
+  tied to particular serial batches; treat as a last resort, and prefer your own
+  backup.
+  <https://forum.chuwi.com/t/topic/930>
+  <https://forum.chuwi.com/t/vi8-plus-corrupted-bios/5273>
+
+## Prior art on Linux on Atom tablets
+
+Useful for context and for the firmware-menu conventions, but note that most of
+it targets the **Bay Trail** generation — the original Chuwi Vi8, the ASUS
+T100TA, the Dell Venue 8 Pro — which uses different silicon from the Vi8 Plus.
+See the comparison table in the [README](../README.md#do-not-confuse-it-with-the-chuwi-vi8).
+
+- `Manouchehri/vi8` — the original Chuwi Vi8 (Bay Trail).
+  <https://github.com/Manouchehri/vi8>
+- `jfwells/linux-asus-t100ta` — the historic source of `bootia32.efi` binaries.
+  <https://github.com/jfwells/linux-asus-t100ta>
+- Sturmflut, "Installing Ubuntu on BayTrail tablets (version 2)".
+  <https://sturmflut.github.io/linux/ubuntu/2015/02/04/installing-ubuntu-on-baytrail-tablets-version-2/>
+- Hackaday, "Liberating a $50 Windows tablet" — creating a 32-bit UEFI live stick.
+  <https://hackaday.io/project/83212-liberating-a-50-windows-tablet/log/115347-creating-a-32-bit-uefi-comaptible-live-boot-stick>
+- `willyneutron/lubuntu_in_chuwi_Hi10Pro` — a Cherry Trail Chuwi, closer to this
+  tablet than the Bay Trail guides.
+  <https://github.com/willyneutron/lubuntu_in_chuwi_Hi10Pro>
+
+## Distributions
+
+- Lubuntu 26.04 LTS release notes. <https://lubuntu.me/lubuntu-26-04-lts-released/>
+- Debian installer images. <https://www.debian.org/CD/>
+- Arch Linux downloads. <https://archlinux.org/download/>
+- Ventoy. <https://www.ventoy.net/>
+- Rufus. <https://rufus.ie/>
