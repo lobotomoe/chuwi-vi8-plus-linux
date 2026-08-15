@@ -367,7 +367,18 @@ log "Copied."
 # --------------------------------------------------------------------------
 
 # FAT is case-insensitive, but the ISO may have created EFI/boot or EFI/BOOT.
-efi_boot=$(find "$mnt_usb" -maxdepth 2 -type d -iname boot -ipath '*/EFI/*' -print -quit)
+#
+# The pruning is not cosmetic. macOS drops .Spotlight-V100 onto every volume it
+# mounts and TCC then denies even root access to it, so find exits non-zero -
+# which under errexit killed this script right here, after the multi-minute copy
+# had already succeeded and before the bootloader was installed. The stick came
+# out with 64-bit loaders only: the exact failure this repository exists to
+# prevent. A non-zero exit is a warning now, because the emptiness test below is
+# the real guard and nothing is worth discarding a finished copy for.
+efi_boot=$(find "$mnt_usb" -maxdepth 2 \
+  \( -name '.Spotlight-V100' -o -name '.fseventsd' -o -name '.Trashes' \) -prune -o \
+  -type d -iname boot -ipath '*/EFI/*' -print -quit) ||
+  warn "find reported errors under $mnt_usb; continuing"
 [ -n "$efi_boot" ] || {
   efi_boot="$mnt_usb/EFI/BOOT"
   mkdir -p "$efi_boot"
