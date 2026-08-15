@@ -122,6 +122,32 @@ Press `e` at the GRUB menu and add it to the `linux` line. Reach for this only i
 scan picks the wrong device — and check the number with `lsblk` first, because
 `mmcblk` numbering is assigned in probe order and is not guaranteed.
 
+## Before you commit to this: try booting the card on its own
+
+`make-media.sh` puts `\EFI\BOOT\BOOTIA32.EFI` on everything it builds, so the live
+medium is a bootable volume in its own right. The firmware is
+[not known to boot from the card slot](01-hardware.md#storage) — but that rests on
+owner reports, not on a test here.
+
+So look. Put the finished card in the slot, enter setup, open `Boot Override`. If it
+is listed, boot it and stop reading: you need no USB stick, no hub in the critical
+path, and none of this page.
+
+## Cards drop out on this model too
+
+Worth knowing before you move your root filesystem onto one. The 4PDA thread carries
+years of reports of microSD cards vanishing from the running system, needing a
+re-seat after every boot, or never being detected — see
+[90-references.md](90-references.md#the-4pda-owners-thread). Two firmware settings
+come up as fixes: the SD controller in **PCI mode rather than AHCI**, and an item
+under `Advanced` -> `System Component`.
+
+This is not a reason to skip the split. A card that works is far steadier than the
+USB path this page exists to route around, and on the unit behind this guide the card
+enumerated cleanly (`mmcblk2`, 58.2 GiB) in the same session where the USB stick
+would not enumerate at all. But if the card starts misbehaving, look in the firmware
+before concluding the approach is wrong.
+
 ## What this does not fix
 
 Only the reading of the live filesystem moves off USB. The keyboard is still on USB,

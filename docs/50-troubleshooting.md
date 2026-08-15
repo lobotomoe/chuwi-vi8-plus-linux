@@ -177,8 +177,9 @@ In order:
    and a keyboard are enough for everything in this guide.
 4. **Try the hub's SD card reader** if it has one, with a microSD carrying the
    install image. A card reader presents as USB mass storage, so unlike the
-   tablet's own microSD slot — which the firmware cannot boot from at all — it is
-   an ordinary bootable USB device as far as the firmware is concerned.
+   tablet's own microSD slot — which the firmware is
+   [not known to boot from](01-hardware.md#storage) — it is an ordinary bootable
+   USB device as far as the firmware is concerned.
 5. **Try a different hub**, ideally a plain USB 2.0 one.
 
 Confirm each attempt in `USB Configuration` rather than by trying to boot: the

@@ -245,7 +245,19 @@ and reachable by paging to `&st=` in multiples of 20.
 - **The USB-C port enumerates only what was attached before power-on** (#3720),
   and a stick the firmware missed can appear after a re-seat (#2214).
 - **The firmware boot menu does not offer the microSD slot**, only USB mass
-  storage (#791) — consistent with this repo's requirement to install to eMMC.
+  storage (#791). Owners asked whether Windows could be reinstalled from a card
+  and were told no — "sd карточки не получается, нада флешка" (#2191), with the
+  suggested workaround being to run the installer's `Setup.exe` from the already
+  running system rather than booting the card (#2410); asked again in #3411. No
+  post in the thread reports booting from the slot. Strong, but still second-hand:
+  **not tried on the unit behind this guide.**
+- **Cards dropping out is a recurring complaint on this model**, independent of
+  booting: undetected cards of any size (#894), a card that needs re-seating after
+  every boot (#2572), 32 and 64 GB cards that kept falling off (#3046). Fixes
+  owners report: SD controller in **PCI mode rather than AHCI** (#3335), and an
+  item under `Advanced` -> `System Component` (#3046). `Sdcard RCOMP Trigger Delay`
+  is also suspected of being involved (#2299). Relevant to
+  [13-split-media.md](13-split-media.md), which puts the live filesystem on a card.
 - Battery: the thread's specification header states Chuwi claims 4000 mAh with
   owners measuring 3900-4050 mAh, contradicting Notebookcheck's 5000 mAh.
   Unresolved; read `energy_full_design` on your own unit.

@@ -186,8 +186,23 @@ Stock `/proc/partitions` on an untouched unit, for orientation — sizes in 1 Ki
 
 — **verified on the unit**
 
-The firmware **cannot boot from the microSD slot**. Linux must be installed to the
-eMMC. You can put `/home` on the SD card afterwards if you want.
+The firmware is **not known to boot from the microSD slot**, so plan on installing
+Linux to the eMMC and on a USB stick to start from. Owners asked about booting a
+card at least three times over the thread's life and were told it does not work
+(4PDA #2191, #2410, #3411); nobody there reports having done it. That is decent
+evidence and not proof — it has not been tried on the unit behind this guide. If
+you are about to build a card anyway, look for it under `Boot Override` first: it
+costs one reboot, and if it is there you can skip the stick entirely.
+
+You can put `/home` on the SD card afterwards if you want.
+
+**Card detection is a known sore spot on this model**, separately from booting.
+Owners report cards that vanish from the running system, need a re-seat after every
+boot, or are never detected at all (#894, #2572, #3046). Two firmware settings come
+up as fixes: putting the SD controller in **PCI mode rather than AHCI** (#3335), and
+an item under `Advanced` -> `System Component` (#3046). There is also an
+`Sdcard RCOMP Trigger Delay` item people associate with drop-outs (#2299). Worth
+knowing before you rely on a card for anything.
 
 The card is still useful during the install, though: the kernel reads it over the SD
 controller rather than over USB, so a live filesystem placed there is immune to the
