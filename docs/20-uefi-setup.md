@@ -61,15 +61,18 @@ Note that `F7` is **not** advertised there, but it does work — verified here. 
 opens a small boot picker rather than the setup menu:
 
 ```
-Please select boot device:
+Please select boot device:            Please select boot device:
 
-  Windows Boot Manager
-  Enter Setup
-
+  Windows Boot Manager                  Windows Boot Manager
+  Enter Setup                           UEFI: SanDisk, Partition 1
+                                        Enter Setup
   ↑ and ↓ to move selection
-  ENTER to select boot device
+  ENTER to select boot device         nothing to boot   |   ready to go
   ESC to boot using defaults
 ```
+
+The choice it makes is one-off: it does not change the boot order, so the tablet
+goes back to Windows on the next power-on until Linux is installed.
 
 That is the fastest way to check whether the firmware considers a stick bootable:
 if it is not in this list, it is not going to boot, and you have your answer in
