@@ -57,16 +57,30 @@ So **Esc and Del both work** — **verified from the POST screen of the unit thi
 guide was written against**. That is also the fastest way to settle the question
 on any unit: disable `Quiet Boot` once and the firmware announces its own keys.
 
-Note that `F7` is **not** advertised there. Owners report it as a one-off boot
-menu (4PDA #993, #2719) and it may well work, but the firmware does not claim it.
-One owner could not get in with Esc at all and used the volume keys instead
-(techtablets #34717), so have the alternatives ready:
+Note that `F7` is **not** advertised there, but it does work — verified here. It
+opens a small boot picker rather than the setup menu:
+
+```
+Please select boot device:
+
+  Windows Boot Manager
+  Enter Setup
+
+  ↑ and ↓ to move selection
+  ENTER to select boot device
+  ESC to boot using defaults
+```
+
+That is the fastest way to check whether the firmware considers a stick bootable:
+if it is not in this list, it is not going to boot, and you have your answer in
+about fifteen seconds. One owner could not get in with Esc at all and used the
+volume keys instead (techtablets #34717), so have the alternatives ready:
 
 | Key | What it does | Evidence |
 |---|---|---|
 | **Esc** | Firmware setup. The one to use. | The POST screen says so |
 | **Del** | Firmware setup, equally | The POST screen says so |
-| **F7** | One-off boot menu, skipping setup | Owner reports only |
+| **F7** | One-off boot menu, skipping setup | Verified here |
 | **Volume +** | Setup, without a keyboard. Also the documented way back in when a bad setting leaves the tablet stuck on the logo — see [50-troubleshooting.md](50-troubleshooting.md#a-setting-you-changed-left-it-stuck-on-the-chuwi-logo) | Owner reports only |
 
 ## The firmware you will see
