@@ -46,6 +46,33 @@ sudo apt install iio-sensor-proxy       # or: pacman -S iio-sensor-proxy
 monitor-sensor                          # tilt the tablet, watch the output
 ```
 
+### Rotating it once, by hand, in Lubuntu
+
+Before any of the automatic-rotation machinery: if the desktop simply comes up
+sideways and you want it fixed, that is a two-minute GUI job. Lubuntu 26.04 ships
+LXQt 2.3 on **X11** — the Wayland session is not on the ISO — so the normal tool
+works:
+
+**Preferences -> LXQt settings -> Monitor Settings**, then the **Advanced** tab, and
+the **Rotation** dropdown. "Inverted" is upside down.
+
+The same thing from a terminal, which is quicker to experiment with:
+
+```sh
+xrandr --query | grep -w connected      # find the output name, e.g. DSI-1
+xrandr --output DSI-1 --rotate right    # or: left, normal, inverted
+```
+
+If the touchscreen then registers touches in the wrong place, that is expected —
+X rotates the picture but not the digitiser's coordinate space. Rotate the input
+device with the matching transformation matrix, e.g. for `right`:
+
+```sh
+xinput set-prop "<device name>" "Coordinate Transformation Matrix" 0 1 0 -1 0 1 0 0 1
+```
+
+### Automatic rotation
+
 GNOME and KDE Plasma rotate by themselves once the daemon is running. LXQt and
 Xfce do not — they need something to act on the events. On LXQt with X11, a
 minimal approach:

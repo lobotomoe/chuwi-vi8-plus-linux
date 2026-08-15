@@ -332,6 +332,32 @@ if [ -f "$cfg" ]; then
     printf 'e2e: FAIL  kernel arguments were lost\n' >&2
     status=1
   fi
+  # The added entry that shows the kernel log instead of the splash.
+  if grep -q 'kernel log visible' "$cfg"; then
+    printf 'e2e: ok    verbose menu entry added\n'
+  else
+    printf 'e2e: FAIL  no verbose menu entry\n' >&2
+    status=1
+  fi
+  # It has to keep the distribution's own arguments while dropping only the two
+  # that hide the log - an entry that boots differently is worse than none.
+  if awk '/kernel log visible/, /^}/' "$cfg" |
+    grep -q -- '^[[:space:]]*linux[[:space:]].*---[[:space:]]*$'; then
+    printf 'e2e: ok    verbose entry keeps the distribution arguments\n'
+  else
+    printf 'e2e: FAIL  verbose entry lost or mangled the arguments\n' >&2
+    awk '/kernel log visible/, /^}/' "$cfg" >&2
+    status=1
+  fi
+  # Only the linux line: the entry's own title is free to say the words, and an
+  # earlier version of this check failed on a title reading "(no splash)".
+  if awk '/kernel log visible/, /^}/' "$cfg" |
+    grep '^[[:space:]]*linux[[:space:]]' | grep -qE 'quiet|splash'; then
+    printf 'e2e: FAIL  verbose entry still has quiet/splash\n' >&2
+    status=1
+  else
+    printf 'e2e: ok    verbose entry has no quiet/splash\n'
+  fi
 fi
 
 if [ "$(uname -s)" = Darwin ]; then

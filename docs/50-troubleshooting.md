@@ -219,10 +219,23 @@ i915.modeset=0             # the Cherry Trail-specific one
 nomodeset                  # sledgehammer: a picture, but no acceleration
 ```
 
-**This tablet does it.** Booting Lubuntu 26.04's plain "Try or Install" entry
-gives a black screen; its **"safe graphics"** entry, which is these parameters
-already applied, boots to a working desktop. Try safe graphics first — it is one
-menu item down and costs nothing.
+**Do not reach for safe graphics first, and do not conclude you have a display
+problem from a black screen alone.** This page previously said the plain "Try or
+Install" entry black-screens this tablet and that safe graphics was the fix. That
+was wrong, and the mistake is worth describing because it is easy to repeat.
+
+The plain entry did black-screen, repeatedly, while safe graphics reached a
+desktop — which looks like conclusive evidence about the display driver. It was
+not. The live USB was dropping off the bus and taking the root filesystem with
+it (see [above](#a-usb-30-stick-cannot-hold-a-link-here)); the two entries differ
+in how long they take to get to the point of needing it, which is enough to make
+a storage fault look like a graphics fault. With the live filesystem moved to the
+microSD card, **the plain entry boots to a working LXQt desktop and runs the
+installer through to a finished system.** — **verified on the unit**
+
+So: `nomodeset` is not required on this hardware, and taking it "just to be safe"
+costs you acceleration for nothing. Rule out the medium first — the
+[kernel log](13-split-media.md#boot-it) says which one you are looking at.
 
 ### Why it happens
 

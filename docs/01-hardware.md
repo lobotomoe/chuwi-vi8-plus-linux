@@ -15,24 +15,66 @@ Get-CimInstance Win32_BIOS             | Select-Object Manufacturer, SMBIOSBIOSV
 **From a Linux live session:**
 
 ```sh
-cat /sys/class/dmi/id/sys_vendor /sys/class/dmi/id/product_name /sys/class/dmi/id/board_name
+cat /sys/class/dmi/id/sys_vendor /sys/class/dmi/id/product_name \
+    /sys/class/dmi/id/board_vendor /sys/class/dmi/id/board_name
 ```
 
-A Chuwi Vi8 Plus reports:
+**Run all four, not the first three, and read the next section before you conclude
+anything.**
 
-```
-Hampoo
-D2D3_Vi8A1
-Cherry Trail CR
-```
-
-Those three strings are what the kernel itself matches on to enable the touchscreen,
-the audio quirks and the accelerometer orientation. If your tablet reports something
-else, the rest of this repo still mostly applies (any Cherry Trail tablet with 32-bit
-UEFI works the same way), but the per-device quirks in the table below will not.
+A Vi8 Plus with complete DMI reports `Hampoo` / `D2D3_Vi8A1` / `Hampoo` /
+`Cherry Trail CR`. Those strings are what the kernel matches on to enable the
+touchscreen, the Wi-Fi calibration data, the audio quirks and the accelerometer
+orientation.
 
 `scripts/collect-hw-report.sh`, run from a live session, dumps all of this plus the
 driver state in one file.
+
+### Some units ship with the DMI fields unfilled, and it breaks four things at once
+
+Check this early. It is invisible, it is not a fault in your tablet, and it is the
+single explanation for a whole cluster of "nothing works out of the box".
+
+The unit behind this guide — BIOS `1ATFG007`, 12/11/2015 — reports:
+
+```
+sys_vendor:    To be filled by O.E.M.
+product_name:  To be filled by O.E.M.
+board_vendor:  Hampoo
+board_name:    Cherry Trail CR
+```
+
+— **verified on the unit**
+
+Chuwi left the two system fields at the SMBIOS placeholder. The board fields are
+correct, but almost every kernel quirk matches on the **system** fields, so none of
+them fire:
+
+| Component | What the kernel matches on | Result with unfilled DMI |
+|---|---|---|
+| Touchscreen (ICN8505) | `DMI_SYS_VENDOR` "Hampoo" + `DMI_PRODUCT_NAME` "D2D3_Vi8A1" + `DMI_BOARD_NAME` "Cherry Trail CR" | no match — firmware never extracted, driver probe fails |
+| Wi-Fi NVRAM | `snprintf("%s-%s", sys_vendor, product_name)` in `brcmfmac/dmi.c` | looks for `...-sdio.To be filled by O.E.M.-To be filled by O.E.M..txt` |
+| Audio (RT5651) | `Hampoo` + `D2D3_Vi8A1` | no match — no mono-speaker / swapped-headphone correction |
+| Accelerometer mount matrix | hwdb `svnHampoo:pnD2D3_Vi8A1` | no match — rotation has no orientation reference |
+
+A giveaway before you check anything: the installer proposes a hostname like
+`chuwi-tobefilledbyoem`, because it builds one out of these same fields.
+
+Both of the components that matter can be fixed without DMI, because in each case the
+driver's *second* attempt uses a name that does not depend on it —
+[Wi-Fi](#wi-fi--bluetooth--ampak-ap6212-broadcom-bcm43430) and
+[touchscreen](#touchscreen--chipone-icn8505) below. Audio and the accelerometer
+matrix have no equivalent escape hatch and would need a kernel patch.
+
+The proper fix is upstream: an additional DMI entry matching `DMI_BOARD_VENDOR`
+"Hampoo" + `DMI_BOARD_NAME` "Cherry Trail CR" together with something narrow enough
+to avoid catching every Hampoo Cherry Trail board — the BIOS version or date. That
+has not been submitted.
+
+### If your tablet reports something else entirely
+
+The rest of this repo still mostly applies — any Cherry Trail tablet with 32-bit UEFI
+boots the same way — but the per-device quirks in the table below will not.
 
 ### Not every Vi8 Plus has 32-bit firmware
 
@@ -121,18 +163,88 @@ Check it landed:
 dmesg | grep -iE 'icn8505|efi.*firmware'
 ```
 
+**On a unit with [unfilled DMI](#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-four-things-at-once)
+it does not just work.** What that looks like:
+
+```
+chipone_icn8505 i2c-CHPN0001:00: Direct firmware load for chipone/icn8505-HAMP0002.fw failed with error -2
+chipone_icn8505 i2c-CHPN0001:00: Firmware request error -2
+chipone_icn8505 i2c-CHPN0001:00: probe with driver chipone_icn8505 failed with error -2
+```
+
+— **verified on the unit**
+
+Read that carefully, because it is better news than it looks. The I2C device is found,
+the driver binds to it, and the probe fails on exactly one thing: a missing file. The
+hardware and the driver are fine.
+
+And the filename in that message does **not** come from the DMI quirk — the driver
+builds `chipone/icn8505-<ACPI HID>.fw` from the ACPI device's own ID. So dropping the
+file into `/lib/firmware/chipone/` makes the touchscreen work with the DMI still
+unfilled; the quirk's only job was to extract that same file from the UEFI image.
+
+Getting the file means pulling it out of your own firmware — it is not redistributed
+anywhere. The kernel records exactly what to look for: **35012 bytes**, starting with
+`b0 07 00 00 e4 07 00 00`, SHA-256
+`93e549e0b6a2b4b3889634975ea81378729b8b829eb5ca7f125134f4307cfc7c`. Dump the SPI flash
+read-only (`flashrom -p internal -r`) or take an official Chuwi BIOS image, find the
+blob, and check it against that hash before installing it.
+
 ### Wi-Fi / Bluetooth — AmPak AP6212 (Broadcom BCM43430)
 
 - Wi-Fi driver: `brcmfmac` over SDIO (`CONFIG_BRCMFMAC=m`, `CONFIG_BRCMFMAC_SDIO=y`)
 - NVRAM: `brcm/brcmfmac43430-sdio.Hampoo-D2D3_Vi8A1.txt`, present in `linux-firmware`
-  since 2018. Any current distribution has it.
+  since 2018. Any current distribution has it — **but see the chip revision note
+  below before assuming it is the file your unit needs.**
 - **2.4 GHz only.** The chip has no 5 GHz radio. This is not a driver limitation.
 - Bluetooth: BCM43430A1 attached over UART, driver `hci_uart` + `btbcm`, patch file
   `brcm/BCM43430A1.hcd` from `linux-firmware`.
 
-Wi-Fi is reliable. Bluetooth on UART-attached Broadcom parts on Cherry Trail is the one
-component worth verifying on your own unit rather than trusting a table — see
-[50-troubleshooting.md](50-troubleshooting.md#bluetooth-does-not-appear).
+Wi-Fi is reliable **once it has NVRAM**. Bluetooth on UART-attached Broadcom parts on
+Cherry Trail is the one component worth verifying on your own unit rather than trusting
+a table — see [50-troubleshooting.md](50-troubleshooting.md#bluetooth-does-not-appear).
+
+#### Two chip revisions ship in this model, and they want different NVRAM
+
+`brcmfmac` picks firmware names by chip **revision**. Check which one you have:
+
+```sh
+sudo dmesg | grep brcmf_fw_alloc_request
+```
+
+```
+brcmfmac: brcmf_fw_alloc_request: using brcm/brcmfmac43430a0-sdio for chip BCM43430/0
+```
+
+— **verified on the unit**: revision **a0**.
+
+That matters because the NVRAM `linux-firmware` ships for this tablet is
+`brcmfmac43430**-sdio.Hampoo-D2D3_Vi8A1.txt` — no `a0`, so it came from a unit with the
+**a1** revision. The same tablet model shipped with both. There is no `a0` file named
+for this board, so an `a0` unit finds nothing and the chip never initialises:
+
+```
+Direct firmware load for brcm/brcmfmac43430a0-sdio.txt failed with error -2
+brcmfmac: brcmf_sdio_htclk: HT Avail timeout (1000000): clkctl 0x50
+```
+
+The fix does not need DMI: after the DMI-derived name fails, the driver falls back to
+the plain `brcm/brcmfmac43430a0-sdio.txt`, so put an NVRAM there.
+
+```sh
+ls /lib/firmware/brcm/ | grep 43430          # what your distribution ships
+sudo sh -c 'zstd -dc "/lib/firmware/brcm/brcmfmac43430-sdio.Hampoo-D2D3_Vi8A1.txt.zst" \
+    > /lib/firmware/brcm/brcmfmac43430a0-sdio.txt'
+sudo modprobe -r brcmfmac && sudo modprobe brcmfmac
+ip -br link                                   # wlan0 should appear
+```
+
+Candidates in preference order, all of them 8" Cherry Trail tablets with the same
+AmPak module: this board's own `Hampoo-D2D3_Vi8A1` first, since NVRAM is mostly board
+RF calibration; then the `a0` files `ilife-S806`, `ONDA-V80 PLUS`,
+`jumper-ezpad-mini3`. Trying one costs a file copy and a module reload, so work down
+the list. `ilife-S806` is the one upstream already associates with a Hampoo
+`Cherry Trail CR` board, in `brcmfmac/dmi.c`.
 
 ### Audio — Realtek RT5651
 
@@ -145,6 +257,13 @@ So the speaker is mono and the headphone channels are swapped in hardware — th
 already compensates. Userspace needs the matching UCM profile, which is in
 `alsa-ucm-conf` on every current distribution.
 
+On a unit with [unfilled DMI](#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-four-things-at-once)
+this quirk does not fire, and unlike Wi-Fi and the touchscreen there is no
+DMI-independent fallback: expect stereo routing on a mono speaker and headphone
+channels the wrong way round. The `bytcr_rt5651.c` quirk can be forced with the
+module's `quirk=` parameter if you are prepared to work out the bitmask, but that
+has not been tried here.
+
 ### Accelerometer / auto-rotation — Bosch BOSC0200
 
 - Driver: `bmc150_accel`
@@ -154,6 +273,12 @@ already compensates. Userspace needs the matching UCM profile, which is in
 
 Install `iio-sensor-proxy` and rotation works in any Wayland/GNOME/KDE session.
 See [40-post-install.md](40-post-install.md#screen-rotation).
+
+The hwdb entry matches on `svnHampoo:pnD2D3_Vi8A1`, so on a unit with
+[unfilled DMI](#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-four-things-at-once)
+the mount matrix is not applied and auto-rotation has no idea which way is up. The
+accelerometer itself still works — you can copy the matrix into a local hwdb rule
+matched on something your unit actually reports.
 
 ### Power — X-Powers AXP288 PMIC
 

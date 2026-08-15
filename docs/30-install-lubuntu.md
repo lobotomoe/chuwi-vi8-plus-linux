@@ -22,15 +22,28 @@ pool** rather than the network. The pool is definitely there:
 `lubuntu-26.04-desktop-amd64.iso` carries `grub-efi-ia32`, `grub-efi-ia32-bin`
 and `grub-efi-ia32-unsigned` in `pool/main/g/grub2/`.
 
-**Connect Wi-Fi before you install anyway.** What has been verified here is that
-the packages are on the ISO and that the installer asks for the right one. What
-has *not* been verified is that `apt-cdrom` finds the medium when the stick is a
-FAT32 copy of the ISO (what `make-media.sh` builds) rather than a `dd`-written
-ISO9660 image — the two are not the same medium as far as `apt-cdrom` is
-concerned. With network available the step succeeds either way. If you must
-install offline, expect to run
-[postinstall-grub-ia32.sh](../scripts/postinstall-grub-ia32.sh) with
-`--offline-debs` afterwards, and build that payload beforehand.
+**This works, and it works offline.** An install was run here start to finish from
+a FAT32 copy of the ISO built by `make-media.sh`, **with no network at all** — no
+Wi-Fi, no Ethernet, Calamares warning about it on the way past. The result boots.
+Afterwards the firmware's `Boot Override` lists:
+
+```
+Ubuntu          <- NVRAM entry, \EFI\ubuntu\
+UEFI OS         <- removable-media fallback, \EFI\BOOT\BOOTIA32.EFI
+```
+
+— **verified on the unit**
+
+Both paths, so the install survives firmware that ignores NVRAM boot entries. GRUB's
+own menu carries `Memory test (mt86+ia32)`, which is the giveaway that the 32-bit
+build is the one installed. `postinstall-grub-ia32.sh` was not needed.
+
+That settles the doubt this section used to carry about whether `apt-cdrom` can find
+a FAT32 copy of the ISO the way it finds a `dd`-written one. It can, or the step
+found what it needed some other way; either way the outcome is a booting 32-bit
+GRUB. Connecting Wi-Fi first remains the safer habit, and if you do end up with an
+unbootable install, [postinstall-grub-ia32.sh](../scripts/postinstall-grub-ia32.sh)
+with `--offline-debs` is the recovery.
 
 Ubuntu and Xubuntu use curtin, which picks the GRUB flavour from the *target
 architecture* rather than the firmware — there is no reference to

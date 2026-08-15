@@ -471,7 +471,38 @@ copy_boot_only() {
       "$cfg"
   } >"$mnt_usb/boot/grub/grub.cfg" || die "could not write grub.cfg"
 
+  add_verbose_entry "$mnt_usb/boot/grub/grub.cfg"
+
   log "Boot files: ${kernel##*/}, ${initrd##*/}, boot/grub/grub.cfg"
+}
+
+# A boot that stops partway is the normal failure on this hardware, and with the
+# distribution's default "quiet splash" the screen shows a logo whether the kernel
+# is working, waiting or dead. Same boot, log on screen, so it can say where it
+# stopped - and as a menu entry rather than a thing to retype under pressure.
+#
+# Derived from the menu's own first entry instead of written from scratch, so the
+# distribution's arguments (Ubuntu's "---", Debian's boot=live, and so on) survive.
+add_verbose_entry() {
+  local cfg=$1 linux_line initrd_line
+  linux_line=$(awk '/^[[:space:]]*linux[[:space:]]/ { print; exit }' "$cfg")
+  initrd_line=$(awk '/^[[:space:]]*initrd[[:space:]]/ { print; exit }' "$cfg")
+  [ -n "$linux_line" ] && [ -n "$initrd_line" ] || {
+    warn "could not find a linux/initrd pair in the menu; no verbose entry added"
+    return 0
+  }
+  # Leading whitespace is required in the match so this cannot bite into a longer
+  # word that happens to end in "quiet" or "splash".
+  linux_line=$(printf '%s' "$linux_line" |
+    sed -e 's/[[:space:]]\{1,\}quiet//g' -e 's/[[:space:]]\{1,\}splash//g')
+  cat >>"$cfg" <<EOF
+
+menuentry "Boot with the kernel log visible" {
+    set gfxpayload=keep
+$linux_line
+$initrd_line
+}
+EOF
 }
 
 if [ "$boot_only" = yes ]; then

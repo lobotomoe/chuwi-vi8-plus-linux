@@ -94,6 +94,25 @@ Put the card in the tablet's microSD slot, plug in the stick, and boot the stick
 exactly as in [20-uefi-setup.md](20-uefi-setup.md). The GRUB menu is the
 distribution's own, so pick the entry you would normally pick.
 
+There is one extra entry at the bottom: **"Boot with the kernel log visible"**. It is
+the distribution's own first entry with `quiet splash` removed.
+
+Take it the moment a boot misbehaves. With the splash up, a kernel that is working,
+a kernel that is waiting and a kernel that is dead all look identical — a logo on a
+coloured background — and every diagnosis becomes a guess about how long to wait.
+With the log on screen the boot says where it stopped. What to look for:
+
+| On screen | Meaning |
+|---|---|
+| `Unable to find a medium containing a live file system` | the card was not found; see [50-troubleshooting.md](50-troubleshooting.md#unable-to-find-a-medium-containing-a-live-file-system) |
+| stops on `i915` or `drm` lines | the display driver; reboot and take safe graphics |
+| `mmcblk` lines appear | the card is being read, which is the point of all this |
+| lines still moving, just slowly | reading 4 GB over an SD controller takes minutes; wait |
+
+GRUB itself sits on `Booting a command list` for a minute or two before any of that:
+that is it reading the kernel and a ~100 MB initrd off the USB stick. Kernel output
+starts after.
+
 ## Check it worked
 
 Once you have a desktop:
