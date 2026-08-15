@@ -2,6 +2,52 @@
 
 Ordered roughly by when you hit them.
 
+## It sits on the CHUWI logo after you pick the stick
+
+**Wait ten minutes before doing anything.** This is the single most common false
+alarm on this tablet. The firmware redraws its splash screen after you select a
+boot device and leaves it up for minutes, and because `Quiet Boot` is `Enabled`
+by default the logo stays on screen until a loader replaces it — so the picture
+in front of you carries no information at all about whether anything is running.
+
+Owners booting Windows installers from USB put the normal wait at **5-10
+minutes** (4PDA post #34449). Four minutes of logo is not a hang; it is the
+middle of the normal range.
+
+Two things make this less miserable next time:
+
+- `Boot` -> `Quiet Boot` -> `Disabled`, so POST text replaces the logo and you
+  can see progress. It does not speed anything up.
+- A USB keyboard with LEDs. `Num Lock` toggling the LED means firmware is alive
+  and servicing USB; a dead LED means it is not.
+
+If ten minutes pass with no change, power off by holding the power button for
+10-15 seconds and work through
+[the stick-not-listed checklist](#the-tablet-does-not-list-the-usb-stick-at-all).
+
+## A setting you changed left it stuck on the Chuwi logo
+
+Changing the wrong item in the firmware setup — especially anything touching
+video — can leave the tablet showing the logo and ignoring the keyboard. There is
+no CMOS jumper and no coin cell to pull. Recovery, in order:
+
+1. **Power on with `Volume +` held instead of Esc.** One owner recovered exactly
+   this state that way and restored the values by hand (4PDA post #9597). Try
+   this first.
+2. **Navigate blind.** Plug in a keyboard with a `Num Lock` LED — if it toggles,
+   the firmware is alive and taking input even with no picture, which tells you
+   the machine is worth saving. Owners have reset these tablets to defaults
+   without a display this way. Our unit's key legend puts Optimized Defaults on
+   **F3** and Save & Exit on **F4**; go slowly, and remember `+`/`-` change
+   values while `Enter` opens submenus.
+3. **HDMI.** Micro-HDMI sometimes still carries a picture when the panel does
+   not, which turns a blind recovery into a sighted one.
+
+If none of that works, the remaining route is disassembly and reflashing the SPI
+chip with a **1.8 V** CH341A programmer. That is a repair-shop job, and it is the
+reason [20-uefi-setup.md](20-uefi-setup.md#most-of-this-menu-is-hidden--turn-it-on-first)
+tells you to change Secure Boot and nothing else.
+
 ## The tablet does not list the USB stick at all
 
 The single most common cause is a missing `bootia32.efi`. Put the stick back in

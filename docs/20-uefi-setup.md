@@ -43,14 +43,20 @@ With the tablet fully off and the keyboard attached through the hub: hold the
 power button to switch on and tap **Esc** repeatedly on the USB keyboard from
 the moment the screen lights up.
 
-If Esc does nothing, on Chuwi tablets the volume rocker is the other route:
-hold **Volume +** (or **Volume -**, they differ by model) while pressing power,
-and keep holding until a menu appears. The volume keys navigate and power
-selects.
+**Esc is the right key on this tablet** — confirmed on the unit this guide was
+written against, and independently by several owners on the 4PDA thread
+(post #8455: *"заходим в биос (при включении зажать кнопку ESC)"*, post #13025).
+Two alternatives are also confirmed there:
 
-This tablet's exact key was not verified for this guide — reports for Chuwi
-Cherry Trail tablets cover Esc, Del, F7, Volume + and Volume -. Use the Windows
-route above if you can; it removes the guesswork entirely.
+| Key | What it does |
+|---|---|
+| **Esc** | Firmware setup. The one to use. |
+| **F7** | One-off boot menu — goes straight to the device list |
+| **Del** | Setup, on some units |
+| **Volume +** | Setup, without a keyboard. Also the documented way back in when a bad setting leaves the tablet stuck on the logo — see [50-troubleshooting.md](50-troubleshooting.md#a-setting-you-changed-left-it-stuck-on-the-chuwi-logo) |
+
+`F7` is worth knowing: it skips the setup menu entirely, which is what you want
+once Secure Boot is already sorted and you just need to pick the stick.
 
 ## The firmware you will see
 
@@ -98,8 +104,28 @@ Secure Boot lives. In the default, truncated menu it is nowhere:
 
 Once `SHOW ALL ITEM` is on, treat the rest of the menu with care — memory
 timings, voltages and chipset internals become visible along with the setting you
-came for. Change Secure Boot and nothing else. `F3` (Optimized Defaults) undoes
-an accident.
+came for. **Change Secure Boot and nothing else.**
+
+This is not boilerplate caution. On the 4PDA thread, changing the wrong item in
+this menu is the single most common way owners have bricked these tablets — not
+flashing firmware, just saving a bad setting:
+
+> *"стоит что-то одно не верно поменять/включить/выключить/наковырять и
+> получится кирпич, с которым прямая дорога в СЦ и перепрошивка микрухи
+> программатором"* — post #16457
+
+`F3` (Optimized Defaults) undoes an accident **while you can still see the
+screen**. If a setting kills video output, you are navigating blind, and the
+recovery is in
+[50-troubleshooting.md](50-troubleshooting.md#a-setting-you-changed-left-it-stuck-on-the-chuwi-logo).
+There is no CMOS jumper and no coin cell on this board.
+
+**Never flash firmware from another Chuwi model.** Several people tried a Hi10
+or a 64-bit image and got an unrecoverable brick; there is no way to convert a
+32-bit UEFI unit to 64-bit in software (post #33310). Recovery from that point
+means disassembly and a CH341A programmer running at **1.8 V**, not the 3.3 V the
+common ones ship with. Nothing in this repository requires touching the firmware
+image, and you should not.
 
 ## What to change
 
@@ -202,6 +228,25 @@ actually found something bootable in.
 If the stick is absent while a keyboard on the same hub works, the missing piece
 is the loader, not the hub — USB itself is plainly being serviced.
 
+### The Chuwi logo will sit there for minutes. That is normal.
+
+**Do not power off early.** After you pick the stick, this tablet redraws the
+CHUWI splash screen and stays on it for a long time before the loader paints
+anything. Owners installing Windows from USB describe exactly the same thing and
+put the normal range at **5-10 minutes**:
+
+> *"Включаешь планшет и жмешь F7. Далее выбираем загрузку с флешки. Появится
+> логотип Chuwi. Ждем не больше 5-10 минут. Появится установщик Windows 10."*
+> — 4PDA post #34449
+
+`Quiet Boot` is `Enabled` out of the box, and the splash stays up until
+something replaces it, so a logo on screen tells you nothing about whether the
+loader is running. Give it **a full 10 minutes** before concluding anything.
+Turning `Quiet Boot` off (`Boot` tab) replaces the logo with POST text and makes
+this far less nerve-wracking — it does not make the stick boot any sooner.
+
+Only after 10 minutes of no change is it worth treating as a real hang.
+
 What should happen next: a GRUB menu with the distribution's usual entries.
 That means `bootia32.efi` started, found `/boot/grub/grub.cfg` on the stick and
 handed over. From here the 32-bit part of the job is done — everything after
@@ -220,6 +265,35 @@ In order of likelihood:
 4. **The hub was plugged in after power-on.** Power off completely and retry.
 5. **The firmware wants a differently typed partition.** Rebuild the stick from
    Linux or with Rufus (GPT / UEFI non-CSM).
+6. **Re-seat the stick.** One owner reports the firmware missing a stick at
+   power-on but picking it up immediately after unplugging and replugging it
+   (4PDA post #28075). Cheap to try before rebuilding anything.
+
+### The one recipe known to have worked on this exact tablet
+
+A 4PDA owner installed **Ubuntu 20.04** successfully in May 2020 (post #3875)
+and described what it took:
+
+> *"Понадобилось bootia32.efi в /efi/boot (оттуда все удалить обязательно и
+> оставить только этот файл), пишем флешку через руфус. Установку производим
+> автоматом. ОБЯЗАТЕЛЬНО иметь интернет (свисток, юсб модем), без интернета
+> будет давать ошибку в конце установки."*
+
+Three things in that are worth taking seriously:
+
+- **`\EFI\BOOT\` contained only `bootia32.efi`** — everything else, including
+  `bootx64.efi`, was deleted. A conformant 32-bit firmware should simply ignore
+  `bootx64.efi`, so this should not matter; on AMI builds of this vintage it
+  reportedly did. If a stick that looks correct will not start, emptying
+  `\EFI\BOOT\` down to the single 32-bit loader is a cheap thing to test.
+- **The installer needs a working network connection**, or it fails at the very
+  end. This tablet's Wi-Fi does work in a live session, but if you are installing
+  somewhere without Wi-Fi, plan for a USB Ethernet adapter on the hub.
+- Sound, graphics, brightness, **screen orientation** and the physical buttons
+  worked out of the box for them; Wi-Fi and touch did not. That report predates
+  the `chipone_icn8505` driver reaching a released Ubuntu kernel, which is why
+  [01-hardware.md](01-hardware.md) expects touch to work on anything current —
+  but it is the reason to verify touch in the live session rather than assume.
 
 More in [50-troubleshooting.md](50-troubleshooting.md).
 
