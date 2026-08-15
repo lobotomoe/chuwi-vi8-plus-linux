@@ -43,7 +43,7 @@ driver state in one file.
 | GPU | Intel HD Graphics (Gen8 / Cherry Trail) |
 | RAM | 2 GB DDR3L, soldered |
 | Storage | 32 GB eMMC + microSD slot |
-| Display | 8.0" IPS, 1280x800, native landscape, 10-point capacitive touch |
+| Display | 8.0" IPS, 1280x800, 10-point capacitive touch. Scanout orientation is probably **portrait** (800x1280) — the firmware setup renders upright with the tablet held portrait — and the kernel has no orientation quirk for this model, so expect to rotate it yourself. See [40-post-install.md](40-post-install.md#if-everything-starts-sideways) |
 | Firmware | **32-bit (IA32) UEFI**, no CSM/legacy boot |
 | Ports | 1x USB Type-C (USB 2.0, power + data, OTG), micro-HDMI 1.4, microSD, 3.5 mm |
 | Battery | 5000 mAh Li-Po |

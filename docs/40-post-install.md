@@ -55,10 +55,43 @@ sudo apt install screen-rotate           # if packaged for your release
 # or use iio-sensor-proxy + a small xrandr script bound to monitor-sensor output
 ```
 
-The panel is native landscape at 1280x800, so the desktop starts the right way
-up with no `video=` or `fbcon=rotate` argument. If you ever do need to force the
-early-boot mode, add `video=1280x800@60` to `GRUB_CMDLINE_LINUX_DEFAULT` in
-`/etc/default/grub` and run `update-grub`.
+### If everything starts sideways
+
+Check this before assuming it is broken. The setup menu on this tablet renders
+upright while the tablet is held in portrait, with the Windows button at the
+bottom — and firmware draws at the panel's native scanout orientation. That is
+consistent with a **portrait-native panel** (800x1280 scanned out, presented as
+1280x800 in landscape use), which is the norm for 8" Windows tablets.
+
+If that is what this panel is, GRUB, the kernel console and the desktop will all
+start rotated 90°, because **the kernel has no panel-orientation quirk for this
+model**. `drivers/gpu/drm/drm_panel_orientation_quirks.c` covers the Chuwi HiBook
+(CWI514) and Hi10 Pro (CWI529) but not the Vi8 Plus, so nothing corrects it
+automatically. The HiBook entry matches on `Hampoo` + `Cherry Trail CR`, which
+this tablet also reports, but it is declared for a 1200x1920 panel and the lookup
+compares resolution before anything else, so it cannot misfire here.
+
+Settle it in the live session before installing:
+
+```sh
+cat /sys/class/graphics/fb0/virtual_size        # 1280,800 or 800,1280
+xrandr --query | grep -w connected               # X11
+```
+
+If it is portrait-native, the fixes are, in order of preference:
+
+```sh
+# the desktop session, per-output and persistent - try this first
+xrandr --output DSI-1 --rotate right
+
+# the kernel console and GRUB, if those matter to you too
+# add to GRUB_CMDLINE_LINUX_DEFAULT in /etc/default/grub, then update-grub
+fbcon=rotate:1 video=DSI-1:panel_orientation=right_side_up
+```
+
+Replace `DSI-1` with the connector name `xrandr` actually reports. If early boot
+is garbled rather than merely rotated, `video=1280x800@60` is the separate fix
+for that.
 
 ## Audio
 

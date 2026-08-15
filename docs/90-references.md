@@ -99,10 +99,26 @@ inspecting the actual ISO — rather than taken from a forum post.
   Button Reset`. — **verified from photographs of the running setup menu,
   August 2026**. Searching for documentation of `SHOW ALL ITEM` on Chuwi hardware
   turns up nothing; the on-screen help is the source.
+- With `SHOW ALL ITEM` enabled, `Security` gains `▶ Secure Boot menu` and
+  `▶ Secure Flash update`. The latter is a read-only report (`Signed BIOS update
+  Enabled`, `Public Key store Sha256`, `Signature algorithm PKCS#1v1.5/PSS`,
+  `BIOS flash method Runtime,Capsule,Recovery`, `Flash write-protection
+  Disabled`) and is not where Secure Boot is configured. `Save & Exit` also gains
+  `Reset System with ME disable ModeMEUD000`. — **verified from photographs of
+  the running setup menu, August 2026**
 - AMI Aptio locks the Secure Boot setting until an Administrator (supervisor)
   password is set; setting one makes it selectable, and clearing it afterwards
   leaves the choice in place.
   <https://www.makeuseof.com/secure-boot-grayed-out-bios/>
+- No panel-orientation quirk exists for the Vi8 Plus in
+  `drivers/gpu/drm/drm_panel_orientation_quirks.c`; the file covers the Chuwi
+  HiBook (CWI514) and Hi10 Pro (CWI529). The HiBook entry matches on
+  `Hampoo` + `Cherry Trail CR`, which the Vi8 Plus also reports, but it is
+  declared for a 1200x1920 panel and `drm_get_panel_orientation_quirk()` compares
+  width and height before consulting the DMI match, so it cannot misfire on this
+  tablet.
+  <https://github.com/torvalds/linux/blob/master/drivers/gpu/drm/drm_panel_orientation_quirks.c>
+  — **verified**
 - Chuwi Vi8 family: Esc on a USB keyboard immediately after power-on enters the
   setup menu, and the one-off boot choice lives under `Boot Override` in the last
   tab. Community reports, not verified per-unit here.

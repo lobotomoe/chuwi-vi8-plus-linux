@@ -107,8 +107,26 @@ an accident.
 a Microsoft-signed 32-bit x86 shim, so with Secure Boot on, nothing you build
 will start. See [02-boot-problem.md](02-boot-problem.md#secure-boot).
 
-If it appears but is greyed out, that is the AMI Aptio behaviour where the
-setting is locked until a supervisor password exists:
+With `SHOW ALL ITEM` enabled, the `Security` tab gains two submenus:
+
+```
+Administrator Password
+User Password
+▶ Secure Boot menu        <- this one
+▶ Secure Flash update
+```
+
+Open **`Secure Boot menu`** with **Enter** — the `▶` marks a submenu, so `+/-`
+does nothing on it. The `Secure Boot` value lives inside.
+
+`Secure Flash update` is the neighbouring trap: it is a read-only report on the
+firmware's own update policy (`Signed BIOS update`, `Public Key store`,
+`Signature algorithm`, `BIOS flash method`, `Flash write-protection`). Nothing in
+it is editable and nothing in it concerns booting Linux. Landing there and
+concluding that Secure Boot cannot be changed is an easy mistake to make.
+
+If the setting inside is greyed out, that is the AMI Aptio behaviour where it is
+locked until a supervisor password exists:
 
 1. `Security` -> `Administrator Password` -> set one
 2. `Secure Boot` -> `Disabled`
