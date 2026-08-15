@@ -47,9 +47,9 @@ firmware that is **not** 32-bit:
 - **Dual-boot (Android + Windows) units behave differently.** One owner reports BIOS
   `D2D3_Vi8A1.232` presenting as 32-bit when booting Windows and **64-bit when
   booting Android**, with `x64` appended to the version string in the menu
-  (post #36155). Those units expose a **`Boot architecture`** setting the 32-bit
-  units do not have (posts #33087, #33636).
-- BIOS revision **1608** is reported as 64-bit when booting Windows (post #37112).
+  (post #2861). Those units expose a **`Boot architecture`** setting the 32-bit
+  units do not have (posts #2613, #2655).
+- BIOS revision **1608** is reported as 64-bit when booting Windows (post #2940).
 
 So "the Vi8 Plus has 32-bit UEFI" is true of this model in general and **not
 guaranteed of your unit**. Check before you build anything:
@@ -58,12 +58,25 @@ guaranteed of your unit**. Check before you build anything:
 cat /sys/firmware/efi/fw_platform_size      # 32 -> this guide applies
 ```
 
+That needs a booted Linux, which is the thing you cannot do yet. **From Windows,
+while you still have it**, this answers the same question:
+
+```powershell
+$env:PROCESSOR_ARCHITECTURE                 # x86 -> 32-bit Windows
+Confirm-SecureBootUEFI                      # errors if not booted via UEFI
+```
+
+UEFI requires the firmware and the operating system to share a bitness, so a
+**32-bit Windows booted in UEFI mode means 32-bit firmware** — which is the case
+this repository is written for, and what the stock Vi8 Plus ships with. If that
+reports `AMD64`, stop and re-read this section before building a stick.
+
 If it reports `64`, you do not have this repository's problem at all — install
 normally with the distribution's own 64-bit media and ignore everything here about
 `bootia32.efi`. If your firmware has a `Boot architecture` item, leave it alone
 unless you know exactly which way your unit boots; owners who tried to move a
 32-bit unit to 64-bit firmware bricked it, and there is no software path back
-(post #33310).
+(post #2626).
 
 ## Base specification
 

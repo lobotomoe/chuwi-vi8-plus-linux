@@ -45,7 +45,7 @@ the moment the screen lights up.
 
 **Esc is the right key on this tablet** — confirmed on the unit this guide was
 written against, and independently by several owners on the 4PDA thread
-(post #8455: *"заходим в биос (при включении зажать кнопку ESC)"*, post #13025).
+(post #636: *"заходим в биос (при включении зажать кнопку ESC)"*, post #990).
 Two alternatives are also confirmed there:
 
 | Key | What it does |
@@ -112,7 +112,7 @@ flashing firmware, just saving a bad setting:
 
 > *"стоит что-то одно не верно поменять/включить/выключить/наковырять и
 > получится кирпич, с которым прямая дорога в СЦ и перепрошивка микрухи
-> программатором"* — post #16457
+> программатором"* — post #1270
 
 `F3` (Optimized Defaults) undoes an accident **while you can still see the
 screen**. If a setting kills video output, you are navigating blind, and the
@@ -122,7 +122,7 @@ There is no CMOS jumper and no coin cell on this board.
 
 **Never flash firmware from another Chuwi model.** Several people tried a Hi10
 or a 64-bit image and got an unrecoverable brick; there is no way to convert a
-32-bit UEFI unit to 64-bit in software (post #33310). Recovery from that point
+32-bit UEFI unit to 64-bit in software (post #2626). Recovery from that point
 means disassembly and a CH341A programmer running at **1.8 V**, not the 3.3 V the
 common ones ship with. Nothing in this repository requires touching the firmware
 image, and you should not.
@@ -241,7 +241,7 @@ put the normal range at **5-10 minutes**:
 
 > *"Включаешь планшет и жмешь F7. Далее выбираем загрузку с флешки. Появится
 > логотип Chuwi. Ждем не больше 5-10 минут. Появится установщик Windows 10."*
-> — 4PDA post #34449
+> — 4PDA post #2719
 
 `Quiet Boot` is `Enabled` out of the box, and the splash stays up until
 something replaces it, so a logo on screen tells you nothing about whether the
@@ -271,7 +271,7 @@ In order of likelihood:
    Linux or with Rufus (GPT / UEFI non-CSM).
 6. **Re-seat the stick.** One owner reports the firmware missing a stick at
    power-on but picking it up immediately after unplugging and replugging it
-   (4PDA post #28075). Cheap to try before rebuilding anything.
+   (4PDA post #2214). Cheap to try before rebuilding anything.
 
 ### The one recipe known to have worked on this exact tablet
 

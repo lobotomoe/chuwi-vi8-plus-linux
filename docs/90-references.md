@@ -128,22 +128,23 @@ inspecting the actual ISO — rather than taken from a forum post.
 ## The 4PDA owners' thread
 
 <https://4pda.to/forum/index.php?showtopic=713525> — "Chuwi Vi8 Plus —
-Обсуждение", 4191 posts across 201 pages, December 2015 to February 2026. Readable
+Обсуждение" (Russian), 3999 posts across 201 pages, December 2015 to April 2026. Readable
 without an account. By far the largest body of first-hand experience with this exact
 model, and the only place several of the facts below appear at all. It is a forum:
 individual posts are unverified owner reports, and they are cited as such. Where a
 claim below is corroborated by more than one independent poster, that is noted.
 
-Post numbers are the thread's own (`#NNNN`), reachable by paging to them.
+Post numbers are the thread's own (`#NNNN`, up to #4002), shown against each post
+and reachable by paging to `&st=` in multiples of 20.
 
 - **Esc enters setup; F7 is the one-off boot menu; Volume + also enters setup.**
-  Multiple independent reports (#8455, #13025, #13040, #34449, and #4193/#9596 for
+  Multiple independent reports (#636, #990, #993, #2719, and #318/#721 for
   Volume +). Esc is separately **verified on the unit this guide was written
   against**.
 - **The CHUWI splash sits for 5-10 minutes after you select a USB device, and
-  that is normal.** Post #34449 gives the full working procedure for booting a
+  that is normal.** Post #2719 gives the full working procedure for booting a
   Windows installer this way. Corroborated by owners who mistook it for a hang
-  (#33062, #42091, #46715). This is the single most useful thing in the thread.
+  (#2609, #3345, #3741). This is the single most useful thing in the thread.
 - **Ubuntu 20.04 was installed successfully on this tablet in May 2020**, post
   #3875: `bootia32.efi` alone in `\EFI\BOOT\` with everything else deleted, stick
   written with Rufus, and a working network connection required or the install
@@ -151,23 +152,32 @@ Post numbers are the thread's own (`#NNNN`), reachable by paging to them.
   physical buttons worked; Wi-Fi and touch did not — that predates
   `chipone_icn8505` reaching a released Ubuntu kernel. Arch also installs
   (#3876).
-- **The default setup menu genuinely has no Secure Boot entry.** Post #12579 —
+- **The default setup menu genuinely has no Secure Boot entry.** Post #960 —
   *"в биос зашёл с помощью Esc ... но secury boot нет, есть quiet boot, fast boot
   и boot опции 1,2,3,4"* — is an owner hitting exactly the truncated menu that
   `SHOW ALL ITEM` unhides, and concluding the setting does not exist.
 - **Firmware revisions differ in bitness.** BIOS `D2D3_Vi8A1.232` on dual-boot
-  units reports 32-bit for Windows and 64-bit for Android (#36155); those units
-  have a `Boot architecture` item (#33087, #33636); revision 1608 is reported
-  64-bit (#37112). Converting a 32-bit unit to 64-bit firmware is described as a
-  guaranteed brick (#33310).
-- **Bricking is usually caused by a bad setup setting, not by flashing** (#16457,
-  #12779, #9535). Recovery routes: power on holding Volume + (#9597), or blind
-  navigation confirmed by a keyboard's Num Lock LED (#13040, #13097). Last resort
-  is a CH341A programmer at **1.8 V**, not 3.3 V (#16151).
-- **The USB-C port enumerates only what was attached before power-on** (#46482),
-  and a stick the firmware missed can appear after a re-seat (#28075).
+  units reports 32-bit for Windows and 64-bit for Android (#2861); those units
+  have a `Boot architecture` item (#2613, #2655); revision 1608 is reported
+  64-bit (#2940). Converting a 32-bit unit to 64-bit firmware is described as a
+  guaranteed brick (#2626).
+- **Bricking is usually caused by a bad setup setting, not by flashing** (#1270,
+  #973, #713). Recovery routes: power on holding Volume + (#721), or blind
+  navigation confirmed by a keyboard's Num Lock LED (#993, #1000). Last resort
+  is a CH341A programmer at **1.8 V**, not 3.3 V (#1246).
+- **DNX mode exists on this model and is entered exactly as de Goede describes.**
+  Post #3499 spells it out — *"Выключить планшет. Затем включить его, зажав
+  качельки громкости "+" и "-" вместе. На экране планшета должна появиться
+  надпись 'DNX FASTBOOT MODE..'"* — and post #2932 is an owner landing in
+  `Entering dnx mode. Waiting for fastboot command` by accident. Two caveats
+  worth carrying: one owner reports DNX simply not working on their unit (#2681),
+  and another could not get a Vi8 Plus in DNX to enumerate on the host at all,
+  showing as an unknown device on two different PCs (#2935). So DNX is the right
+  first thing to try, not a guarantee.
+- **The USB-C port enumerates only what was attached before power-on** (#3720),
+  and a stick the firmware missed can appear after a re-seat (#2214).
 - **The firmware boot menu does not offer the microSD slot**, only USB mass
-  storage (#10561) — consistent with this repo's requirement to install to eMMC.
+  storage (#791) — consistent with this repo's requirement to install to eMMC.
 - Battery: the thread's specification header states Chuwi claims 4000 mAh with
   owners measuring 3900-4050 mAh, contradicting Notebookcheck's 5000 mAh.
   Unresolved; read `energy_full_design` on your own unit.
@@ -212,9 +222,10 @@ because a claim repeated by one community is not the same as a verified one.
     keys instead (#34717), which is why both are documented.
 - **Dell KB 000141299, "Systems with 32 bit processor will not boot to USB key if
   both 32 bit and 64 bit images are present"** — prescribes a key carrying only
-  the 32-bit loader. **Retired by Dell** (every locale now returns "The chosen
-  document is not currently available", checked August 2026) and recoverable only
-  from search-engine indexes, so treat it as weak. Its stated mechanism — that
+  the 32-bit loader. **Retired by Dell** — the `en-us` and `en-ca` locales both
+  return "The chosen document is not currently available" (checked August 2026),
+  and the text quoted here survives only in search-engine indexes rather than
+  having been read from the live article, so treat it as weak. Its stated mechanism — that
   the firmware "will not boot past the bootx64.efi boot file" — also contradicts
   the UEFI specification, under which IA32 firmware looks only for
   `\EFI\BOOT\BOOTIA32.EFI`. Taken together with the techtablets counter-evidence,

@@ -57,7 +57,9 @@ Confirm which one you have before doing anything else — see
    - [Linux](docs/11-usb-linux.md)
    - [Windows](docs/12-usb-windows.md)
 4. Get into the tablet's firmware setup, disable Secure Boot, boot the stick —
-   [docs/20-uefi-setup.md](docs/20-uefi-setup.md).
+   [docs/20-uefi-setup.md](docs/20-uefi-setup.md). **Then wait ten minutes.** This
+   tablet sits on the CHUWI logo for 5-10 minutes after you pick the stick, and
+   powering off early is the most common way people conclude it does not work.
 5. Install:
    - [Lubuntu 26.04 LTS](docs/30-install-lubuntu.md) — **recommended**, this is the
      "latest Ubuntu, user friendly" answer for this hardware

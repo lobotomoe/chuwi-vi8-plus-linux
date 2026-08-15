@@ -11,7 +11,7 @@ by default the logo stays on screen until a loader replaces it — so the pictur
 in front of you carries no information at all about whether anything is running.
 
 Owners booting Windows installers from USB put the normal wait at **5-10
-minutes** (4PDA post #34449). Four minutes of logo is not a hang; it is the
+minutes** (4PDA post #2719). Four minutes of logo is not a hang; it is the
 middle of the normal range.
 
 Two things make this less miserable next time:
@@ -32,7 +32,7 @@ video — can leave the tablet showing the logo and ignoring the keyboard. There
 no CMOS jumper and no coin cell to pull. Recovery, in order:
 
 1. **Power on with `Volume +` held instead of Esc.** One owner recovered exactly
-   this state that way and restored the values by hand (4PDA post #9597). Try
+   this state that way and restored the values by hand (4PDA post #721). Try
    this first.
 2. **Navigate blind.** Plug in a keyboard with a `Num Lock` LED — if it toggles,
    the firmware is alive and taking input even with no picture, which tells you
@@ -54,7 +54,16 @@ enter setup. **Cherry Trail is the good case here:** the USB gadget PHY is
 integrated into the SoC, so DNX works, where on many Bay Trail units it does not.
 
 Enter it by powering on with **Volume Up and Volume Down held together**. The
-tablet prints `DNX` on the panel.
+tablet prints `DNX FASTBOOT MODE` on the panel — Vi8 Plus owners describe exactly
+this (4PDA posts #3499 and #2932), so the mode is present on this model rather
+than merely on the platform in general.
+
+**Nobody has confirmed the full recovery on a Vi8 Plus**, and there are two known
+ways it disappoints: one owner reports DNX not working on their unit (#2681), and
+another could not get the tablet to enumerate on the host at all, showing as an
+unknown device on two different PCs (#2935). If the host does not see it, that is
+a driver problem on the PC side, not necessarily a dead tablet — try a Linux host,
+where `fastboot` from `android-tools` needs no vendor driver.
 
 Then, from a PC with `fastboot` installed and the tablet connected over USB:
 
