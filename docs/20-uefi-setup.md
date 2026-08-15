@@ -217,8 +217,10 @@ enumerated fully at power-on.
 workaround for random freezes on Chuwi's Atom tablets. It costs battery life, so
 leave it alone unless you actually see freezes — and if you do, see
 [50-troubleshooting.md](50-troubleshooting.md#random-freezes). There is no
-`Power` tab on this firmware; look under `Advanced` or `Chipset` after enabling
-`SHOW ALL ITEM`. Its exact location here has not been confirmed.
+`Power` tab on this firmware — with `SHOW ALL ITEM` on, look under
+**`Advanced` -> `PPM Configuration`** (Processor Power Management), which is where
+AMI puts C-state options on this platform. The submenu exists on this unit; its
+contents have not been photographed, so the exact item name is not recorded.
 
 Save with **F4** and let it reboot.
 

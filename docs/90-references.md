@@ -106,6 +106,18 @@ inspecting the actual ISO — rather than taken from a forum post.
   Disabled`) and is not where Secure Boot is configured. `Save & Exit` also gains
   `Reset System with ME disable ModeMEUD000`. — **verified from photographs of
   the running setup menu, August 2026**
+- With `SHOW ALL ITEM` enabled, the `Advanced` tab carries exactly these
+  submenus, in this order: `Trusted Computing`, `ACPI Settings`, `Serial Port
+  Console Redirection`, `CPU Configuration`, `PPM Configuration`, `Thermal`,
+  `Android`, `PCI Subsystem Settings`, `Network Stack Configuration`,
+  `USB Configuration`, `Platform Trust Technology`, `Security Configuration`,
+  `System Component`. — **verified from a photograph of the running setup menu,
+  August 2026.** Three of these matter here: `PPM Configuration` is where AMI
+  puts C-state options on this platform; `USB Configuration` is the one that
+  bricks the tablet if USB is turned off, and on this firmware it also lists
+  detected mass-storage devices, which separates "the firmware cannot see the
+  stick" from "it sees it but finds no loader" (4PDA #2831 describes exactly that
+  split); and `Android` is presumably the dual-boot machinery, unexplored here.
 - AMI Aptio locks the Secure Boot setting until an Administrator (supervisor)
   password is set; setting one makes it selectable, and clearing it afterwards
   leaves the choice in place.
