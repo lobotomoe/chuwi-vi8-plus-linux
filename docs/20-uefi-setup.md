@@ -77,21 +77,41 @@ The key legend is printed down the right-hand side of every page:
 
 **Saving is F4, not F10.** F10 does nothing here.
 
+## Most of this menu is hidden — turn it on first
+
+**Do not go looking for Secure Boot tab by tab. It is not displayed at all until
+you unhide it.** Chuwi ships this firmware with most of its settings suppressed,
+and the switch is in an unexpected place:
+
+`Save & Exit` -> **`SHOW ALL ITEM`** -> `Enabled` (change it with `+`, not Enter)
+
+The on-screen help for it reads *"Enable or Disable show all setup item"*. Its
+default is `Disabled`. Then pick `Save Changes and Reset` and re-enter setup:
+every tab now carries considerably more than before.
+
+This is why a stock walkthrough of these tablets is so often wrong about where
+Secure Boot lives. In the default, truncated menu it is nowhere:
+
+- `Security` holds only `Administrator Password` and `User Password` (3–20 chars)
+- `Boot` holds only `Bootup NumLock State`, `Quiet Boot`, `Fast Boot`, the fixed
+  boot order and `UEFI Hard Disk Drive BBS Priorities`
+
+Once `SHOW ALL ITEM` is on, treat the rest of the menu with care — memory
+timings, voltages and chipset internals become visible along with the setting you
+came for. Change Secure Boot and nothing else. `F3` (Optimized Defaults) undoes
+an accident.
+
 ## What to change
 
 **1. Secure Boot -> Disabled.** This is not optional: no distribution publishes
 a Microsoft-signed 32-bit x86 shim, so with Secure Boot on, nothing you build
 will start. See [02-boot-problem.md](02-boot-problem.md#secure-boot).
 
-It is **not** on the `Security` tab. On this firmware that tab contains only
-`Administrator Password` and `User Password` (3–20 characters) and nothing else.
-Look under `Boot`, then `Advanced`.
-
-If you find `Secure Boot` but it is greyed out, that is the AMI Aptio behaviour
-where the setting is locked until a supervisor password exists:
+If it appears but is greyed out, that is the AMI Aptio behaviour where the
+setting is locked until a supervisor password exists:
 
 1. `Security` -> `Administrator Password` -> set one
-2. `Boot` -> `Secure Boot` -> `Disabled`
+2. `Secure Boot` -> `Disabled`
 3. `Security` -> `Administrator Password` -> enter the current one, leave the new
    one **empty** — this clears it again
 
@@ -100,20 +120,24 @@ hub, and a tablet has no CMOS jumper or coin cell to clear a forgotten password
 with. Treat the password as a temporary key, write it down while it is set, and
 remove it as soon as Secure Boot is off.
 
-If there is no Secure Boot setting anywhere, it is absent from this firmware
-build rather than hidden, and there is nothing to turn off — go straight to
-booting the stick.
+**2. Boot order — nothing to do.** The shipped order already puts USB first:
 
-**2. Boot order.** `Boot` tab: put USB ahead of the internal eMMC. For a one-off
-choice, use `Save & Exit` -> `Boot Override` — the last tab — and pick the stick
-there instead of changing the order at all.
+```
+Boot Option #1   [USB Lan]
+Boot Option #2   [USB Key]
+Boot Option #3   [USB Hard Disk]
+Boot Option #4   [Hard Disk: Windows Boot Manager]
+```
+
+`Fast Boot` is `Disabled` out of the box too, which is what you want — USB gets
+enumerated fully at power-on.
 
 **3. Optional: CPU C-states.** Setting C-States to `C1` is a long-standing
 workaround for random freezes on Chuwi's Atom tablets. It costs battery life, so
 leave it alone unless you actually see freezes — and if you do, see
 [50-troubleshooting.md](50-troubleshooting.md#random-freezes). There is no
-`Power` tab on this firmware; if the setting exists it is under `Advanced` or
-`Chipset`. Its exact location here has not been confirmed.
+`Power` tab on this firmware; look under `Advanced` or `Chipset` after enabling
+`SHOW ALL ITEM`. Its exact location here has not been confirmed.
 
 Save with **F4** and let it reboot.
 
@@ -123,12 +147,20 @@ Go to the last tab, `Save & Exit`, and pick the stick under **`Boot Override`**.
 There is no separate `Boot Manager` tab on this firmware. The stick usually
 appears under its own product name rather than as "UEFI: USB".
 
-Whether the stick is listed at all is the single most informative thing in this
-whole menu. The firmware only offers a removable device it could actually start,
-so if it appears, a 32-bit loader was found at `\EFI\BOOT\BOOTIA32.EFI` — which
-is the entire problem this repository exists to solve. If the stick is absent
-while a keyboard on the same hub works fine, the loader is what is missing, not
-the hub.
+Whether the stick is listed there is the single most informative thing in this
+whole menu, and it costs nothing to look. The firmware only offers a removable
+device it could actually start, so if the stick appears, a 32-bit loader was
+found at `\EFI\BOOT\BOOTIA32.EFI` — the entire problem this repository exists to
+solve, answered without leaving setup. With no stick attached the list shows just
+`Windows Boot Manager`, so make sure it is plugged in before reading anything
+into its absence.
+
+A matching `UEFI USB Key Drive BBS Priorities` submenu appearing on the `Boot`
+tab is the same signal: those submenus exist only for device classes the firmware
+actually found something bootable in.
+
+If the stick is absent while a keyboard on the same hub works, the missing piece
+is the loader, not the hub — USB itself is plainly being serviced.
 
 What should happen next: a GRUB menu with the distribution's usual entries.
 That means `bootia32.efi` started, found `/boot/grub/grub.cfg` on the stick and

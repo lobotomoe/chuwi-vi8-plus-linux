@@ -88,6 +88,17 @@ inspecting the actual ISO — rather than taken from a forum post.
   Secure Boot entry. The on-screen key legend gives `F4: Save & Exit`,
   `F3: Optimized Defaults`, `F2: Previous Values`, `+/-: Change Opt.`
   — **verified from a photograph of the running setup menu, August 2026**
+- `Save & Exit` -> **`SHOW ALL ITEM`**, default `[Disabled]`, help text *"Enable
+  or Disable show all setup item"*. Chuwi suppresses most of the setup menu with
+  it, which is why Secure Boot is absent from both `Security` and `Boot` in the
+  default view. The `Boot` tab ships with `Bootup NumLock State [On]`,
+  `Quiet Boot [Enabled]`, `Fast Boot [Disabled]`, a fixed boot order of
+  `USB Lan / USB Key / USB Hard Disk / Hard Disk: Windows Boot Manager`, and only
+  `UEFI Hard Disk Drive BBS Priorities`. `Save & Exit` also carries `Boot
+  Override`, `Launch EFI Shell from filesystem device` and `Windows 10 - Push
+  Button Reset`. — **verified from photographs of the running setup menu,
+  August 2026**. Searching for documentation of `SHOW ALL ITEM` on Chuwi hardware
+  turns up nothing; the on-screen help is the source.
 - AMI Aptio locks the Secure Boot setting until an Administrator (supervisor)
   password is set; setting one makes it selectable, and clearing it afterwards
   leaves the choice in place.
