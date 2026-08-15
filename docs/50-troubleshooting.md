@@ -158,12 +158,18 @@ power, which arrives long before any USB transaction succeeds.
 
 In order:
 
-1. **Try a USB 2.0 stick.** This tablet's port is USB 2.0 and its firmware dates
+1. **Try a different hub. This is the one that actually happened.** A USB-C hub
+   that passed a keyboard and a mouse through perfectly never presented the stick
+   to the firmware at all — no `Drive` on the `USB Devices:` line, in any of its
+   ports, with the stick's own activity LED lit the whole time. Swapping to
+   another hub made the same stick appear immediately. Nothing about the stick,
+   its filesystem or its bootloader was involved. If HID works but storage does
+   not, suspect the hub before anything else.
+2. **Try a USB 2.0 stick.** This tablet's port is USB 2.0 and its firmware dates
    from 2015 with a single XHCI controller. A USB 3.0 stick behind a USB 3.0 hub
-   on a USB 2.0 host is a combination old firmware frequently fails to enumerate,
-   while low-speed HID devices on the same hub keep working perfectly — which
-   makes it look like the stick is at fault when it is the negotiation. An
-   unremarkable 8-32 GB USB 2.0 stick sidesteps the whole question.
+   on a USB 2.0 host is a combination old firmware can fail to enumerate, while
+   low-speed HID devices on the same hub keep working — which makes it look like
+   the stick is at fault when it is the negotiation.
 2. **Power the hub.** With a hub attached this tablet runs on battery, and a stick
    draws far more than a keyboard. If your hub has a Type-C Power Delivery input,
    put a charger in it.

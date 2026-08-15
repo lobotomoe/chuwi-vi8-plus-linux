@@ -323,6 +323,11 @@ partition_macos() {
   # ends up with exactly one FAT32 partition covering the whole device. macOS
   # types it "Microsoft Basic Data" rather than "EFI System"; firmware looking
   # for \EFI\BOOT\BOOTIA32.EFI on removable media scans FAT volumes either way.
+  #
+  # That last sentence was an assumption for a long time. It is now confirmed: a
+  # stick built here, typed Microsoft Basic Data, boots the Chuwi Vi8 Plus - it
+  # appears as "UEFI: SanDisk, Partition 1" under Boot Override and hands over to
+  # GRUB. No ESP type code needed.
   diskutil unmountDisk force "$device" >/dev/null 2>&1 || true
   diskutil eraseDisk -noEFI FAT32 "$LABEL" GPT "$device" >/dev/null ||
     die "diskutil eraseDisk failed on $device"

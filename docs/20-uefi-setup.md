@@ -288,10 +288,26 @@ whole menu, and it costs nothing to look:
 
 The firmware only offers a removable device it could actually start, so the
 stick's presence in that list answers the entire question this repository exists
-for, without leaving setup. The entry usually carries the stick's own product name
-rather than reading "UEFI: USB". With no stick attached the list shows just
-`Windows Boot Manager`, so confirm it is plugged in before reading anything into
-its absence.
+for, without leaving setup. On this unit a working stick appears as:
+
+```
+Boot Override
+  Windows Boot Manager
+  UEFI: SanDisk, Partition 1
+```
+
+— the `UEFI:` prefix followed by the stick's own product name.
+
+### The list is built at POST, so reboot before you read it
+
+**This costs people an evening.** `Advanced` -> `USB Configuration` polls the bus
+live, so a stick plugged in while you are sitting in setup shows up there
+immediately. `Boot Override` does not work that way: the firmware enumerates
+boot options once, during POST, and hot-plugging afterwards cannot add to it.
+
+A stick that is listed under `USB Configuration` as a `Drive` but missing from
+`Boot Override` usually means nothing more than that it was inserted too late.
+Press `F4`, let it reboot with the stick attached, and look again.
 
 **There is no way to look without committing:** pressing `Enter` on an entry boots
 it immediately. `Esc` backs out without booting.
