@@ -52,33 +52,83 @@ This tablet's exact key was not verified for this guide — reports for Chuwi
 Cherry Trail tablets cover Esc, Del, F7, Volume + and Volume -. Use the Windows
 route above if you can; it removes the guesswork entirely.
 
+## The firmware you will see
+
+**AMI Aptio Setup Utility, version 2.17.1249 (American Megatrends, 2015).** Not
+Insyde. Six tabs, in this order:
+
+```
+Main   Advanced   Chipset   Security   Boot   Save & Exit
+```
+
+The key legend is printed down the right-hand side of every page:
+
+| Key | Action |
+|---|---|
+| ← → | Move between tabs |
+| ↑ ↓ | Move between items |
+| Enter | Open the selected item |
+| **+ / −** | **Change the value** — not Enter, on value fields |
+| F1 | General help |
+| F2 | Previous values |
+| F3 | Optimized defaults |
+| **F4** | **Save & Exit** |
+| Esc | Back / exit |
+
+**Saving is F4, not F10.** F10 does nothing here.
+
 ## What to change
 
-The firmware is an InsydeH2O/AMI tablet build. Menu names vary slightly between
-BIOS versions; the settings you want are:
+**1. Secure Boot -> Disabled.** This is not optional: no distribution publishes
+a Microsoft-signed 32-bit x86 shim, so with Secure Boot on, nothing you build
+will start. See [02-boot-problem.md](02-boot-problem.md#secure-boot).
 
-**1. Secure Boot -> Disabled.** Usually under `Security`, sometimes
-`Boot -> Secure Boot Option`. This is not optional: no distribution publishes a
-Microsoft-signed 32-bit x86 shim, so with Secure Boot on, nothing you build will
-start. See [02-boot-problem.md](02-boot-problem.md#secure-boot).
+It is **not** on the `Security` tab. On this firmware that tab contains only
+`Administrator Password` and `User Password` (3–20 characters) and nothing else.
+Look under `Boot`, then `Advanced`.
 
-**2. Boot order.** Put USB ahead of the internal eMMC, or plan on using the
-one-off boot menu (`Boot Manager` in the setup, or F7/F12 at power-on) each
-time.
+If you find `Secure Boot` but it is greyed out, that is the AMI Aptio behaviour
+where the setting is locked until a supervisor password exists:
 
-**3. Optional: CPU C-states.** Under `Power -> Advanced CPU Control`, setting
-C-States to `C1` is a long-standing workaround for random freezes on Chuwi's
-Atom tablets. It costs battery life, so leave it alone unless you actually see
-freezes — and if you do, see
-[50-troubleshooting.md](50-troubleshooting.md#random-freezes).
+1. `Security` -> `Administrator Password` -> set one
+2. `Boot` -> `Secure Boot` -> `Disabled`
+3. `Security` -> `Administrator Password` -> enter the current one, leave the new
+   one **empty** — this clears it again
 
-Save with **F10** and let it reboot.
+Do not skip step 3. The only input this tablet has is a USB keyboard on the OTG
+hub, and a tablet has no CMOS jumper or coin cell to clear a forgotten password
+with. Treat the password as a temporary key, write it down while it is set, and
+remove it as soon as Secure Boot is off.
+
+If there is no Secure Boot setting anywhere, it is absent from this firmware
+build rather than hidden, and there is nothing to turn off — go straight to
+booting the stick.
+
+**2. Boot order.** `Boot` tab: put USB ahead of the internal eMMC. For a one-off
+choice, use `Save & Exit` -> `Boot Override` — the last tab — and pick the stick
+there instead of changing the order at all.
+
+**3. Optional: CPU C-states.** Setting C-States to `C1` is a long-standing
+workaround for random freezes on Chuwi's Atom tablets. It costs battery life, so
+leave it alone unless you actually see freezes — and if you do, see
+[50-troubleshooting.md](50-troubleshooting.md#random-freezes). There is no
+`Power` tab on this firmware; if the setting exists it is under `Advanced` or
+`Chipset`. Its exact location here has not been confirmed.
+
+Save with **F4** and let it reboot.
 
 ## Booting the stick
 
-From the setup menu choose `Boot Manager` (or `Save & Exit -> Boot Override`)
-and pick the USB device. It usually appears under its own product name rather
-than as "UEFI: USB".
+Go to the last tab, `Save & Exit`, and pick the stick under **`Boot Override`**.
+There is no separate `Boot Manager` tab on this firmware. The stick usually
+appears under its own product name rather than as "UEFI: USB".
+
+Whether the stick is listed at all is the single most informative thing in this
+whole menu. The firmware only offers a removable device it could actually start,
+so if it appears, a 32-bit loader was found at `\EFI\BOOT\BOOTIA32.EFI` — which
+is the entire problem this repository exists to solve. If the stick is absent
+while a keyboard on the same hub works fine, the loader is what is missing, not
+the hub.
 
 What should happen next: a GRUB menu with the distribution's usual entries.
 That means `bootia32.efi` started, found `/boot/grub/grub.cfg` on the stick and

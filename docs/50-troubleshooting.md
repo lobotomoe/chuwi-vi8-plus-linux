@@ -126,9 +126,11 @@ use degrades 2.4 GHz Wi-Fi throughput. That is the hardware.
 
 A long-standing complaint on Chuwi's Atom tablets. Two things to try, in order:
 
-1. In the firmware setup, `Power -> Advanced CPU Control -> C-States -> C1`.
-   Costs battery life. This is the fix people report most often, though it was
-   established on the Bay Trail generation rather than this one.
+1. In the firmware setup, set C-States to `C1`. Costs battery life. This is the
+   fix people report most often, though it was established on the Bay Trail
+   generation rather than this one. The Aptio build on this tablet has no `Power`
+   tab — look under `Advanced` or `Chipset`; the exact location has not been
+   confirmed here. See [20-uefi-setup.md](20-uefi-setup.md#what-to-change).
 2. Confirm you are not swapping to eMMC. `swapon --show` should list a zram
    device and nothing else.
 

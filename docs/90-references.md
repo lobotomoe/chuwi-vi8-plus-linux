@@ -79,6 +79,25 @@ inspecting the actual ISO — rather than taken from a forum post.
   `sensor:modalias:acpi:BOSC0200:*:dmi:*:svnHampoo:pnD2D3_Vi8A1:*`.
   <https://github.com/systemd/systemd/blob/main/hwdb.d/60-sensor.hwdb> — **verified**
 
+## The firmware setup menu
+
+- The firmware on a CWI519 identifies itself as **`Aptio Setup Utility`,
+  `Version 2.17.1249`, "Copyright (C) 2015 American Megatrends, Inc."** Tabs are
+  `Main / Advanced / Chipset / Security / Boot / Save & Exit`. The `Security` tab
+  carries only `Administrator Password` and `User Password` (length 3–20) — no
+  Secure Boot entry. The on-screen key legend gives `F4: Save & Exit`,
+  `F3: Optimized Defaults`, `F2: Previous Values`, `+/-: Change Opt.`
+  — **verified from a photograph of the running setup menu, August 2026**
+- AMI Aptio locks the Secure Boot setting until an Administrator (supervisor)
+  password is set; setting one makes it selectable, and clearing it afterwards
+  leaves the choice in place.
+  <https://www.makeuseof.com/secure-boot-grayed-out-bios/>
+- Chuwi Vi8 family: Esc on a USB keyboard immediately after power-on enters the
+  setup menu, and the one-off boot choice lives under `Boot Override` in the last
+  tab. Community reports, not verified per-unit here.
+  <https://techtablets.com/forum/topic/chuwi-vi8-plus/>
+  <https://techtablets.com/2015/01/chuwi-vi8-bios-settings-menus/>
+
 ## The device itself
 
 - Notebookcheck review of the Chuwi Vi8 Plus (CWI519) — ports, the single USB-C
