@@ -218,12 +218,50 @@ i915.modeset=0             # the Cherry Trail-specific one
 nomodeset                  # sledgehammer: a picture, but no acceleration
 ```
 
-A black screen right after picking "Try Ubuntu" is the classic Bay/Cherry Trail
-symptom, and `i915.modeset=0` is what that community settled on. Both reports we
-have for this tablet — a Vi8 Plus owner in January 2016 and the wider Bay Trail
-thread — hit it. Note that both predate years of i915 work, so on a current
-kernel you may well not need any of this: try booting untouched first, and reach
-for these only when it actually fails.
+**This tablet does it.** Booting Lubuntu 26.04's plain "Try or Install" entry
+gives a black screen; its **"safe graphics"** entry, which is these parameters
+already applied, boots to a working desktop. Try safe graphics first — it is one
+menu item down and costs nothing.
+
+### Why it happens
+
+Cherry Trail drives the panel over **MIPI DSI**, not eDP. `i915` brings such a
+panel up in its `vlv_dsi` path, toggling the panel-enable and backlight-enable
+GPIOs according to sequences described in the firmware's VBT. On Bay and Cherry
+Trail tablets those sequences routinely do not work: on some the backlight comes
+on and the LCD stays black, on others the backlight never comes on. Hans de Goede
+— the same developer behind this tablet's touchscreen and audio support — has
+been [patching exactly this](https://patchwork.kernel.org/project/linux-acpi/patch/20191129185836.2789-3-hdegoede@redhat.com/)
+for years.
+
+`nomodeset` works around it by never letting the kernel touch the display
+pipeline at all: it keeps using the framebuffer the firmware set up during POST.
+That is also why the desktop is slow afterwards — there is no acceleration,
+because there is no driver.
+
+It is **not** the touchscreen. An input device cannot affect display output, and
+this catches people out.
+
+### Getting acceleration back
+
+Worth doing after the install rather than during it, where a failed attempt costs
+one reboot instead of a re-install:
+
+```
+video=1280x800@60                      # state the mode explicitly
+acpi_backlight=vendor acpi_osi=Linux   # when the panel renders but is unlit
+```
+
+From the wider Bay/Cherry Trail community: forcing a mode change from GRUB with
+`set gfxpayload=800x600` helps on some units, and a session that came up blind
+can sometimes be recovered with
+`xrandr --output DSI-1 --off && xrandr --output DSI-1 --auto`.
+
+**One free diagnostic:** shine a light across the screen while it is "black". If
+the interface is faintly visible, the panel is rendering and only the backlight
+is off — an `acpi_backlight` problem, fixable while keeping acceleration. If
+there is genuinely nothing, the panel itself is not lighting up and `nomodeset`
+is the answer.
 
 ## The install finished and now nothing boots
 
