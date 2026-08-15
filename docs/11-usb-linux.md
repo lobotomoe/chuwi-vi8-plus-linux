@@ -71,9 +71,15 @@ covering the whole stick, the ISO's contents copied onto it, and
 
 **4. Optional, Ubuntu flavours only — carry the 32-bit GRUB package:**
 
+The build script unmounts the stick when it finishes, so replug it (or mount it
+by hand) before copying — the path below only exists once something has mounted
+it.
+
 ```sh
 ./scripts/fetch-offline-payload.sh --release resolute
+findmnt -no TARGET /dev/sdb1      # where your desktop mounted it, if anywhere
 sudo cp -R payload /media/$USER/VI8PLUS/
+sync
 ```
 
 Debian's netinst already ships `grub-efi-ia32-bin` in its pool, so skip this

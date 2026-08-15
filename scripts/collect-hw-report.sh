@@ -8,11 +8,8 @@
 # shellcheck source-path=SCRIPTDIR source=lib.sh
 source "$(dirname -- "${BASH_SOURCE[0]}")/lib.sh"
 
-[ "$(host_os)" = linux ] || die "run this on the tablet, from a Linux session"
-
-outdir=$REPO_ROOT/reports
-out=$outdir/hw-$(date +%Y%m%d-%H%M%S).txt
-
+# --help is answered before the platform check, so it works from the machine you
+# are reading the guide on rather than only from the tablet.
 [ $# -eq 0 ] || {
   case $1 in
   -h | --help)
@@ -22,6 +19,11 @@ out=$outdir/hw-$(date +%Y%m%d-%H%M%S).txt
   *) die "unknown argument: $1" ;;
   esac
 }
+
+[ "$(host_os)" = linux ] || die "run this on the tablet, from a Linux session"
+
+outdir=$REPO_ROOT/reports
+out=$outdir/hw-$(date +%Y%m%d-%H%M%S).txt
 
 mkdir -p "$outdir"
 

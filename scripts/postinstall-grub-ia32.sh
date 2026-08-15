@@ -96,10 +96,19 @@ bind_into_root() {
   local what=$1 where=$root$2 type=${3:-}
   [ -d "$where" ] || return 0
   mountpoint -q "$where" && return 0
+  # A failure here is not fatal on its own - efivars in particular is absent on
+  # plenty of live images - but grub-install misbehaves in confusing ways without
+  # /dev, /proc and /sys, so say which one did not mount rather than going quiet.
   if [ -n "$type" ]; then
-    mount -t "$type" "$type" "$where" || return 0
+    mount -t "$type" "$type" "$where" || {
+      warn "could not mount $type at $where"
+      return 0
+    }
   else
-    mount --bind "$what" "$where" || return 0
+    mount --bind "$what" "$where" || {
+      warn "could not bind-mount $what at $where"
+      return 0
+    }
   fi
   mounted+=("$where")
 }
@@ -137,6 +146,9 @@ Mount it first, or pass --esp."
 if [ -z "$bootloader_id" ]; then
   # shellcheck disable=SC1091 # path is built at runtime from --root
   bootloader_id=$(. "$root/etc/os-release" >/dev/null 2>&1 && printf '%s' "${ID:-linux}")
+  # No os-release, or one without ID: grub-install --bootloader-id= would create a
+  # nameless directory in the ESP rather than fail, so pin a name here instead.
+  [ -n "$bootloader_id" ] || bootloader_id=linux
 fi
 log "ESP: $esp    bootloader-id: $bootloader_id"
 
@@ -183,6 +195,15 @@ run_in_target grub-install --target=i386-efi --efi-directory="$esp" \
 log "Running grub-install --removable (\\EFI\\BOOT\\bootia32.efi fallback)..."
 run_in_target grub-install --target=i386-efi --efi-directory="$esp" \
   --removable --recheck || die "the removable fallback install failed"
+
+# This is the path that actually boots on this firmware, so confirm the file is
+# really there rather than trusting grub-install's exit code: pointed at the
+# wrong directory it will happily report success and write nothing bootable.
+fallback=$(find "$root$esp/EFI" -maxdepth 2 -iname 'bootia32.efi' -print -quit 2>/dev/null || true)
+[ -n "$fallback" ] ||
+  die "grub-install --removable reported success, but no bootia32.efi exists under
+$root$esp/EFI. That is the only path this firmware reliably boots. Check that
+$esp is really the ESP the tablet boots from (lsblk -o NAME,SIZE,FSTYPE,MOUNTPOINT)."
 
 log "Regenerating the GRUB menu..."
 if run_in_target sh -c 'command -v update-grub' >/dev/null 2>&1; then

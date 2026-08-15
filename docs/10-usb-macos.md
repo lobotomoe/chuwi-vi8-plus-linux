@@ -68,9 +68,14 @@ sudo ./scripts/make-usb.sh --iso ... --device ... --scratch /Volumes/Big
 If the tablet will not have Wi-Fi during the install, or you want to be able to
 repair the bootloader without a network:
 
+The build script ejects the stick when it finishes, so unplug it and plug it back
+in first — `/Volumes/VI8PLUS` only exists once macOS has re-mounted it.
+
 ```sh
 ./scripts/fetch-offline-payload.sh --release resolute
+ls -d /Volumes/VI8PLUS            # confirm it is mounted before copying
 cp -R payload /Volumes/VI8PLUS/
+sync && diskutil eject /Volumes/VI8PLUS
 ```
 
 (`resolute` is the codename of 26.04 LTS. Use `--release noble` for 24.04, and
