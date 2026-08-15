@@ -242,6 +242,19 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+group "Documentation"
+
+if command -v python3 >/dev/null 2>&1; then
+  if output=$(python3 "$REPO_ROOT/tests/check-doc-links.py" 2>&1); then
+    pass "internal links and anchors resolve"
+  else
+    fail "internal links and anchors resolve" "$output"
+  fi
+else
+  skip "internal links and anchors resolve" "python3 not available"
+fi
+
+# ---------------------------------------------------------------------------
 group "make-usb.sh end to end (virtual disk)"
 
 if [ "$(id -u)" -ne 0 ]; then
