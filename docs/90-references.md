@@ -118,6 +118,22 @@ inspecting the actual ISO — rather than taken from a forum post.
   detected mass-storage devices, which separates "the firmware cannot see the
   stick" from "it sees it but finds no loader" (4PDA #2831 describes exactly that
   split); and `Android` is presumably the dual-boot machinery, unexplored here.
+- `Security` -> `Secure Boot menu` -> `Key Management` reports **every Secure Boot
+  key store empty** — `Platform Key(PK)`, `Key Exchange Keys`, `Authorized
+  Signatures`, `Forbidden Signatures` and `Authorized TimeStamps` all show
+  `Size 0 | Key# 0`, with `Provision Factory Default keys [Disabled]`. That is
+  direct confirmation, at the key-store level rather than inferred from
+  `System Mode: Setup`, that Secure Boot cannot engage on this tablet. The
+  `Secure Boot Mode` selector offers `Standard` and `Custom`, and sits on
+  `Custom`. — **verified from photographs of the running setup menu, August 2026**
+- `Advanced` -> `USB Configuration` reports `USB Module Version 11`, one `XHCI`
+  controller, `XHCI Hand-off [Enabled]`, `USB Mass Storage Driver Support
+  [Enabled]`, and the tunables `USB transfer time-out [20 sec]`, `Device reset
+  time-out [20 sec]`, `Device power-up delay [Auto]`. It also enumerates attached
+  devices under `USB Devices:`, which is what makes it a diagnostic — a stick
+  that does not appear there is not being seen by the firmware at all, so no
+  amount of rebuilding its filesystem or bootloader will help.
+  — **verified from a photograph of the running setup menu, August 2026**
 - AMI Aptio locks the Secure Boot setting until an Administrator (supervisor)
   password is set; setting one makes it selectable, and clearing it afterwards
   leaves the choice in place.

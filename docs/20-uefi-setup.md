@@ -175,8 +175,27 @@ enrolled and CSM disabled. With no keys in the firmware it cannot engage at all,
 whatever the setting says. This tablet appears to ship that way, so treat this
 step as *confirm*, not *change*.
 
-Stay out of `Key Management`. Enrolling keys is the one action on this screen
-that can make the machine harder to boot, and nothing here needs it.
+`Key Management` on this unit confirms it at the key-store level — every store is
+empty:
+
+```
+Provision Factory Default keys   [Disabled]
+  Enroll all Factory Default keys
+  Save all Secure Boot variables
+
+Secure Boot variable  | Size | Key# | Key source
+Platform Key(PK)      |   0  |  0   |
+Key Exchange Keys     |   0  |  0   |
+Authorized Signatures |   0  |  0   |
+Forbidden Signatures  |   0  |  0   |
+Authorized TimeStamps |   0  |  0   |
+```
+
+With no Platform Key there is nothing for Secure Boot to enforce, whatever the
+`[Disabled]` setting says. **Look, then leave.** `Enroll all Factory Default keys`
+is the one action in this menu that would populate a PK and let Secure Boot
+actually engage — which is precisely how you would stop your own Linux from
+booting. Nothing in this repository needs a key enrolled.
 
 `Secure Flash update` is the neighbouring trap: it is a read-only report on the
 firmware's own update policy (`Signed BIOS update`, `Public Key store`,
