@@ -257,11 +257,60 @@ From the wider Bay/Cherry Trail community: forcing a mode change from GRUB with
 can sometimes be recovered with
 `xrandr --output DSI-1 --off && xrandr --output DSI-1 --auto`.
 
+**This is worth attempting, because KMS is known to work on this exact model.** Hans
+de Goede's install notes for the Vi8 Plus write to
+`/sys/class/backlight/intel_backlight` and then start a graphical session — that sysfs
+node only exists when `i915` has come up with modesetting, so `nomodeset` is a
+workaround here and not the ceiling. See
+[90-references.md](90-references.md#hans-de-goedes-notes-on-this-exact-tablet).
+
 **One free diagnostic:** shine a light across the screen while it is "black". If
 the interface is faintly visible, the panel is rendering and only the backlight
 is off — an `acpi_backlight` problem, fixable while keeping acceleration. If
 there is genuinely nothing, the panel itself is not lighting up and `nomodeset`
 is the answer.
+
+## The live session boots, then slowly falls apart
+
+Symptoms, in this order: the desktop comes up and works, the installer quits on its
+own without an error, windows stop repainting, and eventually the screen goes black
+and nothing — not even Ctrl+Alt+Del — gets a response.
+
+That is not a crash and not a graphics fault. It is what a running system looks like
+when its **root filesystem disappears**. Anything already in page cache keeps working
+for a while; the first process that has to read from the squashfs blocks forever, and
+the session dies component by component over several minutes.
+
+The cause is the USB-C port changing role. `extcon_intel_int3496` is the driver that
+decides whether the port is host or device, and on this generation it can flip the
+port back to device mode after boot — taking the live USB, and with it the root
+filesystem, away from the running system. Plugging in a charger mid-session is one
+way to trigger it.
+
+Add both of these to the `linux` line in GRUB (press `e`, then Ctrl+X):
+
+```
+modprobe.blacklist=extcon_intel_int3496 gpiolib_acpi.run_edge_events_on_boot=0
+```
+
+Note the spelling of `blacklist`. Hans de Goede's own notes for this tablet have a
+typo there (`blaclist`), and a misspelled kernel parameter is silently ignored — you
+get the same failure and conclude the workaround does not help.
+
+**Telling this apart from a display problem** costs one boot: append a bare `3` as
+well, which starts the session in text mode. A text login prompt means the system is
+alive and the fault was in the display path. Nothing at all means the root filesystem
+went away and you are in this section.
+
+Both parameters are current — `extcon-intel-int3496` is still built
+([drivers/extcon/Makefile](https://github.com/torvalds/linux/blob/master/drivers/extcon/Makefile)),
+and `run_edge_events_on_boot` still lives in `gpiolib_acpi`
+([gpiolib-acpi-quirks.c](https://github.com/torvalds/linux/blob/master/drivers/gpio/gpiolib-acpi-quirks.c),
+`0=no, 1=yes, -1=auto`).
+
+A weak ten-year-old battery produces a similar picture — the tablet browns out under
+load — and the fix overlaps: keep a charger on a 5 V-passing hub. See
+[01-hardware.md](01-hardware.md#ports-otg-and-charging-while-a-hub-is-attached).
 
 ## The install finished and now nothing boots
 

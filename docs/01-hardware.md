@@ -178,12 +178,27 @@ Cherry Trail routes the cameras through the Intel ISP2400 ("atomisp"). The mainl
 driver is in `drivers/staging/` and does not produce a usable camera on this hardware.
 Treat both cameras as non-functional. This is not going to change.
 
-### Ports and the OTG problem
+### Ports, OTG, and charging while a hub is attached
 
-The single USB-C port carries both power and data, at USB 2.0 speed. There is no power
-delivery path that survives an OTG adapter: **while a hub is attached, the tablet is on
-battery.** Charge to 100 % before you start, and do not leave the live session sitting
-idle for an hour before you begin the install.
+The single USB-C port carries both power and data, at USB 2.0 speed.
+
+**Charging is 5 V / 2 A and nothing else.** The port does not speak USB Power Delivery.
+A modern PD charger reached over a C-to-C cable commonly settles on 500 mA, which is
+less than the tablet draws with a hub attached — it discharges while plugged in. Use a
+plain **USB-A charger with a USB-A-to-C cable**.
+
+A data-only hub leaves the tablet on battery, so charge to 100 % before you start and
+do not let the live session idle for an hour before you begin the install. But that is
+a property of the hub, not of the tablet: **a hub that passes 5 V through (an "OTG
+charging hub" with its own power input) charges the tablet while the port stays in host
+mode.** Hans de Goede, who maintains this class of tablet upstream and owns this exact
+model, installs Fedora on it that way — see [90-references.md](90-references.md#hans-de-goedes-notes-on-this-exact-tablet).
+
+Applying 5 V is itself an event the port-role driver reacts to, so the order matters:
+bring the tablet up with the hub in OTG mode and no 5 V, then apply power once you are
+already at the firmware menu. If the port flips to device mode *after* Linux has
+started, a running live session loses its root filesystem — see
+[50-troubleshooting.md](50-troubleshooting.md#the-live-session-boots-then-slowly-falls-apart).
 
 Micro-HDMI 1.4 output works, up to 1080p, with audio.
 

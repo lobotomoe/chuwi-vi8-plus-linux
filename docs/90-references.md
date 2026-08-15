@@ -79,6 +79,43 @@ inspecting the actual ISO — rather than taken from a forum post.
   `sensor:modalias:acpi:BOSC0200:*:dmi:*:svnHampoo:pnD2D3_Vi8A1:*`.
   <https://github.com/systemd/systemd/blob/main/hwdb.d/60-sensor.hwdb> — **verified**
 
+## Hans de Goede's notes on this exact tablet
+
+The single most useful outside source for this device. De Goede maintains Bay and
+Cherry Trail tablet support upstream, owns a Chuwi Vi8 Plus, and keeps a working
+file of per-tablet notes including his own Fedora install procedure for it:
+
+<https://github.com/jwrdegoede/sunxi-fedora-scripts/blob/master/x86-tablet-info>
+
+What it establishes, all of it matching this repository's own findings where the two
+overlap:
+
+- `Cherry Trail x5-Z8300, 2G RAM`, `8" 800x1280 LCD`. The 800x1280 confirms the
+  panel scans out **portrait**. — **verified on the unit** (Windows "About" reports
+  2.00 GB and an x5-Z8300; the display orientation was seen in the firmware setup)
+- Wi-Fi is `brcmfmac43430`, touchscreen is `Chipone ICN8505, fw in EFI`, PMIC is
+  `AXP288`, audio codec `ALC5651`. — **corroborates** the table in
+  [01-hardware.md](01-hardware.md)
+- Charging is `only through Type-C 5V/2A, does not do PD`, and a C-to-C cable to a
+  modern charger yields `only 500mA`; he uses a USB-A charger with a USB-A-to-C
+  cable, through a hub that always passes the 5 V. — **not yet verified here**
+- His boot parameters are
+  `modprobe.blacklist=extcon_intel_int3496 gpiolib_acpi.run_edge_events_on_boot=0 3`,
+  to stop `extcon_intel_int3496` switching the port back to device mode, which
+  otherwise makes the live session lose its root filesystem. **His file misspells it
+  as `blaclist`** — a misspelled kernel parameter is silently ignored. — **not yet
+  verified here**; see
+  [50-troubleshooting.md](50-troubleshooting.md#the-live-session-boots-then-slowly-falls-apart)
+- He runs `echo 20 > /sys/class/backlight/intel_backlight/brightness` and then
+  `systemctl start gdm`. `intel_backlight` exists only under `i915` with modesetting,
+  so **KMS works on this model** and `nomodeset` is a workaround rather than the
+  ceiling. — **not yet verified here**
+
+One caution: he notes `Battery is dead (browns out on consumption peaks)` and that
+his unit `needs to always have a charger connected`. That is his particular unit's
+battery, not a property of the model — though a ten-year-old original battery will
+behave the same way.
+
 ## The firmware setup menu
 
 - The firmware on a CWI519 identifies itself as **`Aptio Setup Utility`,
