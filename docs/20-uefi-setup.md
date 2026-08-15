@@ -213,17 +213,42 @@ Save with **F4** and let it reboot.
 
 ## Booting the stick
 
-Go to the last tab, `Save & Exit`, and pick the stick under **`Boot Override`**.
-There is no separate `Boot Manager` tab on this firmware. The stick usually
-appears under its own product name rather than as "UEFI: USB".
+There is no separate `Boot Manager` tab on this firmware. The one-off boot choice
+lives in a group called **`Boot Override`** at the **bottom of the last tab**,
+below `Save Changes and Reset`, `Discard Changes and Exit` and `Launch EFI Shell
+from filesystem device`.
+
+Two ways to get to it. Either way, the hub, keyboard and stick must be plugged in
+**before** you power on:
+
+**The short way** — power on and tap **F7** repeatedly from the moment the screen
+lights up. This opens the boot-device menu directly, skipping setup. Reported by
+owners of this model rather than verified here, so if nothing happens, use the
+other route.
+
+**Through setup** — power on, tap **Esc** repeatedly, then:
+
+1. **→** to the last tab, `Save & Exit` (five presses from `Main`)
+2. **↓** to the bottom of the page, past the save/discard entries
+3. Read what is listed under `Boot Override`
 
 Whether the stick is listed there is the single most informative thing in this
-whole menu, and it costs nothing to look. The firmware only offers a removable
-device it could actually start, so if the stick appears, a 32-bit loader was
-found at `\EFI\BOOT\BOOTIA32.EFI` — the entire problem this repository exists to
-solve, answered without leaving setup. With no stick attached the list shows just
-`Windows Boot Manager`, so make sure it is plugged in before reading anything
-into its absence.
+whole menu, and it costs nothing to look:
+
+| What you see | What it means |
+|---|---|
+| `Windows Boot Manager` only | The firmware does not consider the stick bootable. Do not sit and wait — rebuild it. |
+| A second entry, usually the stick's model name | A 32-bit loader was found at `\EFI\BOOT\BOOTIA32.EFI`. The hard part is solved. |
+
+The firmware only offers a removable device it could actually start, so the
+stick's presence in that list answers the entire question this repository exists
+for, without leaving setup. The entry usually carries the stick's own product name
+rather than reading "UEFI: USB". With no stick attached the list shows just
+`Windows Boot Manager`, so confirm it is plugged in before reading anything into
+its absence.
+
+**There is no way to look without committing:** pressing `Enter` on an entry boots
+it immediately. `Esc` backs out without booting.
 
 A matching `UEFI USB Key Drive BBS Priorities` submenu appearing on the `Boot`
 tab is the same signal: those submenus exist only for device classes the firmware
