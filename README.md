@@ -168,6 +168,7 @@ covers the firmware history, what each image really is, and what does help.
 artifacts/    bootia32.efi and its provenance - the file that makes the stick bootable
 scripts/      build the stick, inspect ISOs, back up the eMMC, repair GRUB, tune
 docs/         the actual guide, split by host OS and by distribution
+patches/      kernel patches for a unit with unfilled DMI - prepared, not yet sent
 tests/        checks the scripts still behave; see "Tests" below
 ```
 

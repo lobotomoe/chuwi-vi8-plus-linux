@@ -43,11 +43,18 @@ try() {
   printf 'generated: %s\n' "$(date -Is)"
 
   section "Identity (DMI)"
-  for f in sys_vendor product_name product_version board_vendor board_name \
+  # Every field a kernel DMI quirk can match on, because on this tablet the
+  # system fields are often placeholders and a patch has to key off the rest.
+  for f in sys_vendor product_name product_version product_sku product_family \
+    board_vendor board_name board_version chassis_vendor chassis_type \
     bios_vendor bios_version bios_date; do
     printf '%-16s %s\n' "$f" "$(cat "/sys/class/dmi/id/$f" 2>/dev/null || echo '?')"
   done
   printf '\nExpected on a Chuwi Vi8 Plus: Hampoo / D2D3_Vi8A1 / Cherry Trail CR\n'
+
+  # The exact string systemd's hwdb matches against, needed verbatim to write a
+  # sensor (accelerometer orientation) entry.
+  printf '\nmodalias:\n%s\n' "$(cat /sys/class/dmi/id/modalias 2>/dev/null || echo '?')"
 
   section "Firmware"
   if [ -d /sys/firmware/efi ]; then

@@ -1,0 +1,38 @@
+ASoC: Intel: bytcr_rt5651: Add quirk for Chuwi Vi8 Plus with unfilled DMI
+
+Some Chuwi Vi8 Plus (CWI519) units report "To be filled by O.E.M." for both
+sys_vendor and product_name, so the existing Vi8 Plus quirk cannot match and
+the mono-speaker, swapped-headphone and IN2 microphone corrections are not
+applied.
+
+Add a second entry keyed on the board fields plus the BIOS date, carrying the
+same quirk flags as the existing entry.
+
+Signed-off-by: Your Name <your.email@example.com>
+---
+ Generated against linux master 3eb40771c00a (2026-08-15).
+ Apply with: git am, or patch -p1 < this file
+---
+--- a/sound/soc/intel/boards/bytcr_rt5651.c
++++ b/sound/soc/intel/boards/bytcr_rt5651.c
+@@ -416,6 +416,20 @@
+ 		.matches = {
+ 			DMI_MATCH(DMI_SYS_VENDOR, "Hampoo"),
+ 			DMI_MATCH(DMI_PRODUCT_NAME, "D2D3_Vi8A1"),
++		},
++		.driver_data = (void *)(BYT_RT5651_DEFAULT_QUIRKS |
++					BYT_RT5651_IN2_MAP |
++					BYT_RT5651_HP_LR_SWAPPED |
++					BYT_RT5651_MONO_SPEAKER),
++	},
++	{
++		/* Chuwi Vi8 Plus (CWI519), unit with unfilled system DMI */
++		.callback = byt_rt5651_quirk_cb,
++		.matches = {
++			DMI_MATCH(DMI_BOARD_VENDOR, "Hampoo"),
++			DMI_MATCH(DMI_BOARD_NAME, "Cherry Trail CR"),
++			/* Above matches are too generic, add bios-date match */
++			DMI_MATCH(DMI_BIOS_DATE, "12/11/2015"),
+ 		},
+ 		.driver_data = (void *)(BYT_RT5651_DEFAULT_QUIRKS |
+ 					BYT_RT5651_IN2_MAP |

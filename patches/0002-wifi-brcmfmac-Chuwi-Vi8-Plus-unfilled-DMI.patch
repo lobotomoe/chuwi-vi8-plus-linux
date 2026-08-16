@@ -1,0 +1,57 @@
+wifi: brcmfmac: Add DMI nvram filename quirk for Chuwi Vi8 Plus with unfilled DMI
+
+Some Chuwi Vi8 Plus (CWI519) units report "To be filled by O.E.M." for both
+sys_vendor and product_name, so the fallback board_type built from those two
+fields becomes a name no nvram file will ever have, and the radio never
+initialises.
+
+The nvram which linux-firmware carries for this tablet,
+brcmfmac43430-sdio.Hampoo-D2D3_Vi8A1.txt, only exists under the revision-less
+name and so is unreachable on a chip-revision 0 (a0) unit, which looks for
+brcmfmac43430a0-sdio.*. Both revisions shipped in this model. Point the quirk
+at ilife-S806 instead, which is present as an a0 build and is the same AP6212
+module; the chiprev check keeps a1 units on their existing path.
+
+Tested on an a0 unit, where the Vi8 Plus nvram data is confirmed to work.
+
+Signed-off-by: Your Name <your.email@example.com>
+---
+ Generated against linux master 3eb40771c00a (2026-08-15).
+ Apply with: git am, or patch -p1 < this file
+---
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/dmi.c
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/dmi.c
+@@ -34,6 +34,16 @@
+ 	BRCM_CC_43430_CHIP_ID, 0, "ilife-S806"
+ };
+ 
++/* The Chuwi Vi8 Plus uses the same Ampak AP6212 module as the Chuwi Hi8 Pro.
++ * Units with a chip-revision 0 (a0) radio cannot use the nvram which is in
++ * linux-firmware under the Vi8 Plus' own name, because that is only present
++ * under the revision-less name; the ilife-S806 file is the a0 build of the
++ * same data.
++ */
++static const struct brcmf_dmi_data chuwi_vi8_plus_data = {
++	BRCM_CC_43430_CHIP_ID, 0, "ilife-S806"
++};
++
+ static const struct brcmf_dmi_data gpd_win_pocket_data = {
+ 	BRCM_CC_4356_CHIP_ID, 2, "gpd-win-pocket"
+ };
+@@ -116,6 +126,16 @@
+ 		.driver_data = (void *)&chuwi_hi8_pro_data,
+ 	},
+ 	{
++		/* Chuwi Vi8 Plus (CWI519) with unfilled system DMI */
++		.matches = {
++			DMI_EXACT_MATCH(DMI_BOARD_VENDOR, "Hampoo"),
++			DMI_EXACT_MATCH(DMI_BOARD_NAME, "Cherry Trail CR"),
++			/* Above strings are too generic, also match on BIOS date */
++			DMI_MATCH(DMI_BIOS_DATE, "12/11/2015"),
++		},
++		.driver_data = (void *)&chuwi_vi8_plus_data,
++	},
++	{
+ 		/* Cyberbook T116 rugged tablet */
+ 		.matches = {
+ 			DMI_EXACT_MATCH(DMI_BOARD_VENDOR, "Default string"),

@@ -1,0 +1,43 @@
+platform/x86: touchscreen_dmi: Add info for the Chuwi Vi8 Plus with unfilled DMI
+
+Some Chuwi Vi8 Plus (CWI519) units leave the SMBIOS system fields at the
+placeholder string, reporting "To be filled by O.E.M." for both sys_vendor
+and product_name. On those units the existing Vi8 Plus entry cannot match,
+so the ICN8505 firmware is never extracted from the EFI image and the
+touchscreen does not work.
+
+This is not a factory misprogramming that a BIOS update repairs: the
+placeholder is what the firmware image ships. Parsing the SMBIOS defaults
+out of the last BIOS Chuwi published for this tablet (P03_C806.109,
+2016-02-25) shows "To be filled by O.E.M." for the system manufacturer and
+product name, with the board fields correctly set to "Hampoo" and
+"Cherry Trail CR".
+
+Add a second entry keyed on the board fields plus the BIOS date, the same
+approach already used for the Chuwi HiBook (CWI514) a few entries above.
+
+Signed-off-by: Your Name <your.email@example.com>
+---
+ Generated against linux master 3eb40771c00a (2026-08-15).
+ Apply with: git am, or patch -p1 < this file
+---
+--- a/drivers/platform/x86/touchscreen_dmi.c
++++ b/drivers/platform/x86/touchscreen_dmi.c
+@@ -1236,7 +1236,17 @@
+ 		.matches = {
+ 			DMI_MATCH(DMI_SYS_VENDOR, "Hampoo"),
+ 			DMI_MATCH(DMI_PRODUCT_NAME, "D2D3_Vi8A1"),
++			DMI_MATCH(DMI_BOARD_NAME, "Cherry Trail CR"),
++		},
++	},
++	{
++		/* Chuwi Vi8 Plus (CWI519), unit with unfilled system DMI */
++		.driver_data = (void *)&chuwi_vi8_plus_data,
++		.matches = {
++			DMI_MATCH(DMI_BOARD_VENDOR, "Hampoo"),
+ 			DMI_MATCH(DMI_BOARD_NAME, "Cherry Trail CR"),
++			/* Above matches are too generic, add bios-date match */
++			DMI_MATCH(DMI_BIOS_DATE, "12/11/2015"),
+ 		},
+ 	},
+ 	{

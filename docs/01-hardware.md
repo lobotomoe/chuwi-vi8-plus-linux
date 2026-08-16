@@ -87,7 +87,12 @@ DMI_MATCH(DMI_BIOS_DATE, "05/10/2016"),
 
 A Vi8 Plus with unfilled DMI matches the first three exactly — the BIOS image
 confirms the SKU really is `MRD` — and differs only in the date (`12/11/2015`,
-or `02/25/2016` on the newer build). Such a patch has not been submitted.
+or `02/25/2016` on the newer build).
+
+Three such patches are written and in [`patches/`](../patches/) — touchscreen,
+Wi-Fi and audio. They apply cleanly against current mainline but have not been
+tested on hardware or submitted; [`patches/README.md`](../patches/README.md)
+lists what has to be confirmed first.
 
 The other route is to write the two system strings back into the firmware with
 AMI's DMI editor, which would make all four quirks match at once. Untested here;
