@@ -66,29 +66,37 @@ if (!bmc150_apply_acpi_orientation(dev, &data->orientation)) {
 	ret = iio_read_mount_matrix(dev, &data->orientation);
 ```
 
-For a `BOSC0200` device the ACPI path looks for a `ROTM` method. The driver's own
-comment lists "Chuwi Vi8 Plus (CWI519)" among the tablets that supply the matrix
-this way, and Hans de Goede — who maintains that driver and owns a CWI519 —
-records the tablet in his own hardware notes as
-`Accel: BOSC0200 -> BMA250E, mount-matrix ok`
-([90-references.md](90-references.md#hans-de-goedes-notes-on-this-exact-tablet)).
+For a `BOSC0200` device the ACPI path looks for a `ROTM` method, and this tablet's
+DSDT has one. Extracted from `P03_C806.109` and read directly:
 
-Note what that is and is not. Both statements come from the **same person**, so they
-are one source saying something twice, not two sources agreeing — it is simply the
-best-placed source there is. And neither is a reading of *your* DSDT: the ACPI tables
-sit compressed inside the BIOS image and were not decompressed here, so this repo has
-not confirmed `ROTM` in the firmware directly. The one-line check below is the
-confirmation.
+```
+Device ACC2:
+  _HID  BOSC0200        (offset 50051)
+  _CID  BOSC0200
+  _DDN  "Accelerometer"
+  _UID  7
+  _CRS  ... \_SB.PCI0.I2C3
+  ROTM  "0 -1 0"  "-1 0 0"  "0 0 1"     (offset 50159)
+```
 
-So the orientation reference survives unfilled DMI. Confirm on your unit:
+— **verified by extracting the DSDT from the published BIOS image.** `ROTM` sits
+inside the `ACC2` device scope, 108 bytes after its `_HID`, and carries the matrix
+literally. The same object with the same values is in the dual-boot image.
+
+So the orientation reference survives unfilled DMI, and you know in advance what it
+should say. Confirm on your unit:
 
 ```sh
 cat /sys/bus/iio/devices/iio:device0/in_accel_mount_matrix
 ```
 
-An identity matrix (`1, 0, 0; 0, 1, 0; 0, 0, 1`) means nothing was found;
-anything else means `ROTM` was read. Auto-rotation may still not happen, but if
-so that is LXQt not acting on the sensor rather than the sensor being
+```
+0, -1, 0; -1, 0, 0; 0, 0, 1
+```
+
+That is the firmware's own matrix. An identity matrix (`1, 0, 0; 0, 1, 0; 0, 0, 1`)
+means nothing was found. Auto-rotation may still not happen even with the right
+matrix, but if so that is LXQt not acting on the sensor rather than the sensor being
 unreferenced — see [40-post-install.md](40-post-install.md#automatic-rotation).
 
 A giveaway before you check anything: the installer proposes a hostname like
@@ -244,6 +252,18 @@ And the filename in that message does **not** come from the DMI quirk. Note that
 I2C device is `CHPN0001` while the file is `HAMP0002` — the driver builds
 `chipone/icn8505-<_SUB>.fw` from the ACPI `_SUB` (subsystem ID) object of the
 touchscreen node, via `acpi_get_subsystem_id()`. Nothing in that path reads DMI.
+
+That is not just how the driver is written, it is what this tablet's firmware
+declares. From the DSDT extracted out of `P03_C806.109`:
+
+```
+Device TCS1:
+  _HID  CHPN0001        (offset 50769)
+  _CID  PNP0C50
+  _SUB  HAMP0002        (offset 50798)
+```
+
+— **verified by extracting the DSDT from the published BIOS image.**
 
 The lookup order settles the rest. `firmware_request_platform()` is documented in the
 kernel as trying the filesystem first and falling back to the UEFI copy only *"if

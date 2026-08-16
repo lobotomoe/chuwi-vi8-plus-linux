@@ -255,12 +255,11 @@ if (!bmc150_apply_acpi_orientation(dev, &data->orientation)) {
 	ret = iio_read_mount_matrix(dev, &data->orientation);
 ```
 
-For a `BOSC0200` device the ACPI path looks for a `ROTM` method. The driver's
-comment lists "Chuwi Vi8 Plus (CWI519)" among exactly these devices, and the
-driver's maintainer, who owns one, records `mount-matrix ok` for it in his own
-hardware notes. Neither is a reading of the tablet's actual DSDT — the ACPI
-tables are compressed inside the BIOS image and were not unpacked here — so
-treat the `in_accel_mount_matrix` check as the real evidence.
+For a `BOSC0200` device the ACPI path looks for a `ROTM` method, and this tablet's
+DSDT has one — extracted from the published `P03_C806.109` image and read
+directly. It sits in the `ACC2` device scope and spells the matrix out:
+`"0 -1 0" "-1 0 0" "0 0 1"`. The driver's comment lists "Chuwi Vi8 Plus (CWI519)"
+among exactly these devices.
 
 So no hwdb entry is needed and no `modalias` has to be captured for one. If
 auto-rotation still does not happen, that is LXQt not acting on the sensor,

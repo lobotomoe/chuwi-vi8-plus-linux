@@ -65,9 +65,11 @@ inspecting the actual ISO — rather than taken from a forum post.
 
 - Touchscreen: `chuwi_vi8_plus_data` in `drivers/platform/x86/touchscreen_dmi.c`,
   Chipone ICN8505, firmware `chipone/icn8505-HAMP0002.fw`, which the entry is
-  written to extract from the tablet's own UEFI. — **verified that the entry says
-  this**; the blob itself was *not* found in either published BIOS image, see
-  [60-bios-firmware.md](60-bios-firmware.md)
+  written to extract from the tablet's own UEFI. — **verified**. The `HAMP0002`
+  half is also confirmed against the tablet's own firmware: the DSDT extracted
+  from `P03_C806.109` declares `_HID CHPN0001` / `_SUB HAMP0002`. The blob itself
+  was *not* found in either published image, see
+  [60-bios-firmware.md](60-bios-firmware.md#what-could-not-be-determined)
 - The patch series that added it, with the firmware's size and SHA-256:
   <https://patchwork.kernel.org/project/linux-input/patch/20200111145703.533809-11-hdegoede@redhat.com/>
 - Audio: the `Hampoo` / `D2D3_Vi8A1` quirk in

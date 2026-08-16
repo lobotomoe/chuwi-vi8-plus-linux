@@ -108,9 +108,15 @@ Two useful things fell out of this:
 | SoC codename in modules | `CherryView` ×4 | `ValleyView` ×15 |
 | `Hampoo` / `Cherry Trail CR` | present | absent |
 | Flash layout (BIOS region) | 4096 KiB at `0x400000` | 3072 KiB at `0x500000` |
+| ACPI `BOSC0200` accelerometer + `ROTM` | present | absent |
+| ACPI `CHPN0001` touchscreen | present | absent |
 
-— **verified** by string extraction over the decompressed contents and by parsing
-the Intel flash descriptor.
+— **verified** by string extraction over the decompressed contents, by parsing the
+Intel flash descriptor, and by extracting the DSDT from each image.
+
+The last two rows are the hardest to argue with: this tablet's accelerometer and
+its Chipone touchscreen are simply not declared in that firmware's ACPI tables.
+Whatever machine it is for, it is not one with a Vi8 Plus's peripherals on it.
 
 ValleyView is Bay Trail. Insyde is the BIOS vendor on the **original Chuwi Vi8
 (CWI506)** — which is exactly the tablet
@@ -328,6 +334,33 @@ This is not a like-for-like swap. The two Cherry Trail images divide the same
 these rewrites the region map and replaces the Intel TXE firmware with a build
 half the size. Getting back is a full reflash, not a settings change.
 
+### The dual-boot image also breaks the touchscreen on Linux
+
+Worth knowing before anyone flashes it hoping to fix something. The two images
+declare the **same touchscreen controller under a different subsystem ID**:
+
+| Image | `_HID` | `_SUB` | Kernel then asks for |
+|---|---|---|---|
+| Single-OS `P03_C806.109` | `CHPN0001` | `HAMP0002` | `chipone/icn8505-HAMP0002.fw` |
+| Dual-boot `bios.bin` | `CHPN0001` | `HAMP0005` | `chipone/icn8505-HAMP0005.fw` |
+
+— **verified** by extracting the DSDT from each image and reading the `TCS1` /
+`TCS5` device scope.
+
+`chipone_icn8505` builds its firmware filename out of `_SUB`
+([01-hardware.md](01-hardware.md#touchscreen--chipone-icn8505)), so on the
+dual-boot firmware it stops asking for the file the kernel's quirk knows about.
+Upstream's `chuwi_vi8_plus_data` names `HAMP0002` and nothing else, which means
+flashing the dual-boot image turns a touchscreen that mainline supports into one
+it does not. A different blob does exist under that name in the wild — Dax89's
+repository carries `HAMP0005.bin`, 34884 bytes and a different hash from
+`HAMP0002.bin` — but no kernel entry points at it.
+
+The dual-boot DSDT differs in other ways too: it declares `OBDA8723`, a Realtek
+8723 Bluetooth/Wi-Fi part that the single-OS image does not mention. Treat the two
+as firmware for meaningfully different board configurations rather than as two
+settings of one tablet.
+
 ### Why there is no Linux port of `P03_C806.rom.exe` here
 
 The obvious idea is to take the Windows flasher apart and rebuild it for Linux.
@@ -406,17 +439,24 @@ Stated plainly, because guessing here is how tablets get bricked:
 
 - **Whether the ICN8505 touchscreen firmware is in these images.** It is not
   present in either Cherry Trail image as a contiguous blob — searched by the
-  kernel's own 8-byte prefix and 35012-byte length across all 166 PE modules,
-  39 TE modules and every extracted section, with a secondary zlib/LZMA pass.
-  — **verified absent** from what could be decompressed. It cannot be ruled out
-  that a driver stores it compressed inside its own data section. The reference
-  tablet runs `.108`, which was not available for comparison —
-  `sudo ./scripts/dump-bios.sh` on the tablet settles both questions at once,
-  and extracts the firmware if it is there.
+  kernel's own 8-byte prefix across all 6270 extracted files, with a secondary
+  recursive LZMA pass. — **verified absent**.
+
+  That search is worth trusting more than a bare "not found", because the same
+  extraction *does* yield the DSDT, with `BOSC0200`, `ROTM`, `CHPN0001` and
+  `HAMP0002` all readable in it. A search that finds the ACPI tables and not the
+  firmware is a search that was actually looking. What still cannot be ruled out
+  is a driver holding the blob compressed inside its own data section, which no
+  string search reaches. `sudo ./scripts/dump-bios.sh` on the tablet settles it.
 - **What `.109` actually changed.** Only that it is distributed as a microSD
   ("TF card") reading fix. Whether that affects the SD slot's inability to appear
-  as a boot device ([13-split-media.md](13-split-media.md)) is untested — the
-  `.108` image would be needed to diff against.
+  as a boot device ([13-split-media.md](13-split-media.md)) is untested. The
+  `.108` image is needed to diff against; a copy is linked from a 2017 write-up
+  and has not been downloaded or checked here —
+  <https://mega.nz/#!ZhZEGbAR!nU3qqsNt175V7xtCeiNDugItaZvzuRQ4eXNNTtMoKG8>
+  (via <http://billyfung2010.blogspot.com/2017/04/how-to-upgrade-chuwi-vi8-plus-bios.html>).
+  Note it ships under the **same** `P03_C806.rom.exe` filename as `.109`, so the
+  executable's name tells you nothing about which version is inside.
 - **Whether AMIDEEFI runs on this firmware**, and its exact switch names.
 
 Sources for this page are in [90-references.md](90-references.md#bios--uefi-firmware).

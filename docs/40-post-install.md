@@ -39,8 +39,10 @@ is the difference between "slow" and "unusable" when a browser is open.
 
 The accelerometer is a Bosch BOSC0200 on the `bmc150_accel` driver, and unlike
 the touchscreen and Wi-Fi it does **not** depend on DMI: the driver asks ACPI for
-the mount matrix first, and on this model it is meant to come from an ACPI `ROTM`
-method. So there should be nothing to calibrate even on a unit with
+the mount matrix first, and on this model it comes from an ACPI `ROTM` method that
+is present in the firmware — read out of the published BIOS image, where it spells
+the matrix out as `0 -1 0 / -1 0 0 / 0 0 1`. So there is nothing to calibrate even
+on a unit with
 [unfilled DMI](01-hardware.md#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-three-things-at-once).
 Confirm the matrix was picked up:
 
@@ -48,7 +50,8 @@ Confirm the matrix was picked up:
 cat /sys/bus/iio/devices/iio:device0/in_accel_mount_matrix
 ```
 
-Anything other than the identity matrix means ACPI supplied it.
+It should print `0, -1, 0; -1, 0, 0; 0, 0, 1`. An identity matrix means ACPI
+supplied nothing.
 
 ```sh
 sudo apt install iio-sensor-proxy       # or: pacman -S iio-sensor-proxy
