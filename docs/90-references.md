@@ -385,6 +385,83 @@ See the comparison table in the [README](../README.md#do-not-confuse-it-with-the
   tablet than the Bay Trail guides.
   <https://github.com/willyneutron/lubuntu_in_chuwi_Hi10Pro>
 
+## BIOS / UEFI firmware
+
+Background for [60-bios-firmware.md](60-bios-firmware.md). The firmware images
+themselves are not redistributed here; the findings below come from parsing
+copies obtained from the sources listed.
+
+### Verified by parsing the images
+
+Three 8 MB SPI images were extracted with
+[`uefi-firmware-parser`](https://github.com/theopolis/uefi-firmware-parser) and
+their SMBIOS defaults, ACPI tables and Intel flash descriptors read directly.
+
+| Image | SHA-256 |
+|---|---|
+| `P03_C806.109` | `0d72b3ceac2c46c869c1337873238c63612a74759c907e9aa89ab824050742de` |
+| `bios.bin` (dual-boot) | `0068258628377e3ce2a6c2a04cb9a42da88696f72c23a3282effb08fe91d2800` |
+| `CHUWI.D86JLBNR03.bin` | `77a94ca41343a795784c13bba5c0f67aa587602d7d0211dcbc4620a7bc29416d` |
+| `P03_C806.rom.exe` | `6434433c075c063e934ff05a76c5596c6c10845f6da165ffe98c8716d53e0e0f` |
+
+- `P03_C806.109` SMBIOS type 1 hard-codes `To be filled by O.E.M.` for both
+  system manufacturer and product name; type 2 manufacturer is `Hampoo`, SKU is
+  `MRD`. **A BIOS update therefore cannot fix the unfilled DMI.** — **verified**
+- The single-OS image declares the touchscreen as ACPI `HAMP0002`; the dual-boot
+  image declares `HAMP0005`, which no kernel driver claims. — **verified**
+- `CHUWI.D86JLBNR03.bin` is an **InsydeH2O / ValleyView (Bay Trail)** image, not a
+  Vi8 Plus BIOS, despite being distributed as one. — **verified**
+- Flash descriptors differ between the single-OS and dual-boot images (BIOS region
+  4096 KiB at `0x400000` vs 6144 KiB at `0x200000`). — **verified**
+- The ICN8505 touchscreen firmware was **not** found in either Cherry Trail image,
+  searched by the kernel's `prefix`/`length` descriptor across all decompressed
+  sections. — **verified absent** from what could be decompressed
+
+### Kernel precedent for generic DMI
+
+- `brcmfmac/dmi.c` — the Chuwi Hi8 Pro entry matching `DMI_BOARD_VENDOR` "Hampoo"
+  + `DMI_BOARD_NAME` "Cherry Trail CR" + `DMI_PRODUCT_SKU` "MRD" + `DMI_BIOS_DATE`,
+  with the comment *"Above strings are too generic, also match on BIOS date"*.
+  The template for a Vi8 Plus patch.
+  <https://github.com/torvalds/linux/blob/master/drivers/net/wireless/broadcom/brcm80211/brcmfmac/dmi.c>
+  — **verified**
+- `linux-firmware` ships `brcmfmac43430-sdio.Hampoo-D2D3_Vi8A1.txt`, the NVRAM
+  file this tablet needs, reachable only if the DMI strings are correct.
+  <https://gitlab.com/kernel-firmware/linux-firmware/-/tree/main/brcm> — **verified**
+- Hans de Goede, `touchscreen_dmi.c` patch adding the Vi8 Plus, with the
+  `efi_embedded_fw` descriptor (prefix, length 35012, SHA-256).
+  <https://patchwork.kernel.org/project/linux-input/patch/20200111145703.533809-11-hdegoede@redhat.com/>
+  — **verified**
+
+### Releases and flashing
+
+- needrom, Chuwi Vi8 Plus stock ROM listing BIOS `CHT-P03_C806_108_20151211` —
+  the build the reference tablet shipped with.
+  <https://www.needrom.com/download/chuwi-vi8-plus/>
+- Chuwi official forum, single-boot and dual-boot firmware threads.
+  <https://forum.chuwi.com/t/vi8-plus-official-version-singleboot-chuwi-vi8-plus-windows-10-bios-driver-download/956>
+  <https://forum.chuwi.com/t/vi8-plus-official-version-dualboot-chuwi-vi8-plus-dualboot-android-windows-bios/930>
+- "How to upgrade the Chuwi Vi8 Plus BIOS?" — reports upgrading from
+  `P03_C806.108` by running `P03_C806.rom.exe`.
+  <http://billyfung2010.blogspot.com/2017/04/how-to-upgrade-chuwi-vi8-plus-bios.html>
+- TechTablets forum, `fpt.efi -f` from the EFI shell and `afuefi.efi /O` to back
+  up the running ROM. <https://techtablets.com/forum/topic/update-bios-firmware-updated-drivers/>
+- AMI DMIEdit / AMIDEWIN / AMIDEDOS / AMIDEEFI — the OEM DMI provisioning tools.
+  Switch names for the system manufacturer and product fields could **not** be
+  confirmed from a primary AMI source; both the datasheet mirror and the
+  secondary wiki returned 403.
+
+### Recovery
+
+- Hans de Goede, "Soft unbricking Bay- and Cherry-Trail tablets with broken BIOS
+  settings" — DnX mode via volume-up + volume-down, `fastboot flash osloader`.
+  Cherry Trail integrates the gadget PHY into the SoC, so DnX is available even
+  on Windows-only units. <https://hansdegoede.livejournal.com/25342.html>
+  (LiveJournal returns 404 to automated fetches; mirrored at
+  <http://news.tuxmachines.org/node/150888>)
+- "Teclast X98 Air 3G: unbricking a Bay Trail tablet".
+  <https://ao2.it/en/blog/2014/12/30/teclast-x98-air-3g-unbricking-bay-trail-tablet>
+
 ## Distributions
 
 - Lubuntu 26.04 LTS release notes. <https://lubuntu.me/lubuntu-26-04-lts-released/>

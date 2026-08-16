@@ -66,10 +66,32 @@ driver's *second* attempt uses a name that does not depend on it —
 [touchscreen](#touchscreen--chipone-icn8505) below. Audio and the accelerometer
 matrix have no equivalent escape hatch and would need a kernel patch.
 
-The proper fix is upstream: an additional DMI entry matching `DMI_BOARD_VENDOR`
-"Hampoo" + `DMI_BOARD_NAME` "Cherry Trail CR" together with something narrow enough
-to avoid catching every Hampoo Cherry Trail board — the BIOS version or date. That
-has not been submitted.
+**A BIOS update does not fix this.** The placeholder is baked into the firmware
+image: the newest BIOS Chuwi published (`P03_C806.109`, 2016-02-25) hard-codes
+`To be filled by O.E.M.` as its SMBIOS system manufacturer and product name, so
+flashing it changes nothing. That was checked by parsing the image —
+[60-bios-firmware.md](60-bios-firmware.md) has the dump and the rest of the
+firmware story, including why the dual-boot BIOS would make things worse.
+
+The proper fix is upstream, and it has a close precedent. `brcmfmac/dmi.c`
+already handles the sibling Chuwi Hi8 Pro by matching the board fields plus the
+BIOS date, with the comment *"Above strings are too generic, also match on BIOS
+date"*:
+
+```c
+DMI_EXACT_MATCH(DMI_BOARD_VENDOR, "Hampoo"),
+DMI_EXACT_MATCH(DMI_BOARD_NAME, "Cherry Trail CR"),
+DMI_EXACT_MATCH(DMI_PRODUCT_SKU, "MRD"),
+DMI_MATCH(DMI_BIOS_DATE, "05/10/2016"),
+```
+
+A Vi8 Plus with unfilled DMI matches the first three exactly — the BIOS image
+confirms the SKU really is `MRD` — and differs only in the date (`12/11/2015`,
+or `02/25/2016` on the newer build). Such a patch has not been submitted.
+
+The other route is to write the two system strings back into the firmware with
+AMI's DMI editor, which would make all four quirks match at once. Untested here;
+the risks are in [60-bios-firmware.md](60-bios-firmware.md#what-would-actually-fix-it).
 
 ### If your tablet reports something else entirely
 

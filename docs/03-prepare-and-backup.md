@@ -92,7 +92,16 @@ Get-CimInstance Win32_BIOS | Select-Object Manufacturer, SMBIOSBIOSVersion, Rele
 ```
 
 If anything later goes wrong, the BIOS version is the first thing you will want
-to know.
+to know. Record the **release date** as well as the version string — on this
+tablet two different BIOS builds both call themselves `1ATFG007`, and only the
+date tells them apart ([60-bios-firmware.md](60-bios-firmware.md#the-ver-string-is-not-a-version-number)).
+
+`Manufacturer` and `Model` here are the same DMI system fields the kernel matches
+its quirks against. If they read `To be filled by O.E.M.`, that single fact
+explains the touchscreen, Wi-Fi, audio and auto-rotation all failing later —
+see [01-hardware.md](01-hardware.md#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-four-things-at-once).
+If they read `Hampoo` / `D2D3_Vi8A1`, your unit has the good strings: do not
+flash the BIOS, because that would probably overwrite them.
 
 ## Where to go next
 

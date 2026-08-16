@@ -77,6 +77,11 @@ Confirm which one you have before doing anything else — see
    wear, battery.
 7. When something misbehaves: [docs/50-troubleshooting.md](docs/50-troubleshooting.md).
 
+Not part of the install, but read it before you flash anything:
+[docs/60-bios-firmware.md](docs/60-bios-firmware.md) — the tablet's BIOS releases,
+what the circulating firmware archives actually contain, and why updating does not
+fix the Linux problems.
+
 Sources for every technical claim in this repo are collected in
 [docs/90-references.md](docs/90-references.md).
 
@@ -148,6 +153,12 @@ cat /sys/class/dmi/id/sys_vendor /sys/class/dmi/id/product_name
 
 Full explanation and the fixes:
 [docs/01-hardware.md](docs/01-hardware.md#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-four-things-at-once).
+
+**Do not go looking for a BIOS update to fix it.** The placeholder is baked into
+the firmware image Chuwi shipped — verified by parsing the newest published BIOS —
+so flashing it changes nothing, and one image circulating as "Vi8 Plus BIOS" is
+for a different tablet entirely. [docs/60-bios-firmware.md](docs/60-bios-firmware.md)
+covers the firmware history, what each image really is, and what does help.
 
 ---
 
