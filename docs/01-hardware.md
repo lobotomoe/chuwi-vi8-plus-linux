@@ -237,7 +237,11 @@ Ubuntu 26.04 LTS (`linux-buildinfo-7.0.0-31-generic`). All of them are enabled.
 - Firmware: `chipone/icn8505-HAMP0002.fw`, 35012 bytes,
   SHA-256 `93e549e0b6a2b4b3889634975ea81378729b8b829eb5ca7f125134f4307cfc7c`.
 
-This firmware is **not** shipped by `linux-firmware`. It lives inside the tablet's own
+This firmware is **not** shipped by `linux-firmware` — that repository has no
+`chipone/` directory, and its `WHENCE` manifest does not mention `icn8505` or
+`chipone` anywhere in its 10534 lines. — **verified**. No distribution packages
+it, so there is no package to install; every route to the file goes through
+Chuwi. It lives inside the tablet's own
 UEFI image, and the kernel extracts it at boot through the EFI embedded-firmware
 mechanism (`CONFIG_EFI_EMBEDDED_FIRMWARE=y`) that Hans de Goede added specifically for
 this class of tablet. Nothing to download; it just works, but it does mean the
