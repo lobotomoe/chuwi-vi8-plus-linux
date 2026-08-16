@@ -87,17 +87,43 @@ All three patches hard-code `12/11/2015`. That came from a **photograph of the
 setup screen**, not from the kernel's own view of DMI, and if the string in
 `/sys` differs by so much as a leading zero the patches match nothing.
 
-Run this on the tablet and check it against the patches:
+Run this on the tablet. The brackets are not decoration — see below.
 
 ```sh
-cat /sys/class/dmi/id/bios_date        # expected: 12/11/2015
-cat /sys/class/dmi/id/bios_version     # expected: P03_C806.108
-cat /sys/class/dmi/id/board_vendor     # expected: Hampoo
-cat /sys/class/dmi/id/board_name       # expected: Cherry Trail CR
-cat /sys/class/dmi/id/modalias         # needed verbatim for the hwdb entry
+for f in bios_version bios_date sys_vendor product_name product_sku \
+         board_vendor board_name; do
+  printf '%-14s [%s]\n' "$f" "$(cat "/sys/class/dmi/id/$f" 2>/dev/null)"
+done
+cat /sys/class/dmi/id/modalias
 ```
 
-`sudo ./scripts/collect-hw-report.sh` captures all of these in one file.
+Expected, from what has been verified so far:
+
+```
+bios_version   [P03_C806.108]
+bios_date      [12/11/2015]
+sys_vendor     [To be filled by O.E.M.]
+product_name   [To be filled by O.E.M.]
+product_sku    [MRD]
+board_vendor   [Hampoo]
+board_name     [Cherry Trail CR]
+```
+
+**Trailing spaces decide whether patch 0002 works.** DMI strings routinely carry
+them — the BIOS image parsed for this repo has a system serial that is a single
+space — and they are invisible in ordinary output. `DMI_MATCH` is a substring
+test and tolerates them, but patch 0002 uses `DMI_EXACT_MATCH` on
+`board_vendor` and `board_name`, which does not. If either bracket shows
+`[Hampoo ]` rather than `[Hampoo]`, the entry must either include the space or
+switch to `DMI_MATCH`.
+
+Copy the output rather than retyping it. `Cherry Trail CR` and `CherryTrail CR`
+both exist on this hardware — the first is the board name, the second is the
+SMBIOS family in the same BIOS image — and one space is the whole difference
+between a patch that matches and one that silently does nothing.
+
+`sudo ./scripts/collect-hw-report.sh` captures all of these in one file, along
+with everything else worth having.
 
 If `bios_version` reads `P03_C806.108`, consider adding
 `DMI_MATCH(DMI_BIOS_VERSION, "P03_C806.108")` to each entry — it is far more
