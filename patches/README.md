@@ -264,13 +264,24 @@ dmesg | grep -i icn8505
 dmesg | grep -i brcmf_fw_alloc_request
 ```
 
-Note that patch 0001 can only work if the ICN8505 firmware really is in this
-unit's UEFI image. It was **not** found in either published BIOS image
-([60-bios-firmware.md](../docs/60-bios-firmware.md)), so run
-`sudo ./scripts/dump-bios.sh` first — if that does not find it either, the DMI
-match is correct but the touchscreen still will not come up, and that is a
-separate problem. The maintainer's notes do say `fw in EFI` for this model, so
-absence in the published images is more likely an extraction limit than proof.
+**Patch 0001 may well be a no-op on the unit it was written for, and that has to
+be said when sending it.** The quirk entry's entire payload is an `embedded_fw`
+descriptor, so it does something only if the ICN8505 firmware really is in that
+unit's UEFI image. It is not in either published BIOS image, and it is not in the
+flash read off the reference tablet either — `inspect-bios-image.py`, which
+unpacks the UEFI volumes and every LZMA stream rather than grepping raw bytes,
+reports it absent from all of them ([60-bios-firmware.md](../docs/60-bios-firmware.md)).
+So on that tablet the DMI match would fire, the EFI scan would find nothing, and
+the touchscreen would still not come up.
+
+That is evidence about one firmware build, not proof about the model. The
+driver's maintainer records `fw in EFI` for this tablet and his unit is an a1, so
+the likeliest reading is that an earlier BIOS build carried the blob and `.108`
+and `.109` do not. Worth stating in the submission and letting him judge — he
+wrote both the driver and the EFI extraction mechanism.
+
+`sudo ./scripts/dump-bios.sh` checks your own unit, but note it searches the raw
+dump only; a negative from it is weaker than one from the inspector.
 
 **Patch 0001 is a convenience, not the only route to a working touchscreen.** The
 driver derives `chipone/icn8505-HAMP0002.fw` from ACPI `_SUB`, not from DMI, and
@@ -280,6 +291,20 @@ the DMI still unfilled. What the patch buys is not needing the file at all. Try
 the file first — it is the faster way to learn whether the rest of the touchscreen
 stack is healthy, and it makes a good bisection point if the patched kernel still
 does not work.
+
+That route is no longer theoretical: on the reference unit
+`extract-touchscreen-fw.sh --download --install` plus a `modprobe -r` / `modprobe`
+brought the touchscreen up on a stock Ubuntu kernel with the DMI still unfilled —
+tracking the finger, though with both axes rotated 180°, which a libinput
+calibration matrix corrects ([01-hardware.md](../docs/01-hardware.md)). Which is
+also what makes the paragraph above worth taking seriously: the working fix
+bypasses UEFI entirely, so it says nothing about whether the blob is in there.
+
+That rotation is **not** an argument for adding axis properties to patch 0001.
+`chuwi_vi8_plus_data` has no `.properties` at all, so a missed DMI match costs
+the firmware and nothing else, and the likeliest cause is the substitute firmware
+build rather than the hardware. Quirking it upstream would break the units that
+get the blob out of EFI as intended.
 
 ## Where to send them
 

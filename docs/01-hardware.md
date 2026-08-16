@@ -343,6 +343,78 @@ sudo ./scripts/extract-touchscreen-fw.sh --download --install     # ~217 MiB
 Run without `--name` it reads the name your own kernel asked for out of `dmesg`,
 which is the only authoritative answer for your unit.
 
+**This is the route that was run on the reference unit, and it works.** The
+detection read `HAMP0002` off that machine's own `dmesg`, the package hashed as
+expected, the blob matched the 2016-04-21 table, and `--install` wrote
+`/lib/firmware/chipone/icn8505-HAMP0002.fw`. Reloading the driver is enough — no
+reboot:
+
+```sh
+sudo modprobe -r chipone_icn8505 && sudo modprobe chipone_icn8505
+```
+
+The probe then succeeds and the touchscreen registers as an input device:
+
+```
+input: CHPN0001:00 as /devices/pci0000:00/808622C1:04/i2c-4/i2c-CHPN0001:00/input/input25
+```
+
+— **verified on the unit**, with the DMI still unfilled, on a stock distribution
+kernel and no patch. Note the device is named after the ACPI ID, so it is
+`CHPN0001` you grep `/proc/bus/input/devices` for, not `icn8505`.
+
+This also settles, for one build, the question left open below: the vendor
+package's **34900-byte** `HAMP0002` is accepted by the controller even though the
+kernel's EFI path pins 35012 bytes. Do not read more into the probe than it says
+— the driver's post-upload checks are computed over the file it just sent, so
+they prove the I2C transfer, not the blob's provenance. The 34884-byte GitHub
+build is still untried here.
+
+#### With that build the axes come out rotated 180°
+
+Touch works and the pointer tracks the finger, but **both axes are inverted** —
+touch the top right and the pointer goes to the bottom left. Measured off two
+frames of a video of the unit rather than eyeballed: finger at (0.69, 0.26) gave
+a pointer at (0.30, 0.74), and finger at (0.84, 0.46) gave (0.18, 0.65). That is
+`x → 1-x, y → 1-y` on both, with no axis swap, so it is a 180° rotation and not
+a 90° one. — **verified on the unit**
+
+This is not something the DMI quirk can explain, and it is worth being precise
+about why, because it is tempting to blame [patch 0001](../patches/):
+`chuwi_vi8_plus_data` carries an `embedded_fw` descriptor and **nothing else** —
+no `.properties`, no `.acpi_name` — so there are no axis properties for a missed
+DMI match to have cost. The orientation arrives from the controller: the driver
+reads the resolution out of the chip over I2C, then applies
+`touchscreen_parse_properties()`, and upstream sets no `touchscreen-inverted-*`
+for this model at all. On the maintainer's unit, running the blob out of EFI, the
+axes must therefore already be correct.
+
+Which points at the firmware build rather than the hardware. We are loading a
+*different* build of `HAMP0002` than the one the kernel pins, and the scan
+direction is the controller firmware's business. Untested hypothesis, and the
+experiment that would settle it is cheap: load the 34884-byte build and see
+whether the axes flip.
+
+Fix it in userspace meanwhile. This is a calibration matrix, which is what it is
+for — it survives reboots and works under both X11 and Wayland:
+
+```sh
+# /etc/udev/rules.d/99-chuwi-touchscreen.rules
+ACTION=="add|change", KERNEL=="event[0-9]*", ATTRS{name}=="CHPN0001:00", \
+  ENV{LIBINPUT_CALIBRATION_MATRIX}="-1 0 1 0 -1 1"
+```
+
+To try it before committing to it, on an X11 session:
+
+```sh
+xinput set-prop "CHPN0001:00" --type=float \
+  "Coordinate Transformation Matrix" -1 0 1 0 -1 1 0 0 1
+```
+
+Do **not** send this upstream as a `touchscreen-inverted-x`/`-y` quirk. If the
+cause is the substitute firmware build, such a quirk would break every unit that
+gets the blob out of EFI the way the driver intends.
+
 | `_SUB` | Size | SHA-256 |
 |---|---|---|
 | `HAMP0001` | 34980 | `3e0f9cd2…ff7c58` |

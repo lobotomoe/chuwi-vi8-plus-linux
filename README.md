@@ -125,7 +125,7 @@ kernel symbols.
 | Graphics (Cherry Trail, `i915`) | Yes | **Works**, accelerated, no `nomodeset` needed |
 | eMMC, microSD | Yes | **Works** — installed to eMMC, ran the installer off a card |
 | Wi-Fi (BCM43430) | Yes | **Works after a manual NVRAM copy** — see below. 2.4 GHz only, the radio has no 5 GHz |
-| Touchscreen (Chipone ICN8505) | Yes | **Does not work out of the box** — the DMI quirk does not match, so the firmware is never extracted. Fixable without a kernel patch: the filename comes from ACPI, and Chuwi's own driver package carries the firmware |
+| Touchscreen (Chipone ICN8505) | Yes | **Dead out of the box, works after installing the firmware by hand** — the DMI quirk does not match, so nothing is extracted from UEFI. No kernel patch needed: the filename comes from ACPI, and Chuwi's own driver package carries the blob. Done on this unit; the axes then come out rotated 180°, corrected with a libinput matrix |
 | Audio (RT5651) | Yes | Untested; the quirk does not match, so expect wrong channel mapping |
 | Accelerometer / auto-rotation | Partly | **The sensor binds** — `BOSC0200` appears as `iio:device0` — but `iio-sensor-proxy` cannot read it: *"Could not find trigger name"*, then *"Buffer did not have data within 0.5s"*. So orientation is exposed by ACPI `ROTM` as designed, and userspace still does not rotate |
 | Battery, charging (AXP288) | Yes | **Works** — `axp288_fuel_gauge` reports capacity, voltage and current; `axp288_charger` reports the USB supply online. Charges at 2 A only from a USB-A charger via an A-to-C cable — no PD, and C-to-C gives 500 mA |
@@ -247,14 +247,18 @@ network. Wi-Fi was brought up by hand and the fix is recorded. The firmware setu
 menu was walked through and photographed. The failure modes in the touchscreen and
 Wi-Fi sections are copied out of that unit's own `dmesg`.
 
+`collect-hw-report.sh`, `dump-bios.sh` and `extract-touchscreen-fw.sh --download
+--install` have since run on that unit too, so the DMI strings, the flash chip,
+the SPI lock state and the region-by-region comparison against the published
+`.108` are all read off the hardware rather than off a downloaded image.
+
 **Derived from sources, never executed here.**
 
 | Thing | What it rests on |
 |---|---|
 | [Debian](docs/31-install-debian.md) and [Arch](docs/32-install-arch.md) guides | ISO contents and installer source, read. **Neither was installed on this tablet** |
 | [`make-media.ps1`](scripts/make-media.ps1) | Never run — no Windows machine was involved |
-| `restore-emmc.sh`, `postinstall-*.sh`, `dump-bios.sh` | Argument handling is unit-tested; none has run on the tablet |
-| `extract-touchscreen-fw.sh` | Every path exercised except `--install`, which needs the tablet |
+| `restore-emmc.sh`, `postinstall-*.sh` | Argument handling is unit-tested; neither has run on the tablet |
 | The three [`patches/`](patches/) | Apply cleanly to mainline. Never compiled, never booted |
 | Suspend, HDMI, Bluetooth, audio, cameras | Not exercised on the installed system |
 
