@@ -12,7 +12,9 @@ brcmfmac43430a0-sdio.*. Both revisions shipped in this model. Point the quirk
 at ilife-S806 instead, which is present as an a0 build and is the same AP6212
 module; the chiprev check keeps a1 units on their existing path.
 
-Tested on an a0 unit, where the Vi8 Plus nvram data is confirmed to work.
+The board's own nvram data is confirmed to work on an a0 unit, by copying it
+to brcmfmac43430a0-sdio.txt by hand: the a0/a1 split is in the file name, not
+in the calibration data.
 
 Signed-off-by: Your Name <your.email@example.com>
 ---

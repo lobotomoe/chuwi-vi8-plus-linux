@@ -19,9 +19,13 @@ source "$(dirname -- "${BASH_SOURCE[0]}")/lib.sh"
 # The descriptor the kernel uses to find the touchscreen firmware in UEFI
 # memory. From drivers/platform/x86/touchscreen_dmi.c, chuwi_vi8_plus_data.
 TS_FW_NAME=icn8505-HAMP0002.fw
-TS_FW_PREFIX='\xb0\x07\x00\x00\xe4\x07\x00\x00'
+TS_FW_PREFIX_HEX=b0070000e4070000
 TS_FW_LENGTH=35012
 TS_FW_SHA256=93e549e0b6a2b4b3889634975ea81378729b8b829eb5ca7f125134f4307cfc7c
+
+# Both search paths below derive their pattern from TS_FW_PREFIX_HEX, so the
+# bytes are written down exactly once: \xb0\x07\x00\x00\xe4\x07\x00\x00
+ts_prefix_escaped=$(printf '%s' "$TS_FW_PREFIX_HEX" | sed 's/../\\x&/g')
 
 # 1.5.0 could issue an invalid opcode when erasing or writing on Braswell and
 # earlier, leaving an incomplete flash. Reading is not affected, but a version
@@ -99,8 +103,15 @@ flashrom -p internal -r "$base.bin" >>"$probe_log" 2>&1 ||
   die "first read failed; see $probe_log"
 
 log "Reading the flash (2 of 2)..."
-flashrom -p internal -r "$base.verify.bin" >>"$probe_log" 2>&1 ||
-  die "second read failed; see $probe_log"
+if ! flashrom -p internal -r "$base.verify.bin" >>"$probe_log" 2>&1; then
+  # The first read is still on disk and looks exactly like a good dump. Rename
+  # it so it cannot later be mistaken for one that was checked.
+  mv "$base.bin" "$base.unverified.bin" 2>/dev/null || true
+  rm -f "$base.verify.bin"
+  die "second read failed; see $probe_log
+The single read that did succeed is at $base.unverified.bin. It has not been
+checked against a second read, so do not trust it as a backup."
+fi
 
 if ! cmp -s "$base.bin" "$base.verify.bin"; then
   rm -f "$base.bin" "$base.verify.bin"
@@ -131,12 +142,39 @@ log "Identity recorded in ${base##*/}.dmi.txt"
 # scanning UEFI memory for these exact bytes, so the same search works on a
 # flash image - provided the blob is stored uncompressed, which is not
 # guaranteed. Not finding it here does not prove it is absent.
+# Prints the byte offset of the prefix, empty if absent, and fails only if
+# there is no way to search at all. Not every grep is built with PCRE, and a
+# grep that cannot take -P must not be mistaken for a dump without firmware -
+# both would otherwise print nothing.
+find_prefix_offset() {
+  local file=$1
+  if printf '%b' "A$ts_prefix_escaped" |
+    LC_ALL=C grep -qaP "$ts_prefix_escaped" 2>/dev/null; then
+    LC_ALL=C grep -aboP "$ts_prefix_escaped" "$file" | head -1 | cut -d: -f1
+    return 0
+  fi
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c 'import sys
+d = open(sys.argv[1], "rb").read()
+o = d.find(bytes.fromhex(sys.argv[2]))
+print(o if o >= 0 else "")' "$file" "$TS_FW_PREFIX_HEX"
+    return 0
+  fi
+  return 1
+}
+
 log ""
 log "Looking for the touchscreen firmware..."
-offset=$(LC_ALL=C grep -aboP "$TS_FW_PREFIX" "$base.bin" 2>/dev/null |
-  head -1 | cut -d: -f1)
 
-if [ -z "$offset" ]; then
+if ! offset=$(find_prefix_offset "$base.bin"); then
+  warn "cannot search the dump: this grep has no working -P and python3 is absent."
+  warn "The dump is fine; install either and re-run, or search $base.bin by hand."
+  offset=skipped
+fi
+
+if [ "$offset" = skipped ]; then
+  : # already reported
+elif [ -z "$offset" ]; then
   log "  Not found as a contiguous blob. It may be compressed inside a driver."
   log "  This is expected on some builds and is not an error."
 else

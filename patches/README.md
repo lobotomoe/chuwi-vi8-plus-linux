@@ -53,6 +53,34 @@ from the same AmPak AP6212 module — precisely what the existing Chuwi Hi8 Pro
 entry does. The `chiprev` field in `brcmf_dmi_data` means a1 units never hit this
 entry and keep their current behaviour.
 
+**This is the one place where the patch loads data nobody has tested on this
+tablet.** What was verified here is that the tablet's *own* nvram works on an a0
+radio, by copying it to `brcmfmac43430a0-sdio.txt` by hand. `ilife-S806` is a
+different file, chosen because it is the only a0-named candidate from the same
+module. Prove it before sending:
+
+```sh
+sudo cp /lib/firmware/brcm/brcmfmac43430a0-sdio.ilife-S806.txt \
+        /lib/firmware/brcm/brcmfmac43430a0-sdio.txt
+sudo reboot
+ip -br link          # wlan0 must appear, and must associate
+```
+
+Reboot rather than reloading the module — after a failed attempt the chip is
+left wedged and returns `-16 EBUSY`, which looks like an unrelated fault.
+
+If `ilife-S806` does **not** bring the radio up, do not send patch 0002 as
+written. The alternative is to set `board_type` to `"Hampoo-D2D3_Vi8A1"` and
+submit a one-line `linux-firmware` change adding
+`brcmfmac43430a0-sdio.Hampoo-D2D3_Vi8A1.txt` as a link to the existing file.
+That uses the data actually known to work, at the cost of two submissions to
+two projects, and the kernel half is useless until the firmware half lands.
+
+One style point a reviewer may raise either way: `chuwi_vi8_plus_data` is
+byte-identical to `chuwi_hi8_pro_data`. Keeping the separate name documents
+which tablet the entry is for; be ready to be asked to reuse the existing
+struct instead.
+
 ## Before submitting: confirm the BIOS date
 
 All three patches hard-code `12/11/2015`. That came from a **photograph of the
