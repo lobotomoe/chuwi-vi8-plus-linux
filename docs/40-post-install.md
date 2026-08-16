@@ -39,8 +39,8 @@ is the difference between "slow" and "unusable" when a browser is open.
 
 The accelerometer is a Bosch BOSC0200 on the `bmc150_accel` driver, and unlike
 the touchscreen and Wi-Fi it does **not** depend on DMI: the driver asks ACPI for
-the mount matrix first, and this tablet's firmware provides one via a `ROTM`
-method. So there is nothing to calibrate even on a unit with
+the mount matrix first, and on this model it is meant to come from an ACPI `ROTM`
+method. So there should be nothing to calibrate even on a unit with
 [unfilled DMI](01-hardware.md#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-three-things-at-once).
 Confirm the matrix was picked up:
 

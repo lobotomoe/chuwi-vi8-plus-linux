@@ -66,10 +66,17 @@ if (!bmc150_apply_acpi_orientation(dev, &data->orientation)) {
 	ret = iio_read_mount_matrix(dev, &data->orientation);
 ```
 
-For a `BOSC0200` device the ACPI path looks for a `ROTM` method, and this
-tablet's DSDT has one — verified in its own BIOS image, where `ROTM` sits inside
-the `BOSC0200` device scope. The driver's own comment lists "Chuwi Vi8 Plus
-(CWI519)" among the tablets that supply the matrix this way.
+For a `BOSC0200` device the ACPI path looks for a `ROTM` method. The driver's own
+comment lists "Chuwi Vi8 Plus (CWI519)" among the tablets that supply the matrix
+this way, and Hans de Goede — who maintains that driver and owns a CWI519 —
+records the tablet in his own hardware notes as
+`Accel: BOSC0200 -> BMA250E, mount-matrix ok`
+([90-references.md](90-references.md#hans-de-goedes-notes-on-this-exact-tablet)).
+
+That is two independent statements from the person best placed to know, but
+neither is a reading of *your* DSDT: the ACPI tables sit compressed inside the
+BIOS image and were not decompressed here, so this repo has not confirmed `ROTM`
+in the firmware directly. The one-line check below is the confirmation.
 
 So the orientation reference survives unfilled DMI. Confirm on your unit:
 
@@ -231,10 +238,21 @@ Read that carefully, because it is better news than it looks. The I2C device is 
 the driver binds to it, and the probe fails on exactly one thing: a missing file. The
 hardware and the driver are fine.
 
-And the filename in that message does **not** come from the DMI quirk — the driver
-builds `chipone/icn8505-<ACPI HID>.fw` from the ACPI device's own ID. So dropping the
-file into `/lib/firmware/chipone/` makes the touchscreen work with the DMI still
-unfilled; the quirk's only job was to extract that same file from the UEFI image.
+And the filename in that message does **not** come from the DMI quirk. Note that the
+I2C device is `CHPN0001` while the file is `HAMP0002` — the driver builds
+`chipone/icn8505-<_SUB>.fw` from the ACPI `_SUB` (subsystem ID) object of the
+touchscreen node, via `acpi_get_subsystem_id()`. Nothing in that path reads DMI.
+
+The lookup order settles the rest. `firmware_request_platform()` is documented in the
+kernel as trying the filesystem first and falling back to the UEFI copy only *"if
+direct filesystem lookup fails"*. So **a file in `/lib/firmware/chipone/` takes
+priority over the UEFI extraction and works with the DMI still unfilled.** The quirk's
+only job on this tablet is to make that file unnecessary — `chuwi_vi8_plus_data`
+carries an `embedded_fw` entry and no `properties`, so a missed match costs the
+firmware and nothing else.
+
+That makes the touchscreen the one broken component you can fix today without
+building a kernel.
 
 Getting the file means pulling it out of your own firmware — it is not redistributed
 anywhere. The kernel records exactly what to look for: **35012 bytes**, starting with
@@ -245,15 +263,32 @@ anywhere. The kernel records exactly what to look for: **35012 bytes**, starting
 dump the two reads disagree on, searches it for that prefix and installs the result
 only if the hash matches.
 
-A second-hand copy exists — another Vi8 Plus owner publishes one in
-[`sciboy12/vi8-plus-linux-fixes`](https://github.com/sciboy12/vi8-plus-linux-fixes).
-It starts with the right prefix, so it is a real ICN8505 image, but it is **34884
-bytes rather than 35012** and so cannot match the kernel's hash. That does not
-necessarily make it useless: the length and hash are how the kernel finds the blob in
-**EFI memory**, while a file dropped into `/lib/firmware` is simply loaded. It is a
-reasonable thing to try if your own flash turns out not to carry the blob — with the
-caveat that its provenance is unknown and a touchscreen firmware is not a thing to
-take on trust if you can extract your own.
+Second-hand copies exist, and they agree with each other. Two unrelated people
+publish an ICN8505 image for this controller:
+
+| Source | File | Size | SHA-256 |
+|---|---|---|---|
+| [`sciboy12/vi8-plus-linux-fixes`](https://github.com/sciboy12/vi8-plus-linux-fixes) | `firmware/chipone/icn8505-HAMP0002.fw` | 34884 | `d9db81b9…c99327` |
+| [`Dax89/chuwi-dev`](https://github.com/Dax89/chuwi-dev) | `hi10/HAMP0002.bin` | 34884 | `d9db81b9…c99327` |
+
+They are **byte-identical** — verified with `cmp`. Two independent uploads of the same
+bytes is meaningful provenance, and both carry the correct `b0 07 00 00 e4 07 00 00`
+prefix, so this is a real ICN8505 image for `_SUB` = `HAMP0002`.
+
+It is still **34884 bytes rather than the 35012 the kernel pins**, and the obvious
+explanation is wrong: appending or prepending 128 zero or `0xff` bytes does not produce
+the kernel's SHA-256, so this is not the UEFI blob with padding trimmed. It is a
+different build of the same firmware.
+
+That does not make it useless. The length and hash are how the kernel finds the blob in
+**EFI memory**; a file in `/lib/firmware` is simply loaded and sent, and the driver's
+own post-upload length and CRC32 checks compare against the size of the file it just
+transferred — they verify the I2C transfer, not the file's authenticity. So a 34884-byte
+file will not be rejected for being the wrong size. Whether the controller boots from it
+is the actual open question.
+
+Reasonable to try if your own flash turns out not to carry the blob. Extract your own
+first if you can — a touchscreen firmware is not a thing to take on trust.
 
 ### Wi-Fi / Bluetooth — AmPak AP6212 (Broadcom BCM43430)
 
@@ -262,12 +297,29 @@ take on trust if you can extract your own.
   since 2018. Any current distribution has it — **but see the chip revision note
   below before assuming it is the file your unit needs.**
 - **2.4 GHz only.** The chip has no 5 GHz radio. This is not a driver limitation.
-- Bluetooth: BCM43430A1 attached over UART, driver `hci_uart` + `btbcm`, patch file
-  `brcm/BCM43430A1.hcd` from `linux-firmware`.
+- Bluetooth: BCM43430 attached over UART, driver `hci_uart` + `btbcm`, patch file
+  `brcm/BCM43430A1.hcd` — **from `bluez-firmware`, not `linux-firmware`.**
 
-Wi-Fi is reliable **once it has NVRAM**. Bluetooth on UART-attached Broadcom parts on
-Cherry Trail is the one component worth verifying on your own unit rather than trusting
-a table — see [50-troubleshooting.md](50-troubleshooting.md#bluetooth-does-not-appear).
+Wi-Fi is reliable **once it has NVRAM**.
+
+Bluetooth needs its own patch file, and this is the one place the two chip revisions
+diverge in a way no amount of configuration fixes:
+
+| Revision | File `btbcm` looks for | Packaged? |
+|---|---|---|
+| a1 | `brcm/BCM43430A1.hcd` | yes — `bluez-firmware` on both Debian and Ubuntu |
+| a0 | `brcm/BCM4343A0.hcd` | **no — no Debian or Ubuntu package ships it** |
+
+So on an a1 unit `sudo apt install bluez-firmware` is the whole fix. On an a0 unit
+there is nothing to install: the vendor file (`BCM4343A0-26M.hcd` in Broadcom's
+naming) is not redistributed, and a GitHub-wide search for it returns two hits, both
+of them somebody's notes rather than the file.
+
+This matches how the driver's maintainer scores the tablet — his own status table
+marks Bluetooth `FIR`, defined there as *"needs firmware which is not in
+linux-firmware"*, and his unit is an a1. Read the exact name your kernel asked for
+out of `dmesg` rather than assuming; see
+[50-troubleshooting.md](50-troubleshooting.md#bluetooth-does-not-appear).
 
 #### Two chip revisions ship in this model, and they want different NVRAM
 

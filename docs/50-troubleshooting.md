@@ -498,13 +498,27 @@ And if there is no `wlan0` at all, it is the firmware, not the applet — see
 ## Bluetooth does not appear
 
 ```sh
-dmesg | grep -iE 'bluetooth|btbcm|hci_uart|BCM43430'
-ls /lib/firmware/brcm/BCM43430A1.hcd
+dmesg | grep -iE 'bluetooth|btbcm|hci_uart|BCM43430|BCM4343'
 ```
 
 The chip is attached over a UART, which on Cherry Trail depends on the serdev
 driver binding to an ACPI device. It usually works; when it does not, it is
-almost always the missing `.hcd` patch file, which comes from `linux-firmware`.
+almost always the missing `.hcd` patch file. Read the exact filename the kernel
+asked for out of that `dmesg` output rather than guessing — `btbcm` tries several
+names and the one it settles on depends on your chip revision.
+
+**The `.hcd` is not in `linux-firmware`.** It ships in a separate package:
+
+```sh
+sudo apt install bluez-firmware
+ls -l /usr/lib/firmware/brcm/BCM43430A1.hcd*
+```
+
+That covers an **a1** unit. An **a0** unit wants `brcm/BCM4343A0.hcd`, which no
+Debian or Ubuntu package provides — check which revision you have with the
+command in
+[01-hardware.md](01-hardware.md#two-chip-revisions-ship-in-this-model-and-they-want-different-nvram)
+before hunting for a file that is not there.
 
 Wi-Fi and Bluetooth share the antenna path on this module, so heavy Bluetooth
 use degrades 2.4 GHz Wi-Fi throughput. That is the hardware.

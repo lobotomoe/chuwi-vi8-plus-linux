@@ -125,14 +125,14 @@ kernel symbols.
 | Graphics (Cherry Trail, `i915`) | Yes | **Works**, accelerated, no `nomodeset` needed |
 | eMMC, microSD | Yes | **Works** — installed to eMMC, ran the installer off a card |
 | Wi-Fi (BCM43430) | Yes | **Works after a manual NVRAM copy** — see below. 2.4 GHz only, the radio has no 5 GHz |
-| Touchscreen (Chipone ICN8505) | Yes | **Does not work** — the DMI quirk does not match, so the firmware is never extracted |
+| Touchscreen (Chipone ICN8505) | Yes | **Does not work out of the box** — the DMI quirk does not match, so the firmware is never extracted. Fixable by supplying the file; the filename comes from ACPI, not DMI |
 | Audio (RT5651) | Yes | Untested; the quirk does not match, so expect wrong channel mapping |
 | Accelerometer / auto-rotation | Yes | Untested, but **not** DMI-dependent — the mount matrix comes from ACPI `ROTM`. LXQt still needs a helper to act on it |
-| Battery, charging (AXP288) | Yes | Untested on the installed system |
-| Backlight | Yes | Untested on the installed system |
+| Battery, charging (AXP288) | Yes | Untested here; the maintainer records it working. Charges at 2 A only from a USB-A charger via an A-to-C cable — no PD, and C-to-C gives 500 mA |
+| Backlight | Yes | Untested here; the maintainer records it working |
 | micro-HDMI | Yes | Untested |
-| Bluetooth (BCM43430A1 over UART) | Yes | Untested |
-| Suspend | Partly | Untested. s2idle is what to expect; idle drain is worse than Windows |
+| Bluetooth (BCM43430 over UART) | Yes | Untested. Needs an `.hcd` from `bluez-firmware`, **not** `linux-firmware` — and no distribution ships one for an a0 chip |
+| Suspend | Partly | Untested here. The maintainer's table scores it as suspending but **not** reaching S0i3, so expect idle drain |
 | Cameras | **No** | Cherry Trail ISP has no usable mainline driver. Treat them as absent |
 
 ### Why several of those say "does not match"
@@ -144,10 +144,11 @@ system fields, so on such a unit the touchscreen, the Wi-Fi calibration lookup a
 the audio routing quirk all silently fail to apply — three unrelated-looking faults
 from one placeholder string.
 
-Wi-Fi and the touchscreen have DMI-independent workarounds; audio does not, and
-needs a kernel patch. The accelerometer looks like a fourth victim and is not one:
-its mount matrix comes from an ACPI `ROTM` method rather than from DMI, so it is
-unaffected. Check yours before you conclude anything:
+Wi-Fi and the touchscreen have DMI-independent workarounds — in both cases the
+driver's second attempt uses a name that comes from ACPI or from the chip itself.
+Audio has no such escape hatch and needs a kernel patch. The accelerometer looks
+like a fourth victim and is not one: its mount matrix is supposed to come from an
+ACPI `ROTM` method rather than from DMI. Check yours before you conclude anything:
 
 ```sh
 cat /sys/class/dmi/id/sys_vendor /sys/class/dmi/id/product_name

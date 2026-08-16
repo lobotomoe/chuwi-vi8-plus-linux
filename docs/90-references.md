@@ -116,6 +116,50 @@ his unit `needs to always have a charger connected`. That is his particular unit
 battery, not a property of the model — though a ten-year-old original battery will
 behave the same way.
 
+### Three more files in the same repository
+
+`x86-tablet-info` is the one usually cited, but the repository holds three others
+that say something about this model.
+
+**[`x86-tablet-status`](https://github.com/jwrdegoede/sunxi-fedora-scripts/blob/master/x86-tablet-status)**
+— a per-component status matrix against linux-next. The Vi8 Plus row, decoded with
+the file's own legend:
+
+| Component | | Component | |
+|---|---|---|---|
+| LCD | works | speaker | works |
+| Wi-Fi | works | headphones | works |
+| touchscreen | works | jack detection | works |
+| accelerometer | works | USB host | works |
+| battery monitor | works | USB device | works |
+| charge 2 A | works | Bluetooth | **`FIR`** |
+| buttons | works | charge 3 A | n/a |
+| brightness | works | touchpad / lid | n/a |
+| suspend | `yes` | tablet-mode switch | locked on |
+
+Two entries in that row are worth reading closely.
+
+`FIR` is defined in the file as *"needs firmware which is not in linux-firmware"* —
+which is the Bluetooth `.hcd` situation described in
+[01-hardware.md](01-hardware.md#wi-fi--bluetooth--ampak-ap6212-broadcom-bcm43430).
+
+Suspend is scored `yes`, not `S0i3`. Other rows in the same table do say `S0i3`, so
+the distinction is deliberate: the tablet suspends, but is not recorded as reaching
+the deep power state, and battery drain while suspended should be expected to match.
+
+**[`x86-codec-info`](https://github.com/jwrdegoede/sunxi-fedora-scripts/blob/master/x86-codec-info)**
+— per-tablet audio routing. The Vi8 Plus line reads
+`mono / mono in2 / JD1_1`, which independently confirms three of the four flags in
+[`patches/0003`](../patches/) without anyone having to boot a kernel.
+
+**[`brcmfmac-notes`](https://github.com/jwrdegoede/sunxi-fedora-scripts/blob/master/brcmfmac-notes)**
+— Wi-Fi and Bluetooth firmware per tablet. His Vi8 Plus is
+`brcmfmac43430-sdio` with `BCM43430A1-26M.hcd`, i.e. an **a1** unit, and the
+country code needs `ALL->X2`. The a0 tablets in the same list (Onda V80 Plus,
+Jumper ezPad mini 3, Chuwi Hi8) take `BCM4343A0-26M.hcd` instead. This is the
+clearest outside evidence that the a0/a1 split in this model is real and that the
+two revisions want different files on both radios.
+
 ## The firmware setup menu
 
 - The firmware on a CWI519 identifies itself as **`Aptio Setup Utility`,
@@ -479,13 +523,11 @@ works precisely because `brcmfmac` builds the filename out of the DMI strings.
 
 What it offers, with what we could establish about each:
 
-- `chipone/icn8505-HAMP0002.fw`, **34884 bytes**. Begins with the same
-  `b0 07 00 00 e4 07 00 00` the kernel looks for, so it is a genuine ICN8505
-  image — but it is **128 bytes shorter** than the 35012 the kernel pins, and its
-  SHA-256 therefore cannot match `93e549e0…`. That mismatch does not by itself
-  make it unusable: the pinned length and hash are only used to find and validate
-  the blob **in EFI memory**, and a file placed in `/lib/firmware` is loaded
-  as-is. Provenance is unknown. A dump of your own flash is the better source.
+- `chipone/icn8505-HAMP0002.fw`, **34884 bytes**, SHA-256 `d9db81b9…c99327`.
+  Begins with the same `b0 07 00 00 e4 07 00 00` the kernel looks for, so it is a
+  genuine ICN8505 image — but it is **128 bytes shorter** than the 35012 the kernel
+  pins. See the entry below: a second, unrelated upload of the identical bytes
+  turned up, which is what raises this from "some file" to a real candidate.
 - `brcm/brcmfmac43430a0-sdio.*.txt`. The a0-named NVRAM this tablet needs, but the
   content is Broadcom's generic `BCM943430WLSELG` reference file, which says of
   itself *"The following parameter values are just placeholders, need to be
@@ -500,6 +542,30 @@ What it offers, with what we could establish about each:
   the initramfs module list for backlight control, and disabling NetworkManager's
   Wi-Fi power save to stop firmware crashes.
 - Agrees with this repo that both cameras are unusable.
+
+## A second, independent copy of the touchscreen firmware
+
+<https://github.com/Dax89/chuwi-dev> — **inspected, not tested here**
+
+A Chipone reverse-engineering repository aimed at the Chuwi Hi10, unconnected to
+the Vi8 Plus work above. It carries raw controller dumps named by ACPI `_SUB`
+string, `hi10/HAMP0001.bin` through `HAMP0005.bin`, plus an out-of-tree
+`chipone_ts` driver and a Vi10 Ultimate DSDT.
+
+`HAMP0002.bin` — the `_SUB` this tablet's touchscreen reports — is **byte-identical
+to the file in `sciboy12/vi8-plus-linux-fixes`**, confirmed with `cmp`: both 34884
+bytes, both SHA-256 `d9db81b9…c99327`. Two people who do not appear to know each
+other uploaded the same bytes, which is about as much provenance as an
+unredistributable vendor blob gets.
+
+`HAMP0001` and `HAMP0005` share the same 34884-byte length and the same prefix but
+hash differently — they are sibling tablets' firmware for the same controller, and
+are not interchangeable. `HAMP0003`, `HAMP0004` and the Vi10 file are a different
+controller generation (38580 bytes, prefix `30 05 00 00 64 05 00 00`).
+
+The 128-byte gap against the kernel's pinned 35012 is **not** padding: appending or
+prepending 128 zero or `0xff` bytes to the 34884-byte file produces none of the
+kernel's SHA-256. It is a different build, not a trimmed one.
 
 ## Distributions
 

@@ -154,6 +154,15 @@ the enum ordering rather than read from a header, so treat the number as a
 starting point — the driver decodes and logs whatever it applied, which tells
 you immediately whether it is right.
 
+The flags themselves are on firmer ground than the encoding. The patch copies the
+existing upstream `Chuwi Vi8 Plus (CWI519)` entry verbatim and changes only the
+`.matches`, and the driver maintainer's own per-tablet audio table lists this
+model as `mono / mono in2 / JD1_1` — an independent confirmation of the mono
+speaker, the IN2 microphone mapping and the jack-detect source
+([90-references.md](../docs/90-references.md#three-more-files-in-the-same-repository)).
+`HP_LR_SWAPPED` is the one flag not corroborated outside the kernel entry itself,
+and it is also the one you can hear: swapped left and right in headphones.
+
 ### The rest
 
 There is no shortcut: build a kernel with the patches and boot it. On this
@@ -171,7 +180,17 @@ unit's UEFI image. It was **not** found in either published BIOS image
 ([60-bios-firmware.md](../docs/60-bios-firmware.md)), so run
 `sudo ./scripts/dump-bios.sh` first — if that does not find it either, the DMI
 match is correct but the touchscreen still will not come up, and that is a
-separate problem.
+separate problem. The maintainer's notes do say `fw in EFI` for this model, so
+absence in the published images is more likely an extraction limit than proof.
+
+**Patch 0001 is a convenience, not the only route to a working touchscreen.** The
+driver derives `chipone/icn8505-HAMP0002.fw` from ACPI `_SUB`, not from DMI, and
+`firmware_request_platform()` checks the filesystem before the UEFI copy. A file
+dropped into `/lib/firmware/chipone/` therefore works on an unpatched kernel with
+the DMI still unfilled. What the patch buys is not needing the file at all. Try
+the file first — it is the faster way to learn whether the rest of the touchscreen
+stack is healthy, and it makes a good bisection point if the patched kernel still
+does not work.
 
 ## Where to send them
 
@@ -236,9 +255,12 @@ if (!bmc150_apply_acpi_orientation(dev, &data->orientation)) {
 	ret = iio_read_mount_matrix(dev, &data->orientation);
 ```
 
-For a `BOSC0200` device the ACPI path looks for a `ROTM` method, and this
-tablet's DSDT has one — verified in its own BIOS image. The driver's comment
-lists "Chuwi Vi8 Plus (CWI519)" among exactly these devices.
+For a `BOSC0200` device the ACPI path looks for a `ROTM` method. The driver's
+comment lists "Chuwi Vi8 Plus (CWI519)" among exactly these devices, and the
+driver's maintainer, who owns one, records `mount-matrix ok` for it in his own
+hardware notes. Neither is a reading of the tablet's actual DSDT — the ACPI
+tables are compressed inside the BIOS image and were not unpacked here — so
+treat the `in_accel_mount_matrix` check as the real evidence.
 
 So no hwdb entry is needed and no `modalias` has to be captured for one. If
 auto-rotation still does not happen, that is LXQt not acting on the sensor,
