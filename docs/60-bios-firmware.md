@@ -238,10 +238,12 @@ factory DMI, and — if the touchscreen firmware is in there — the only copy o
 that too:
 
 ```sh
-sudo flashrom -p internal -r vi8plus-stock-$(date +%F).bin
-sudo flashrom -p internal -r verify.bin
-cmp vi8plus-stock-*.bin verify.bin      # two reads must be identical
+sudo ./scripts/dump-bios.sh
 ```
+
+That reads the chip twice and refuses to keep a dump unless both reads agree,
+records the DMI strings alongside it, and extracts
+`chipone/icn8505-HAMP0002.fw` if this build carries it. It never writes.
 
 Two methods exist, both Chuwi's own:
 
@@ -272,6 +274,63 @@ This is not a like-for-like swap. The two Cherry Trail images divide the same
 these rewrites the region map and replaces the Intel TXE firmware with a build
 half the size. Getting back is a full reflash, not a settings change.
 
+### Why there is no Linux port of `P03_C806.rom.exe` here
+
+The obvious idea is to take the Windows flasher apart and rebuild it for Linux.
+It is not worth doing, for three separate reasons.
+
+**The flasher is a wrapper, not a flasher.** `P03_C806.rom.exe` is a Delphi
+installer stub — nine PE sections, of which `.rsrc` is 6.4 MB and everything
+else is boilerplate — carrying `SETT`, `SCRIPT` and a 6390674-byte `ITEMS`
+resource in the layout Smart Install Maker uses. `ITEMS` has a Shannon entropy
+of 8.00, so it is compressed or encrypted and does not give up its contents to
+signature scanning. — **verified**. Whatever does the actual writing is inside
+that blob, and on this platform it can only be Intel FPT or AMI AFU driving the
+PCH SPI controller.
+
+**That controller already has a free, portable, maintained driver: flashrom.**
+Reimplementing PCH SPI programming to avoid using it would be rewriting a
+well-tested tool from scratch, in the one domain where a bug means a dead
+tablet.
+
+**And the descriptor does not stand in the way.** The host CPU master has read
+and write permission on every region of this flash:
+
+```
+FLMSTR1 (host CPU/BIOS): 0xffff0000
+    read : Descriptor, BIOS, ME/TXE, GbE, PDR
+    write: Descriptor, BIOS, ME/TXE, GbE, PDR
+```
+
+— **verified** by parsing the descriptor in both Cherry Trail images.
+
+So the Linux flasher already exists, and this tablet is not descriptor-locked
+against it. Note that the descriptor is only one of three gates: `BIOS_CNTL`
+(BLE / SMM_BWP) and the SPI Protected Range registers are set at runtime by the
+BIOS and can only be read on the tablet. `scripts/dump-bios.sh` prints whatever
+flashrom reports about them.
+
+One hard version requirement if you ever do write: **flashrom 1.5.0 issues an
+invalid opcode when erasing or writing on Braswell and earlier**, leaving an
+incomplete flash and a possibly bricked device. Fixed in 1.5.1. Reading is
+unaffected.
+
+### There is no macOS path, and it is worth knowing why
+
+Flashing "from macOS" is not a software gap, it is a wiring one. The SPI chip is
+soldered inside the tablet, and flashrom's `internal` programmer flashes *the
+machine it is running on*. A MacBook has no data path to the tablet's SPI bus —
+the USB-C port speaks USB, not SPI.
+
+The two ways another computer can reach that chip:
+
+- **DnX mode** — the tablet does the flashing; the host only hands it an EFI
+  binary over fastboot. See below.
+- **A hardware SPI programmer** — a CH341A and an SOIC-8 clip on the chip
+  itself. Here flashrom on macOS is genuinely useful, because it drives *the
+  programmer* (`-p ch341a_spi`), not the tablet. This is also the only route
+  that still works on a tablet that will not power on.
+
 ## If it goes wrong: DnX mode
 
 Cherry Trail SoCs carry a firmware-level recovery mode, and unlike Bay Trail they
@@ -300,8 +359,9 @@ Stated plainly, because guessing here is how tablets get bricked:
   39 TE modules and every extracted section, with a secondary zlib/LZMA pass.
   — **verified absent** from what could be decompressed. It cannot be ruled out
   that a driver stores it compressed inside its own data section. The reference
-  tablet runs `.108`, which was not available for comparison; a `flashrom` dump
-  of the tablet itself would settle both questions at once.
+  tablet runs `.108`, which was not available for comparison —
+  `sudo ./scripts/dump-bios.sh` on the tablet settles both questions at once,
+  and extracts the firmware if it is there.
 - **What `.109` actually changed.** Only that it is distributed as a microSD
   ("TF card") reading fix. Whether that affects the SD slot's inability to appear
   as a boot device ([13-split-media.md](13-split-media.md)) is untested — the

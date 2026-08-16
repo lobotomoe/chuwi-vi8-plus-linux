@@ -183,6 +183,7 @@ and stays under the GPL v3+ — [`LICENSE`](LICENSE),
 | `fetch-bootia32.sh` | macOS, Linux | Re-derives `bootia32.efi` from Debian's archive, checksum-verified |
 | `fetch-offline-payload.sh` | macOS, Linux | Downloads `grub-efi-ia32-bin` to carry on the stick |
 | `collect-hw-report.sh` | tablet | One file with DMI, firmware bitness, drivers, audio, power |
+| `dump-bios.sh` | tablet | Reads the SPI flash twice, verifies, extracts the touchscreen firmware. Never writes |
 | `backup-emmc.sh` | tablet | Compressed image of the eMMC to an external disk, before wiping |
 | `restore-emmc.sh` | tablet | Writes that image back, checksum-verified, to get Windows back |
 | `postinstall-grub-ia32.sh` | tablet | Installs a 32-bit GRUB into the installed system's ESP |
