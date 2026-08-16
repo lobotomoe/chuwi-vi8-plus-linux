@@ -573,10 +573,37 @@ FLMSTR1 (host CPU/BIOS): 0xffff0000
 — **verified** by parsing the descriptor in both Cherry Trail images.
 
 So the Linux flasher already exists, and this tablet is not descriptor-locked
-against it. Note that the descriptor is only one of three gates: `BIOS_CNTL`
-(BLE / SMM_BWP) and the SPI Protected Range registers are set at runtime by the
-BIOS and can only be read on the tablet. `scripts/dump-bios.sh` prints whatever
-flashrom reports about them.
+against it. But the descriptor is only one of three gates, and the other two are
+set at runtime by the BIOS and can only be read on the tablet. They have now been
+read, and they are shut:
+
+```
+Enabling flash write... SPI Configuration is locked down.
+```
+
+— **verified on the unit**, from `sudo ./scripts/dump-bios.sh`.
+
+**That closes the flashrom write path on this unit.** Reading works — the dump
+below came out clean — but `BIOS_CNTL`/SPI Protected Range lockdown means
+flashrom cannot program this chip from Linux no matter what the descriptor
+permits. Writing means the vendor's own
+[EFI route](#there-is-an-official-efi-flashing-path-and-it-predates-the-windows-one),
+which runs before the BIOS locks anything, or a hardware programmer.
+
+The chip itself:
+
+```
+Found Winbond flash chip "W25Q64.W" (8192 kB, SPI)
+mapped at physical address 0x00000000ff800000
+```
+
+— **verified on the unit**
+
+This settles the programmer-voltage question, which until now rested on one
+owner's report. The `.W` suffix is not decoration: flashrom's own chip table
+gives `W25Q64.W` a `.voltage` of `{1700, 1950}`, i.e. **1.7–1.95 V**. A 3.3 V
+CH341A on this chip is out of spec by a factor that destroys it. — **verified**
+against flashrom's `flashchips/winbond.c`.
 
 One hard version requirement if you ever do write: **flashrom 1.5.0 issues an
 invalid opcode when erasing or writing on Braswell and earlier**, leaving an
@@ -627,14 +654,20 @@ Stated plainly, because guessing here is how tablets get bricked:
   finds the ACPI tables and not the firmware was looking in the right places.
   What no string search can reach is a driver holding it compressed internally.
 
-  **The practical consequence for a unit running `.108` is settled, though:** the
-  EFI-embedded route has nothing to embed, so [`patches/0001`](../patches/) alone
-  will not produce a working touchscreen and `scripts/dump-bios.sh` will most
-  likely come back empty. Supply the file instead —
+  **And the tablet has now been asked directly.** `dump-bios.sh` read this unit's
+  own chip — two passes, identical, 8388608 bytes — and reported
+  *"Not found as a contiguous blob"*. So the prediction made from the published
+  images holds against the hardware: on this unit the EFI-embedded route has
+  nothing to embed, [`patches/0001`](../patches/) alone will not produce a
+  working touchscreen, and the file has to be supplied by
   [`scripts/extract-touchscreen-fw.sh`](../scripts/extract-touchscreen-fw.sh)
-  takes it from Chuwi's own driver package. This does contradict the driver
-  maintainer's notes, which record `fw in EFI` for this model, so his unit may
-  genuinely differ; `dump-bios.sh` is still worth running once to find out.
+  from Chuwi's own driver package. — **verified on the unit**
+
+  This still contradicts the driver maintainer's notes, which record `fw in EFI`
+  for this model. That contradiction is now sharper rather than resolved: it is
+  no longer "our copy of the image may be wrong" but "his unit and this one
+  disagree". A second unit's dump would settle which is typical; this repository
+  has one tablet.
 - **Which microSD behaviour `.109` fixes.** The BIOS region was rebuilt rather
   than patched ([above](#what-changed-between-108-and-109)), so a byte diff
   cannot isolate it, and whether it affects the SD slot's inability to appear as

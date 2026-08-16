@@ -10,6 +10,16 @@ payload/
 reports/
 backups/
 
+# BIOS dumps from scripts/dump-bios.sh. It writes to the working directory by
+# default, which is this one if you follow the docs. Two reasons never to commit
+# them: the image is Chuwi's firmware, and it carries this unit's own factory
+# identity - serial numbers and MAC addresses that no other unit has.
+bios-*.bin
+bios-*.sha256
+bios-*.dmi.txt
+bios-*.probe.txt
+chipone/
+
 # Vendor touchscreen firmware extracted by scripts/extract-touchscreen-fw.sh.
 # Chuwi's, not ours, and not licensed for redistribution - the script exists so
 # that nobody has to commit it. bootia32.efi is different: that one is GPL GRUB,
