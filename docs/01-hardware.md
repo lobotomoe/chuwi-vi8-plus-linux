@@ -500,8 +500,34 @@ Direct firmware load for brcm/brcmfmac43430a0-sdio.txt failed with error -2
 brcmfmac: brcmf_sdio_htclk: HT Avail timeout (1000000): clkctl 0x50
 ```
 
-The fix does not need DMI: after the DMI-derived name fails, the driver falls back to
-the plain `brcm/brcmfmac43430a0-sdio.txt`, so put an NVRAM there.
+The DMI leak is wider than the NVRAM file. The board suffix goes into the
+*firmware binary* lookup too, so on a unit with unfilled DMI the driver first
+asks for this:
+
+```
+Direct firmware load for brcm/brcmfmac43430a0-sdio.To be filled by O.E.M.-To be filled by O.E.M..bin failed with error -2
+```
+
+— **verified on the unit**, placeholder, spaces and all. That one is harmless:
+the driver falls back to the generic firmware and loads it —
+`Firmware: BCM43430/0 wl0: May 29 2017 version 7.13.53.9 (r664949)`. Only the
+NVRAM failure is fatal.
+
+**One real limitation survives the fix**, and it is worth knowing about because
+nothing on the desktop reports it:
+
+```
+brcmfmac: brcmf_c_process_clm_blob: no clm_blob available (err=-2), device may have limited channels available
+```
+
+— **verified on the unit**. The CLM blob carries per-regulatory-domain channel
+data, `linux-firmware` has none for this chip, so the radio falls back to a
+conservative built-in channel list. On 2.4 GHz that mostly costs channels 12–14
+depending on domain. There is no fix here — the blob does not exist to install.
+
+The NVRAM fix itself does not need DMI: after the DMI-derived name fails, the
+driver falls back to the plain `brcm/brcmfmac43430a0-sdio.txt`, so put an NVRAM
+there.
 
 ```sh
 ls /lib/firmware/brcm/ | grep 43430          # what your distribution ships

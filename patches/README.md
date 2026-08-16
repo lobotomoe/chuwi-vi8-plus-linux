@@ -204,6 +204,25 @@ sudo modprobe snd_soc_sst_bytcr_rt5651 quirk=0xC23412
 dmesg | grep -iA6 'quirk'
 ```
 
+**The driver prints what it applied, and on this tablet it prints the fallback**
+— which is the other half of the proof. Untouched, with no DMI match, it logs:
+
+```
+bytcr_rt5651: quirk IN2_MAP enabled
+bytcr_rt5651: quirk realtek,jack-detect-source 1
+bytcr_rt5651: quirk realtek,over-current-threshold-microamp 2000
+bytcr_rt5651: quirk realtek,over-current-scale-factor 1
+bytcr_rt5651: quirk MCLK_EN enabled
+```
+
+— **verified on the unit**. That is `DEFAULT_QUIRKS | IN2_MAP` = `0x23412`,
+term for term, decoded by the driver itself rather than by the table below.
+`MONO_SPEAKER` and `HP_LR_SWAPPED` are the two that do not appear, and they are
+exactly what this patch adds: `0x23412 | 0x800000 | 0x400000` = **`0xC23412`**.
+So the target value is confirmed from the running driver, and the audio symptoms
+to expect until the patch lands are stereo routing on a mono speaker and swapped
+headphone channels.
+
 `0xC23412` is `BYT_RT5651_DEFAULT_QUIRKS | IN2_MAP | HP_LR_SWAPPED |
 MONO_SPEAKER`, and every term is read from a header rather than inferred:
 

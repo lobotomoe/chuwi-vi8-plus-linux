@@ -121,13 +121,19 @@ require_cmd awk
 
 # Which blob does this machine actually want? The driver logs the name it built
 # out of ACPI _SUB, which is the only authoritative answer.
+#
+# Match on the basename only, never on the directory. The name the kernel builds
+# is "chipone/icn8505-<SUB>.fw", but anchoring the search to that prefix makes
+# the detection fail silently -- and fall back to the default -- if the log wraps
+# the line, the directory is ever renamed, or the message is read through
+# something lossy. The part that carries the answer is icn8505-<SUB>.fw.
 detect_fw_name() {
   local seen
   [ -r /dev/kmsg ] || command -v dmesg >/dev/null 2>&1 || return 1
   seen=$(dmesg 2>/dev/null |
-    grep -o 'chipone/icn8505-[A-Za-z0-9]*\.fw' |
+    grep -o 'icn8505-[A-Za-z0-9]*\.fw' |
     head -1 |
-    sed 's|chipone/icn8505-||; s|\.fw$||') || return 1
+    sed 's|icn8505-||; s|\.fw$||') || return 1
   [ -n "$seen" ] || return 1
   printf '%s' "$seen"
 }
