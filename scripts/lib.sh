@@ -12,10 +12,27 @@ die() {
   exit 1
 }
 
+# Debian/Ubuntu package providing a command, for the cases where the two names
+# differ. Anything not listed ships in a package of the same name.
+pkg_for_cmd() {
+  case "$1" in
+  mountpoint | lsblk | sfdisk | blockdev) printf 'util-linux' ;;
+  dd | df) printf 'coreutils' ;;
+  cmp) printf 'diffutils' ;;
+  sgdisk) printf 'gdisk' ;;
+  mkfs.vfat) printf 'dosfstools' ;;
+  udevadm) printf 'udev' ;;
+  xz) printf 'xz-utils' ;;
+  *) printf '%s' "$1" ;;
+  esac
+}
+
 require_cmd() {
   local cmd
   for cmd in "$@"; do
-    command -v "$cmd" >/dev/null 2>&1 || die "required command not found: $cmd"
+    command -v "$cmd" >/dev/null 2>&1 && continue
+    die "required command not found: $cmd" \
+      "(Debian/Ubuntu: sudo apt install $(pkg_for_cmd "$cmd"))"
   done
 }
 

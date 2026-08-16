@@ -455,8 +455,13 @@ factory DMI, and — if the touchscreen firmware is in there — the only copy o
 that too:
 
 ```sh
+sudo apt install flashrom          # not installed by default
 sudo ./scripts/dump-bios.sh
 ```
+
+Ubuntu 26.04 ships flashrom `1.6.0`, comfortably past the 1.5.0 erase bug
+[noted below](#why-there-is-no-linux-port-of-p03_c806romexe-here) — and reading
+was never affected by it anyway.
 
 That reads the chip twice and refuses to keep a dump unless both reads agree,
 records the DMI strings alongside it, and extracts

@@ -316,7 +316,8 @@ pins: **35012 bytes**, starting with `b0 07 00 00 e4 07 00 00`, SHA-256
 
 `sudo ./scripts/dump-bios.sh` does that job: it reads the flash twice, refuses a
 dump the two reads disagree on, searches it for that prefix and installs the result
-only if the hash matches.
+only if the hash matches. It needs `flashrom`, which no distribution installs by
+default — `sudo apt install flashrom` first.
 
 #### Chuwi ships the firmware itself, in its own driver
 
