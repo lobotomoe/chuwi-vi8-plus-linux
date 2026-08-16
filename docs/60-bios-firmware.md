@@ -163,7 +163,7 @@ obvious from the outside.
 All four broken quirks come down to one thing: the tablet reports
 `To be filled by O.E.M.` as its system vendor and product name, so no kernel
 quirk matches ([the full explanation is in
-01-hardware.md](01-hardware.md#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-four-things-at-once)).
+01-hardware.md](01-hardware.md#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-three-things-at-once)).
 DMI strings are supplied by the firmware, so a BIOS update is a reasonable place
 to look for a fix.
 

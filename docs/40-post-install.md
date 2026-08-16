@@ -37,12 +37,18 @@ is the difference between "slow" and "unusable" when a browser is open.
 
 ## Screen rotation
 
-The accelerometer is a Bosch BOSC0200 on the `bmc150_accel` driver. systemd's
-hwdb carries the correct mount matrix for this tablet — but under
-`Hampoo`/`D2D3_Vi8A1`, so it only applies if your unit reports those strings.
-On a unit with [unfilled DMI](01-hardware.md#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-four-things-at-once)
-nothing matches and rotation has no orientation reference; rotate by hand as
-below. There is no userspace workaround for the matrix itself.
+The accelerometer is a Bosch BOSC0200 on the `bmc150_accel` driver, and unlike
+the touchscreen and Wi-Fi it does **not** depend on DMI: the driver asks ACPI for
+the mount matrix first, and this tablet's firmware provides one via a `ROTM`
+method. So there is nothing to calibrate even on a unit with
+[unfilled DMI](01-hardware.md#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-three-things-at-once).
+Confirm the matrix was picked up:
+
+```sh
+cat /sys/bus/iio/devices/iio:device0/in_accel_mount_matrix
+```
+
+Anything other than the identity matrix means ACPI supplied it.
 
 ```sh
 sudo apt install iio-sensor-proxy       # or: pacman -S iio-sensor-proxy

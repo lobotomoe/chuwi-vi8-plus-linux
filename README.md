@@ -127,7 +127,7 @@ kernel symbols.
 | Wi-Fi (BCM43430) | Yes | **Works after a manual NVRAM copy** — see below. 2.4 GHz only, the radio has no 5 GHz |
 | Touchscreen (Chipone ICN8505) | Yes | **Does not work** — the DMI quirk does not match, so the firmware is never extracted |
 | Audio (RT5651) | Yes | Untested; the quirk does not match, so expect wrong channel mapping |
-| Accelerometer / auto-rotation | Yes | Untested; the hwdb mount matrix does not match. Rotating by hand works |
+| Accelerometer / auto-rotation | Yes | Untested, but **not** DMI-dependent — the mount matrix comes from ACPI `ROTM`. LXQt still needs a helper to act on it |
 | Battery, charging (AXP288) | Yes | Untested on the installed system |
 | Backlight | Yes | Untested on the installed system |
 | micro-HDMI | Yes | Untested |
@@ -140,19 +140,21 @@ kernel symbols.
 **Some units ship with their DMI fields unfilled.** The reference tablet reports
 `To be filled by O.E.M.` for both `sys_vendor` and `product_name`; only the board
 fields are set. Nearly every per-device kernel quirk for this tablet keys off the
-system fields, so on such a unit the touchscreen, the Wi-Fi calibration lookup, the
-audio routing quirk and the accelerometer mount matrix all silently fail to apply —
-four unrelated-looking faults from one placeholder string.
+system fields, so on such a unit the touchscreen, the Wi-Fi calibration lookup and
+the audio routing quirk all silently fail to apply — three unrelated-looking faults
+from one placeholder string.
 
-Wi-Fi and the touchscreen have DMI-independent workarounds; audio and the mount
-matrix do not. Check yours before you conclude anything:
+Wi-Fi and the touchscreen have DMI-independent workarounds; audio does not, and
+needs a kernel patch. The accelerometer looks like a fourth victim and is not one:
+its mount matrix comes from an ACPI `ROTM` method rather than from DMI, so it is
+unaffected. Check yours before you conclude anything:
 
 ```sh
 cat /sys/class/dmi/id/sys_vendor /sys/class/dmi/id/product_name
 ```
 
 Full explanation and the fixes:
-[docs/01-hardware.md](docs/01-hardware.md#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-four-things-at-once).
+[docs/01-hardware.md](docs/01-hardware.md#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-three-things-at-once).
 
 **Do not go looking for a BIOS update to fix it.** The placeholder is baked into
 the firmware image Chuwi shipped — verified by parsing the newest published BIOS —

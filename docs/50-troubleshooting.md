@@ -520,8 +520,27 @@ A long-standing complaint on Chuwi's Atom tablets. Two things to try, in order:
    `PPM Configuration`**. See [20-uefi-setup.md](20-uefi-setup.md#what-to-change).
 2. Confirm you are not swapping to eMMC. `swapon --show` should list a zram
    device and nothing else.
+3. Kernel parameters another Vi8 Plus owner reports as their freeze fix:
+
+   ```
+   usbcore.autosuspend=-1 pcie_aspm=off intel_idle.max_cstate=1
+   ```
+
+   Untested here, and their own note says some of the three may be unnecessary.
+   Add them together first; if the freezes stop, remove them one at a time to
+   find which one mattered. Source in
+   [90-references.md](90-references.md#another-owners-fixes-for-this-exact-tablet).
 
 If the freeze leaves a trace, it will be in `journalctl -b -1 -p err`.
+
+Separately, if the freezes coincide with Wi-Fi activity, the same owner reports
+`brcmfmac` firmware crashes cured by turning NetworkManager's power saving off:
+
+```sh
+printf '[connection]\nwifi.powersave = 2\n' |
+  sudo tee /etc/NetworkManager/conf.d/wifi-powersave-off.conf
+sudo systemctl restart NetworkManager
+```
 
 ## The touchscreen does not respond
 
@@ -541,7 +560,7 @@ reads `To be filled by O.E.M.`, which is what the BIOS itself ships — this is
 the common case, not an exotic one, and it breaks three other things at the
 same time. The cause, the workaround and how to pull the firmware out of your
 own flash are in
-[01-hardware.md](01-hardware.md#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-four-things-at-once).
+[01-hardware.md](01-hardware.md#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-three-things-at-once).
 There are prepared kernel patches for it in [`patches/`](../patches/).
 
 ## Wi-Fi does not see the network

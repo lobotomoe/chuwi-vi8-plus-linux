@@ -98,8 +98,8 @@ date tells them apart ([60-bios-firmware.md](60-bios-firmware.md#the-ver-string-
 
 `Manufacturer` and `Model` here are the same DMI system fields the kernel matches
 its quirks against. If they read `To be filled by O.E.M.`, that single fact
-explains the touchscreen, Wi-Fi, audio and auto-rotation all failing later —
-see [01-hardware.md](01-hardware.md#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-four-things-at-once).
+explains the touchscreen, Wi-Fi and audio all failing later —
+see [01-hardware.md](01-hardware.md#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-three-things-at-once).
 If they read `Hampoo` / `D2D3_Vi8A1`, your unit has the good strings: do not
 flash the BIOS, because that would probably overwrite them.
 

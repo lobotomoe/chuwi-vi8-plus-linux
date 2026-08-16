@@ -100,7 +100,6 @@ for f in bios_version bios_date sys_vendor product_name product_sku \
          board_vendor board_name; do
   printf '%-14s [%s]\n' "$f" "$(cat "/sys/class/dmi/id/$f" 2>/dev/null)"
 done
-cat /sys/class/dmi/id/modalias
 ```
 
 Expected, from what has been verified so far:
@@ -220,20 +219,30 @@ The usual workaround is a separate free account elsewhere used only for kernel
 mail, with an app password. Whatever you use, send the patch to yourself first
 and check that what arrives still applies with `git am`.
 
-## The accelerometer is not a kernel patch
+## The accelerometer needs no patch at all
 
-Auto-rotation orientation lives in systemd's hwdb, which already has this
-tablet under its good DMI strings:
+It looks like a fourth casualty of the unfilled DMI — systemd's hwdb carries
+this tablet only under its good strings:
 
 ```
 sensor:modalias:acpi:BOSC0200:*:dmi:*:svnHampoo:pnD2D3_Vi8A1:*   # Vi8 Plus (CWI519)
 ```
 
-`60-sensor.hwdb` also carries entries matching on BIOS date and board fields for
-tablets with generic system strings, so the same fix applies — but the entry has
-to be written against this unit's exact `modalias`, which is why it is on the
-checklist above and not in this directory yet. It goes to
-<https://github.com/systemd/systemd>, not to the kernel.
+But that entry is a fallback the kernel never reaches here. `bmc150_accel` tries
+ACPI first and only reads the hwdb-supplied property if that fails:
+
+```c
+if (!bmc150_apply_acpi_orientation(dev, &data->orientation)) {
+	ret = iio_read_mount_matrix(dev, &data->orientation);
+```
+
+For a `BOSC0200` device the ACPI path looks for a `ROTM` method, and this
+tablet's DSDT has one — verified in its own BIOS image. The driver's comment
+lists "Chuwi Vi8 Plus (CWI519)" among exactly these devices.
+
+So no hwdb entry is needed and no `modalias` has to be captured for one. If
+auto-rotation still does not happen, that is LXQt not acting on the sensor,
+which is a desktop-side problem and not a quirk to submit anywhere.
 
 ## Provenance
 

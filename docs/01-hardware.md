@@ -30,7 +30,7 @@ orientation.
 `scripts/collect-hw-report.sh`, run from a live session, dumps all of this plus the
 driver state in one file.
 
-### Some units ship with the DMI fields unfilled, and it breaks four things at once
+### Some units ship with the DMI fields unfilled, and it breaks three things at once
 
 Check this early. It is invisible, it is not a fault in your tablet, and it is the
 single explanation for a whole cluster of "nothing works out of the box".
@@ -55,7 +55,32 @@ them fire:
 | Touchscreen (ICN8505) | `DMI_SYS_VENDOR` "Hampoo" + `DMI_PRODUCT_NAME` "D2D3_Vi8A1" + `DMI_BOARD_NAME` "Cherry Trail CR" | no match — firmware never extracted, driver probe fails |
 | Wi-Fi NVRAM | `snprintf("%s-%s", sys_vendor, product_name)` in `brcmfmac/dmi.c` | looks for `...-sdio.To be filled by O.E.M.-To be filled by O.E.M..txt` |
 | Audio (RT5651) | `Hampoo` + `D2D3_Vi8A1` | no match — no mono-speaker / swapped-headphone correction |
-| Accelerometer mount matrix | hwdb `svnHampoo:pnD2D3_Vi8A1` | no match — rotation has no orientation reference |
+
+**The accelerometer is the exception, and it is worth knowing why.** systemd's
+hwdb does carry a `svnHampoo:pnD2D3_Vi8A1` entry that cannot match here, but on
+this tablet it is never needed: `bmc150-accel` asks ACPI first and only falls
+back to the hwdb-supplied property if that fails.
+
+```c
+if (!bmc150_apply_acpi_orientation(dev, &data->orientation)) {
+	ret = iio_read_mount_matrix(dev, &data->orientation);
+```
+
+For a `BOSC0200` device the ACPI path looks for a `ROTM` method, and this
+tablet's DSDT has one — verified in its own BIOS image, where `ROTM` sits inside
+the `BOSC0200` device scope. The driver's own comment lists "Chuwi Vi8 Plus
+(CWI519)" among the tablets that supply the matrix this way.
+
+So the orientation reference survives unfilled DMI. Confirm on your unit:
+
+```sh
+cat /sys/bus/iio/devices/iio:device0/in_accel_mount_matrix
+```
+
+An identity matrix (`1, 0, 0; 0, 1, 0; 0, 0, 1`) means nothing was found;
+anything else means `ROTM` was read. Auto-rotation may still not happen, but if
+so that is LXQt not acting on the sensor rather than the sensor being
+unreferenced — see [40-post-install.md](40-post-install.md#automatic-rotation).
 
 A giveaway before you check anything: the installer proposes a hostname like
 `chuwi-tobefilledbyoem`, because it builds one out of these same fields.
@@ -63,8 +88,9 @@ A giveaway before you check anything: the installer proposes a hostname like
 Both of the components that matter can be fixed without DMI, because in each case the
 driver's *second* attempt uses a name that does not depend on it —
 [Wi-Fi](#wi-fi--bluetooth--ampak-ap6212-broadcom-bcm43430) and
-[touchscreen](#touchscreen--chipone-icn8505) below. Audio and the accelerometer
-matrix have no equivalent escape hatch and would need a kernel patch.
+[touchscreen](#touchscreen--chipone-icn8505) below. The accelerometer never
+needed one, as explained above. **Audio is the only one genuinely stuck**: its
+quirk keys on the system fields with no second path, so it needs a kernel patch.
 
 **A BIOS update does not fix this.** The placeholder is baked into the firmware
 image: the newest BIOS Chuwi published (`P03_C806.109`, 2016-02-25) hard-codes
@@ -190,7 +216,7 @@ Check it landed:
 dmesg | grep -iE 'icn8505|efi.*firmware'
 ```
 
-**On a unit with [unfilled DMI](#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-four-things-at-once)
+**On a unit with [unfilled DMI](#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-three-things-at-once)
 it does not just work.** What that looks like:
 
 ```
@@ -213,9 +239,21 @@ unfilled; the quirk's only job was to extract that same file from the UEFI image
 Getting the file means pulling it out of your own firmware — it is not redistributed
 anywhere. The kernel records exactly what to look for: **35012 bytes**, starting with
 `b0 07 00 00 e4 07 00 00`, SHA-256
-`93e549e0b6a2b4b3889634975ea81378729b8b829eb5ca7f125134f4307cfc7c`. Dump the SPI flash
-read-only (`flashrom -p internal -r`) or take an official Chuwi BIOS image, find the
-blob, and check it against that hash before installing it.
+`93e549e0b6a2b4b3889634975ea81378729b8b829eb5ca7f125134f4307cfc7c`.
+
+`sudo ./scripts/dump-bios.sh` does the whole job: it reads the flash twice, refuses a
+dump the two reads disagree on, searches it for that prefix and installs the result
+only if the hash matches.
+
+A second-hand copy exists — another Vi8 Plus owner publishes one in
+[`sciboy12/vi8-plus-linux-fixes`](https://github.com/sciboy12/vi8-plus-linux-fixes).
+It starts with the right prefix, so it is a real ICN8505 image, but it is **34884
+bytes rather than 35012** and so cannot match the kernel's hash. That does not
+necessarily make it useless: the length and hash are how the kernel finds the blob in
+**EFI memory**, while a file dropped into `/lib/firmware` is simply loaded. It is a
+reasonable thing to try if your own flash turns out not to carry the blob — with the
+caveat that its provenance is unknown and a touchscreen firmware is not a thing to
+take on trust if you can extract your own.
 
 ### Wi-Fi / Bluetooth — AmPak AP6212 (Broadcom BCM43430)
 
@@ -301,7 +339,7 @@ So the speaker is mono and the headphone channels are swapped in hardware — th
 already compensates. Userspace needs the matching UCM profile, which is in
 `alsa-ucm-conf` on every current distribution.
 
-On a unit with [unfilled DMI](#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-four-things-at-once)
+On a unit with [unfilled DMI](#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-three-things-at-once)
 this quirk does not fire, and unlike Wi-Fi and the touchscreen there is no
 DMI-independent fallback: expect stereo routing on a mono speaker and headphone
 channels the wrong way round. The `bytcr_rt5651.c` quirk can be forced with the
@@ -319,7 +357,7 @@ Install `iio-sensor-proxy` and rotation works in any Wayland/GNOME/KDE session.
 See [40-post-install.md](40-post-install.md#screen-rotation).
 
 The hwdb entry matches on `svnHampoo:pnD2D3_Vi8A1`, so on a unit with
-[unfilled DMI](#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-four-things-at-once)
+[unfilled DMI](#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-three-things-at-once)
 the mount matrix is not applied and auto-rotation has no idea which way is up. The
 accelerometer itself still works — you can copy the matrix into a local hwdb rule
 matched on something your unit actually reports.

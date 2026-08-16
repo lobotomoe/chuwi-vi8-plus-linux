@@ -467,6 +467,40 @@ their SMBIOS defaults, ACPI tables and Intel flash descriptors read directly.
 - "Teclast X98 Air 3G: unbricking a Bay Trail tablet".
   <https://ao2.it/en/blog/2014/12/30/teclast-x98-air-3g-unbricking-bay-trail-tablet>
 
+## Another owner's fixes for this exact tablet
+
+`sciboy12/vi8-plus-linux-fixes` — the only other repository found that targets the
+Vi8 Plus specifically, written against Arch. Independent confirmation that this
+tablet's unfilled DMI is a real production variant rather than one bad unit: it
+ships an NVRAM file named, literally,
+`brcmfmac43430a0-sdio.To be filled by O.E.M.-To be filled by O.E.M..txt`, which
+works precisely because `brcmfmac` builds the filename out of the DMI strings.
+<https://github.com/sciboy12/vi8-plus-linux-fixes> — **inspected, not tested here**
+
+What it offers, with what we could establish about each:
+
+- `chipone/icn8505-HAMP0002.fw`, **34884 bytes**. Begins with the same
+  `b0 07 00 00 e4 07 00 00` the kernel looks for, so it is a genuine ICN8505
+  image — but it is **128 bytes shorter** than the 35012 the kernel pins, and its
+  SHA-256 therefore cannot match `93e549e0…`. That mismatch does not by itself
+  make it unusable: the pinned length and hash are only used to find and validate
+  the blob **in EFI memory**, and a file placed in `/lib/firmware` is loaded
+  as-is. Provenance is unknown. A dump of your own flash is the better source.
+- `brcm/brcmfmac43430a0-sdio.*.txt`. The a0-named NVRAM this tablet needs, but the
+  content is Broadcom's generic `BCM943430WLSELG` reference file, which says of
+  itself *"The following parameter values are just placeholders, need to be
+  updated"*. Prefer the board-specific Linaro file that linux-firmware already
+  ships for this mainboard — see
+  [01-hardware.md](01-hardware.md#wi-fi--bluetooth--ampak-ap6212-broadcom-bcm43430).
+  (All three files, theirs and linux-firmware's, carry the same
+  `macaddr=00:90:4c:c5:12:38`; the reference tablet still came up with a real
+  AmPak address, so the driver is not taking the MAC from NVRAM.)
+- Untested leads worth trying: `usbcore.autosuspend=-1 pcie_aspm=off
+  intel_idle.max_cstate=1` against random freezes, `i915 pwm-lpss-platform` in
+  the initramfs module list for backlight control, and disabling NetworkManager's
+  Wi-Fi power save to stop firmware crashes.
+- Agrees with this repo that both cameras are unusable.
+
 ## Distributions
 
 - Lubuntu 26.04 LTS release notes. <https://lubuntu.me/lubuntu-26-04-lts-released/>
