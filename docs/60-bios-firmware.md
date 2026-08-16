@@ -181,14 +181,23 @@ still no touchscreen firmware blob.
 The `.108` package ships a complete UEFI-shell flashing kit alongside the Windows
 executable:
 
-| File | What it is |
-|---|---|
-| `efi/boot/bootia32.efi` | **UEFI Shell**, IA32 — built from EDK, `Edk106\Edk\Sample\Platform\Nt32\uefi\IA32\Shell.pdb` |
-| `efi/boot/bootx64.efi` | the same shell, x64 |
-| `afuefi.efi` | AMI Firmware Update Utility, EFI build |
-| `fpt.efi` | Intel Flash Programming Tool |
-| `fparts.txt` | Intel flash-part definitions, *"For Cherry Trail and Braswell platforms"*, rev 2.8.1 |
-| `startup.nsh` | walks `fs0:`..`fs4:` for itself, then flashes |
+| File | PE machine | What it is |
+|---|---|---|
+| `efi/boot/bootia32.efi` | IA32 | **UEFI Shell** — built from EDK, `Edk106\Edk\Sample\Platform\Nt32\uefi\IA32\Shell.pdb` |
+| `efi/boot/bootx64.efi` | x64 | the same shell |
+| `afuefi.efi` | **IA32** | AMI Firmware Update Utility v5.08.00 (Aptio 5) |
+| `fpt.efi` | **IA32** | Intel Flash Programming Tool |
+| `fparts.txt` | — | Intel flash-part definitions, *"For Cherry Trail and Braswell platforms"*, rev 2.8.1 |
+| `startup.nsh` | — | walks `fs0:`..`fs4:` for itself, then flashes |
+
+— machine types **verified** by reading the PE COFF headers (`0x014c` = IA32,
+`0x8664` = x64), version from AFU's own banner string.
+
+Note which binaries are which. The shell ships in both widths, but **both
+flashing tools are IA32 only** — on 64-bit firmware `bootx64.efi` would start and
+then neither `afuefi.efi` nor `fpt.efi` could execute. So this is not a generic
+AMI kit that happens to include a 32-bit shell: as shipped it can only complete a
+flash on 32-bit-EFI hardware, which is what this tablet is.
 
 The whole procedure is one line at the end of `startup.nsh`:
 
@@ -196,14 +205,50 @@ The whole procedure is one line at the end of `startup.nsh`:
 afuefi.efi bios.bin /p /b /n /x /reboot /r
 ```
 
-— **verified** by reading the files.
+Every flag, taken from AFU's own built-in help text:
 
-That matters for two separate reasons. Chuwi's own supported way to flash this
-tablet **never needed Windows** — put the `dos/` directory on a FAT32 stick and
-boot it. And note `/n`, which programs NVRAM: a flash by this route does not
-preserve NVRAM contents.
+| Flag | Meaning |
+|---|---|
+| `/p` | Program Main BIOS |
+| `/b` | Program Boot Block |
+| `/n` | Program NVRAM |
+| `/x` | **Don't Check ROM ID** |
+| `/reboot` | Reboot after programming |
+| `/r` | **Preserve ALL SMBIOS structure during programming** |
 
-It is also a small vindication of this repository's premise from an unexpected
+— **verified** by extracting the help strings from `afuefi.efi`, where each flag
+token is stored immediately before its description.
+
+Chuwi's own supported way to flash this tablet **never needed Windows**: put the
+`dos/` directory on a FAT32 stick and boot it. Nothing has to be ported to make
+that work from Linux or macOS — `afuefi.efi` is a UEFI application, so it runs
+*instead of* an operating system rather than under one, and the only
+host-specific step is writing a FAT32 stick. The Windows executable in the same
+package is the redundant one, for the reasons in
+[why there is no Linux port](#why-there-is-no-linux-port-of-p03_c806romexe-here).
+
+Two of the flags do not mean what the letters suggest, and both matter:
+
+- `/x` disables the check that the image belongs to this board. Nothing in this
+  procedure will stop you flashing the wrong BIOS, so verify the hash yourself
+  against the [table above](#what-is-actually-in-the-archives) first.
+- `/r` is not "preserve ROM holes". It preserves the **running system's SMBIOS**.
+  That is a second and mechanically separate reason the `To be filled by O.E.M.`
+  placeholder survives an update: the new image carries the same placeholder
+  defaults *and* the flasher copies the old table forward. Do not expect flashing
+  to populate DMI.
+
+`/n` programs NVRAM, so this route **erases UEFI boot entries**. On a machine
+already running Linux that removes the GRUB entry, which then has to be re-added
+with `efibootmgr` — or the fallback `EFI/BOOT/BOOTIA32.EFI` has to be in place
+before you start.
+
+One bug worth knowing about, since it presents as a hang: `startup.nsh` falls
+through `fs0:`→`fs1:`→…→`fs4:`, and the `fs4:` branch jumps back to the `fs2:`
+check rather than giving up. If it never finds itself on any volume it loops
+between `fs2`, `fs3` and `fs4` **forever** instead of exiting.
+
+This is also a small vindication of this repository's premise from an unexpected
 direction. Chuwi shipped a **32-bit `bootia32.efi`** in its own BIOS update kit,
 because it knew perfectly well that this tablet's firmware cannot execute a
 64-bit one. It is a UEFI Shell rather than GRUB, so it is not a substitute for
@@ -417,18 +462,37 @@ That reads the chip twice and refuses to keep a dump unless both reads agree,
 records the DMI strings alongside it, and extracts
 `chipone/icn8505-HAMP0002.fw` if this build carries it. It never writes.
 
-Two methods exist, both Chuwi's own:
+Three methods exist, all three Chuwi's own. Both EFI ones are host-independent —
+copy the directory onto a FAT32 stick from Linux, macOS or anything else, boot
+it, and `startup.nsh` runs itself.
 
-**From an EFI shell** (what the dual-boot archive is built for): put `fpt.efi`,
-`bios.bin` and `startup.nsh` on a FAT32 stick, boot the shell, and it runs
+**From an EFI shell, the stock `.108` package**: copy `dos/` and boot it. This is
+the one to prefer — it writes only the BIOS region and leaves the descriptor and
+TXE alone:
+
+```
+afuefi.efi bios.bin /p /b /n /x /reboot /r
+```
+
+**From an EFI shell, the dual-boot archive**: put `fpt.efi`, `bios.bin` and
+`startup.nsh` on a FAT32 stick, boot the shell, and it runs
 
 ```
 fpt.efi -f bios.bin
 reset
 ```
 
+`fpt -f` writes the **whole 8 MB including the descriptor and TXE**, which is why
+it [repartitions the flash](#the-dual-boot-image-repartitions-the-flash). Do not
+reach for this one unless you mean to switch board configuration.
+
 **From Windows**: run `P03_C806.rom.exe`, wait for the console window to close,
 reboot.
+
+Whichever you pick, do it on mains power, and verify `bios.bin`'s SHA-256 against
+the [table above](#what-is-actually-in-the-archives) before copying it — `afuefi`
+is invoked with `/x`, so it will not check for you. None of this has been tested
+here; this repository has never flashed this tablet.
 
 ### The dual-boot image repartitions the flash
 
