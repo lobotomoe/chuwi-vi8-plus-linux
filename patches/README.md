@@ -168,6 +168,26 @@ submit it — so it is deliberately not pre-filled.
 Read `Documentation/process/submitting-patches.rst` before the first send, and
 run `scripts/checkpatch.pl` on each file from inside a kernel tree.
 
+You do not need a company behind you. Roughly half the commits to
+`touchscreen_dmi.c` come from personal addresses — gmail, yandex, protonmail,
+hotmail — because a quirk table for discontinued Chinese tablets can only be
+maintained by the people who own them. Patches get rejected for format, not for
+who sent them.
+
+### Do not send these from a Proton address
+
+Proton looks up recipient keys over WKD and **encrypts automatically to any
+address it finds a key for**, which includes `@kernel.org`. There is no setting
+to turn it off, so the patch arrives encrypted and unreadable to the list. This
+was raised on LKML in 2022 in a patch proposing to document Proton as unsuitable
+for kernel development; verify whether anything has changed before relying on
+it. Proton's SMTP also needs the paid Bridge before `git send-email` can talk to
+it at all.
+
+The usual workaround is a separate free account elsewhere used only for kernel
+mail, with an app password. Whatever you use, send the patch to yourself first
+and check that what arrives still applies with `git am`.
+
 ## The accelerometer is not a kernel patch
 
 Auto-rotation orientation lives in systemd's hwdb, which already has this
