@@ -605,6 +605,33 @@ gives `W25Q64.W` a `.voltage` of `{1700, 1950}`, i.e. **1.7–1.95 V**. A 3.3 V
 CH341A on this chip is out of spec by a factor that destroys it. — **verified**
 against flashrom's `flashchips/winbond.c`.
 
+#### The dump matches the published `.108` where it matters
+
+Everything this page infers about the hardware was read out of a vendor image
+downloaded from the internet. The dump makes it possible to check that against
+the chip itself.
+
+| Region | Dump vs published `.108` |
+|---|---|
+| Descriptor `0x000000-0x000fff` | **byte-identical** |
+| ME/TXE `0x001000-0x3fffff` | 382222 bytes differ, in 3604 runs |
+| BIOS `0x400000-0x7fffff` | 250599 bytes differ, in 762 runs |
+
+The two differing regions are the ones that hold runtime state — UEFI variables
+in the BIOS region, and the TXE data partitions (`EFFS`, `FOVD`, `MDES`, `PSVN`)
+that get written in normal operation. A tablet that has been booted is *expected*
+to differ there, and the scattered-run shape is what state accumulation looks
+like rather than a different build.
+
+What settles it is running `inspect-bios-image.py` over both. The output is
+**identical, down to the offsets**: the DSDT lands in the same extracted blob,
+`BOSC0200` at 50089 and 50104, `ROTM` at 50197, `CHPN0001` at 50807, the same
+`0 -1 0 / -1 0 0 / 0 0 1` matrix, the same `_SUB` → `HAMP0002`, the placeholder
+8 times in each, and the touchscreen firmware absent from both. — **verified**
+
+So this unit runs the stock `.108`, and every ACPI and SMBIOS conclusion on this
+page transfers to the hardware rather than merely to a file someone uploaded.
+
 One hard version requirement if you ever do write: **flashrom 1.5.0 issues an
 invalid opcode when erasing or writing on Braswell and earlier**, leaving an
 incomplete flash and a possibly bricked device. Fixed in 1.5.1. Reading is
