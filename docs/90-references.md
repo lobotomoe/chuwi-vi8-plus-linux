@@ -549,6 +549,25 @@ What it offers, with what we could establish about each:
   Wi-Fi power save to stop firmware crashes.
 - Agrees with this repo that both cameras are unusable.
 
+## The stock ROM, and the only copy of `P03_C806.108`
+
+`Chuwi-Vi8-Plus-5BS2R-C806.rar`, 4278459662 bytes, SHA-256
+`cd2f09bcde7caba61fafdfffeb9fa31b6ccfa908bb8232cd821ead2f0d4040e0`. Free
+registration required. — **verified** by downloading and unpacking it.
+
+<https://www.needrom.com/download/chuwi-vi8-plus/>
+
+Contains the full Windows 10 image (`VI8 PLUS WIN10.CHUWI.S.10.TH2.1212.V200`)
+and, in `BIOS/CHT-P03_C806_108_20151211/`, the `.108` BIOS twice — `dos/bios.bin`
+and `windows/P03_C806.108` are byte-identical, SHA-256 `5ba88aad…0c3900`. It is
+the only place this BIOS is published; see
+[60-bios-firmware.md](60-bios-firmware.md#what-changed-between-108-and-109).
+
+Unpack it with a RAR5-capable tool. `bsdtar -x -f ARCHIVE 'Chuwi-*/BIOS/*'`
+extracts just the BIOS directory; p7zip reports *"Unsupported Method"* and writes
+zero-byte files, and Homebrew's `unrar` is unsigned so macOS Gatekeeper blocks it
+without printing anything.
+
 ## Chuwi's own driver package — the primary source for the touchscreen firmware
 
 `Hi8_Pro_drivers_C806_X64.zip`, 227034543 bytes, SHA-256

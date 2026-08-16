@@ -46,10 +46,19 @@ BIOS Date: 12/11/2015 21:15:52  Ver: 1ATFG007
 ### The `Ver:` string is not a version number
 
 This is the trap. `1ATFG007` is an AMI build tag, and Chuwi did **not** change it
-between releases — the 2015-12-11 build and the 2016-02-25 build both call
-themselves `1ATFG007`. — **verified**: the 2016-02-25 image carries the signon
-string `BIOS Date: 02/25/2016 20:37:26 Ver: 1ATFG007`, while the reference tablet
-displays the same `Ver:` with a December 2015 date.
+between releases. Both images carry the string, and only the date differs:
+
+| Image | Signon string inside it |
+|---|---|
+| `P03_C806.108` | `BIOS Date: 12/11/2015 21:15:52 Ver: 1ATFG007` |
+| `P03_C806.109` | `BIOS Date: 02/25/2016 20:37:26 Ver: 1ATFG007` |
+
+— **verified** by extracting the strings from both images.
+
+The `.108` line is worth pausing on: it is character-for-character what the
+reference tablet's setup screen displays, **timestamp included**. Everything in
+this repository that depends on the BIOS date — all three kernel patches — was
+resting on a photograph of that screen until the image itself was obtained.
 
 **Read the date, not the `Ver:` string.** The real version lives in the SMBIOS
 type 0 record (`/sys/class/dmi/id/bios_version`), where the two builds are
@@ -70,8 +79,17 @@ community BIOS for this tablet was found. The BIOS modding forums that cover
 Cherry Trail devices (Win-Raid, MyDigitalLife) carry threads for other tablets
 but nothing for the Vi8 Plus.
 
-`P03_C806.108` is listed on needrom as part of the full stock Windows 10 ROM
-(`VI8 PLUS WIN10.CHUWI.S.10.TH2.1212.V200`); the BIOS is not published separately.
+`P03_C806.108` is not published on its own. It ships inside the full stock
+Windows 10 ROM on needrom (`VI8 PLUS WIN10.CHUWI.S.10.TH2.1212.V200`), which was
+downloaded and unpacked for this document — see
+[what changed between .108 and .109](#what-changed-between-108-and-109).
+
+**Beware of links advertising `.108` on its own.** A 2017 write-up titled *"How
+to upgrade the Chuwi Vi8 Plus BIOS?"* says *"Current version: P03_C806.108"* and
+links a MEGA file. That file was downloaded: it is `Vi8 Plus BIOS.rar`, SHA-256
+`b03b953c…c2482`, byte-identical to the archive described below, which contains
+`.109` and no `.108` at all. — **verified**. The confusion is easy to make,
+because both releases ship under the same `P03_C806.rom.exe` filename.
 
 ### Chuwi's own "BIOS download" thread does not contain a BIOS
 
@@ -110,14 +128,22 @@ assumptions that are easy to make:
 
 ---
 
-## What is actually in the two archives
+## What is actually in the archives
 
 | File | SHA-256 (first 16) | What it really is |
 |---|---|---|
 | `P03_C806.109` | `0d72b3ceac2c46c8` | AMI Aptio, Cherry Trail. Full 8 MB SPI image. **The genuine latest Vi8 Plus BIOS** |
-| `P03_C806.rom.exe` | `6434433c075c063e` | Windows flasher wrapping the above |
-| `bios.bin` | `0068258628377e3c` | AMI Aptio, Cherry Trail, dual-boot. Full 8 MB SPI image |
+| `P03_C806.108` | `5ba88aad59a4bd36` | The previous build, and what the reference tablet shipped with. Full 8 MB SPI image |
+| `P03_C806.rom.exe` | `6434433c075c063e` | Windows flasher wrapping `.109` |
+| `bios.bin` (dual-boot) | `0068258628377e3c` | AMI Aptio, Cherry Trail, dual-boot. Full 8 MB SPI image |
 | `CHUWI.D86JLBNR03.bin` | `77a94ca41343a795` | **InsydeH2O, ValleyView (Bay Trail). Not this tablet.** |
+
+`.108` came out of the needrom stock ROM `Chuwi-Vi8-Plus-5BS2R-C806.rar`
+(4278459662 bytes, SHA-256 `cd2f09bc…4040e0`), which carries it twice —
+`BIOS/CHT-P03_C806_108_20151211/dos/bios.bin` and `windows/P03_C806.108` are
+byte-identical. Extracting it needs a RAR5-capable unpacker; `bsdtar` on macOS
+handles it, while p7zip reports *"Unsupported Method"* and silently writes
+zero-byte files.
 
 Two useful things fell out of this:
 
@@ -127,6 +153,62 @@ Two useful things fell out of this:
 - The dual-boot archive ships its own flashing kit: `fpt.efi` (Intel Flash
   Programming Tool), a `startup.nsh` that walks `fs0:`..`fs4:` looking for itself,
   and 32- and 64-bit EFI shell binaries.
+
+### What changed between `.108` and `.109`
+
+`.109` is distributed as *"to solve issue with no read TF card"*, which invites
+the question of whether it also touches anything else. Comparing the two images
+byte for byte:
+
+| Region | Result |
+|---|---|
+| Descriptor `0x000000-0x000fff` | **byte-identical** |
+| ME/TXE `0x001000-0x3fffff` | **byte-identical** |
+| BIOS `0x400000-0x7fffff` | 2503665 bytes differ, in 68549 separate runs |
+
+— **verified**
+
+Two things follow. The Intel TXE firmware is **not** touched by this update, so
+`.109` carries no ME/TXE change whatever else it does. And the BIOS region is not
+patched but rebuilt — 68 thousand scattered differences is a recompile, so a byte
+diff cannot isolate the microSD fix. What the update did *not* change is the more
+useful answer here, and it is documented above: the same SMBIOS placeholder, the
+same `ROTM` matrix, the same `CHPN0001`/`HAMP0002` touchscreen declaration, and
+still no touchscreen firmware blob.
+
+### There is an official EFI flashing path, and it predates the Windows one
+
+The `.108` package ships a complete UEFI-shell flashing kit alongside the Windows
+executable:
+
+| File | What it is |
+|---|---|
+| `efi/boot/bootia32.efi` | **UEFI Shell**, IA32 — built from EDK, `Edk106\Edk\Sample\Platform\Nt32\uefi\IA32\Shell.pdb` |
+| `efi/boot/bootx64.efi` | the same shell, x64 |
+| `afuefi.efi` | AMI Firmware Update Utility, EFI build |
+| `fpt.efi` | Intel Flash Programming Tool |
+| `fparts.txt` | Intel flash-part definitions, *"For Cherry Trail and Braswell platforms"*, rev 2.8.1 |
+| `startup.nsh` | walks `fs0:`..`fs4:` for itself, then flashes |
+
+The whole procedure is one line at the end of `startup.nsh`:
+
+```
+afuefi.efi bios.bin /p /b /n /x /reboot /r
+```
+
+— **verified** by reading the files.
+
+That matters for two separate reasons. Chuwi's own supported way to flash this
+tablet **never needed Windows** — put the `dos/` directory on a FAT32 stick and
+boot it. And note `/n`, which programs NVRAM: a flash by this route does not
+preserve NVRAM contents.
+
+It is also a small vindication of this repository's premise from an unexpected
+direction. Chuwi shipped a **32-bit `bootia32.efi`** in its own BIOS update kit,
+because it knew perfectly well that this tablet's firmware cannot execute a
+64-bit one. It is a UEFI Shell rather than GRUB, so it is not a substitute for
+[`artifacts/bootia32.efi`](../artifacts/) — but it is a 32-bit EFI binary the
+vendor confirmed boots on this exact hardware.
 
 ### One of those files is not a Vi8 Plus BIOS at all
 
@@ -467,36 +549,27 @@ Read it before flashing, not after.
 
 Stated plainly, because guessing here is how tablets get bricked:
 
-- **Whether the ICN8505 touchscreen firmware is in these images.** It is not
-  present in either Cherry Trail image as a contiguous blob — searched by the
-  kernel's own 8-byte prefix across all 6270 extracted files, with a secondary
-  recursive LZMA pass. — **verified absent**.
+- **Whether a driver hides the ICN8505 firmware inside its own compressed data
+  section.** The blob is **verified absent** from `.108`, `.109` and the
+  dual-boot image, searched by the kernel's own 8-byte prefix across every
+  extracted blob with a recursive LZMA pass. That negative is worth more than a
+  bare "not found", because the same extraction *does* yield the DSDT with
+  `BOSC0200`, `ROTM`, `CHPN0001` and `HAMP0002` readable in it — a search that
+  finds the ACPI tables and not the firmware was looking in the right places.
+  What no string search can reach is a driver holding it compressed internally.
 
-  That search is worth trusting more than a bare "not found", because the same
-  extraction *does* yield the DSDT, with `BOSC0200`, `ROTM`, `CHPN0001` and
-  `HAMP0002` all readable in it. A search that finds the ACPI tables and not the
-  firmware is a search that was actually looking. What still cannot be ruled out
-  is a driver holding the blob compressed inside its own data section, which no
-  string search reaches. `sudo ./scripts/dump-bios.sh` on the tablet settles it.
-- **What `.109` actually changed.** Only that it is distributed as a microSD
-  ("TF card") reading fix. Whether that affects the SD slot's inability to appear
-  as a boot device ([13-split-media.md](13-split-media.md)) is untested, because
-  the `.108` image needed to diff against could not be obtained.
-
-  **The `.108` download that circulates is not `.108`.** A 2017 write-up titled
-  *"How to upgrade the Chuwi Vi8 Plus BIOS?"* says *"Current version:
-  P03_C806.108"* and links a MEGA file. That file was downloaded and is
-  `Vi8 Plus BIOS.rar`, SHA-256 `b03b953c…c2482` — **byte-identical to the archive
-  already examined here**, which contains `.109` and the dual-boot image and no
-  `.108` at all. — **verified**
-
-  <https://mega.nz/#!ZhZEGbAR!nU3qqsNt175V7xtCeiNDugItaZvzuRQ4eXNNTtMoKG8>
-  (via <http://billyfung2010.blogspot.com/2017/04/how-to-upgrade-chuwi-vi8-plus-bios.html>)
-
-  The confusion is easy to make, because both releases ship under the **same**
-  `P03_C806.rom.exe` filename — the executable's name tells you nothing about
-  which version is inside. As far as this repository can establish, `.108` is
-  available only inside the full stock Windows ROM on needrom, never separately.
+  **The practical consequence for a unit running `.108` is settled, though:** the
+  EFI-embedded route has nothing to embed, so [`patches/0001`](../patches/) alone
+  will not produce a working touchscreen and `scripts/dump-bios.sh` will most
+  likely come back empty. Supply the file instead —
+  [`scripts/extract-touchscreen-fw.sh`](../scripts/extract-touchscreen-fw.sh)
+  takes it from Chuwi's own driver package. This does contradict the driver
+  maintainer's notes, which record `fw in EFI` for this model, so his unit may
+  genuinely differ; `dump-bios.sh` is still worth running once to find out.
+- **Which microSD behaviour `.109` fixes.** The BIOS region was rebuilt rather
+  than patched ([above](#what-changed-between-108-and-109)), so a byte diff
+  cannot isolate it, and whether it affects the SD slot's inability to appear as
+  a boot device ([13-split-media.md](13-split-media.md)) remains untested.
 - **Whether AMIDEEFI runs on this firmware**, and its exact switch names.
 
 Sources for this page are in [90-references.md](90-references.md#bios--uefi-firmware).

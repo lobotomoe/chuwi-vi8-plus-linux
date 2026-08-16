@@ -114,9 +114,21 @@ struct instead.
 
 ## Before submitting: confirm the BIOS date
 
-All three patches hard-code `12/11/2015`. That came from a **photograph of the
-setup screen**, not from the kernel's own view of DMI, and if the string in
-`/sys` differs by so much as a leading zero the patches match nothing.
+All three patches hard-code `12/11/2015`. That is now **confirmed from the
+firmware image itself**, not only from a photograph: `P03_C806.108`, the build
+the reference tablet shipped with, contains the signon string
+
+```
+BIOS Date: 12/11/2015 21:15:52 Ver: 1ATFG007
+```
+
+— **verified** by extracting strings from the image
+([60-bios-firmware.md](../docs/60-bios-firmware.md#the-ver-string-is-not-a-version-number)).
+
+Still read it off the running kernel before sending. The image proves what the
+firmware was built with; `/sys/class/dmi/id/bios_date` is what `DMI_MATCH`
+actually compares against, and only the second one can rule out a stray space or
+a different formatting.
 
 Run this on the tablet. The brackets are not decoration — see below.
 
