@@ -24,6 +24,9 @@ VENDOR_ZIP_SHA256=92a4163ec7d0388888a31666ef8340d2056e3ec866639d9cdd7275dac81756
 INF_MEMBER='drivers_C806_X64/TP_X64/chpntsc.inf'
 FW_SECTION='[Chpntsc_Device_Firmware.AddReg]'
 
+# Free space --download needs, in KiB: the ~217 MiB package plus room to spare.
+DOWNLOAD_NEEDS_KB=256000
+
 # SHA-256 of each blob as carried by the 2016-04-21 driver (DriverVer
 # 04/21/2016, catalog Chpntsc.cat). A different package version will not match;
 # that is a signal, not a bug — see --allow-unknown.
@@ -167,8 +170,23 @@ if [ "$do_download" = 1 ]; then
   [ -n "$direct" ] ||
     die "no direct link on that page; the host's layout changed — download it by hand and use --zip"
   zip_path=$workdir/drivers.zip
+
+  # The package is ~217 MiB and only one INF is wanted out of it, so the only
+  # real requirement is room for the download itself. Worth checking first: this
+  # runs on a 2 GB tablet, and if /tmp is a tmpfs the default size is half of
+  # RAM, which a failed download would fill before saying anything useful.
+  avail=$(df -Pk "$workdir" 2>/dev/null | awk 'NR == 2 { print $4 }')
+  if [ -n "$avail" ] && [ "$avail" -lt "$DOWNLOAD_NEEDS_KB" ]; then
+    die "only $((avail / 1024)) MiB free on $(df -Pk "$workdir" | awk 'NR == 2 { print $6 }')," \
+      "need $((DOWNLOAD_NEEDS_KB / 1024)) MiB." \
+      "Re-run with TMPDIR set to somewhere roomier, e.g. TMPDIR=/var/tmp"
+  fi
+
   log "downloading ~217 MiB..."
-  curl -fsS -m 1800 -L -A 'Mozilla/5.0' -o "$zip_path" "$direct" ||
+  # --progress-bar rather than -s: this is minutes of silence otherwise, and on
+  # a slow link the difference between "working" and "hung" is the only thing
+  # the person watching actually wants to know.
+  curl -f --progress-bar -m 1800 -L -A 'Mozilla/5.0' -o "$zip_path" "$direct" ||
     die "download failed"
   got=$(sha256_of "$zip_path")
   if [ "$got" != "$VENDOR_ZIP_SHA256" ]; then
