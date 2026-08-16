@@ -410,7 +410,12 @@ their SMBIOS defaults, ACPI tables and Intel flash descriptors read directly.
 - The single-OS image declares the touchscreen as ACPI `HAMP0002`; the dual-boot
   image declares `HAMP0005`, which no kernel driver claims. — **verified**
 - `CHUWI.D86JLBNR03.bin` is an **InsydeH2O / ValleyView (Bay Trail)** image, not a
-  Vi8 Plus BIOS, despite being distributed as one. — **verified**
+  Vi8 Plus BIOS, despite being distributed as one. — **verified** three ways:
+  by BIOS-vendor and SoC strings in the image, by its flash-region layout, and by
+  `touchscreen_dmi.c`, which matches `DMI_BIOS_VERSION` "CHUWI.D86JLBNR" together
+  with `DMI_SYS_VENDOR` "Insyde" / `DMI_PRODUCT_NAME` "i86" for the Chuwi Vi8
+  **CWI506**. The archive folder these come from is labelled "CHUWI VI8 PLUS" and
+  contains four Bay Trail Vi8 images and no Vi8 Plus BIOS at all.
 - Flash descriptors differ between the single-OS and dual-boot images (BIOS region
   4096 KiB at `0x400000` vs 6144 KiB at `0x200000`). — **verified**
 - The ICN8505 touchscreen firmware was **not** found in either Cherry Trail image,

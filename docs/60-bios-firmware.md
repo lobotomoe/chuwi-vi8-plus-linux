@@ -118,6 +118,41 @@ ValleyView is Bay Trail. Insyde is the BIOS vendor on the **original Chuwi Vi8
 Writing it to a Vi8 Plus would flash a Bay Trail firmware onto a Cherry Trail
 SoC with a different region map. Do not.
 
+The kernel settles it from a third direction. `touchscreen_dmi.c` identifies
+these BIOS version strings by name:
+
+```c
+/* Chuwi Vi8 (CWI501) */   DMI_MATCH(DMI_BIOS_VERSION, "CHUWI.W86JLBNR01"),
+/* Chuwi Vi8 (CWI506) */   DMI_MATCH(DMI_BIOS_VERSION, "CHUWI.D86JLBNR"),
+```
+
+both alongside `DMI_SYS_VENDOR` "Insyde" and `DMI_PRODUCT_NAME` "i86" — the
+original Vi8's DMI, not this tablet's. `D86JLBNR03` matches the second prefix.
+— **verified**
+
+### Where the mislabelled images come from
+
+The archive mirrors carry a folder labelled **"CHUWI VI8 PLUS"** whose contents
+are, in full:
+
+| File | What it actually is |
+|---|---|
+| `CHUWI VI8 PLUS W86JLBNR01` | Chuwi Vi8 **CWI501** |
+| `CHUWI VI8 PLUS W86JFBNR01` | same `W86` family |
+| `CHUWI VI8 PLUS W86GFBN02` | same `W86` family |
+| `CHUWI VI8 PLUS D86JLBNR03` | Chuwi Vi8 **CWI506** |
+
+Four Bay Trail Vi8 images and not one Vi8 Plus BIOS. The first and last are
+identified by the kernel entries quoted above; the middle two share the same
+`W86`/`D86` naming and Insyde lineage. Nothing in that folder belongs on a
+CWI519, and the label is the only thing suggesting otherwise.
+
+If you are hunting for firmware for this tablet, judge the file, not the folder:
+a real Vi8 Plus image is 8 MiB, identifies as American Megatrends, and contains
+the strings `Hampoo` and `CherryTrail CR`. `scripts/dump-bios.sh` plus the
+checks in this page's tables are enough to tell them apart before you flash
+anything.
+
 ---
 
 ## Does a BIOS update fix the touchscreen, Wi-Fi or audio?
