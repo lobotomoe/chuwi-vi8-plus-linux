@@ -64,8 +64,10 @@ inspecting the actual ISO — rather than taken from a forum post.
 ## Chuwi Vi8 Plus hardware in the kernel
 
 - Touchscreen: `chuwi_vi8_plus_data` in `drivers/platform/x86/touchscreen_dmi.c`,
-  Chipone ICN8505, firmware `chipone/icn8505-HAMP0002.fw` extracted from the
-  tablet's own UEFI. — **verified**
+  Chipone ICN8505, firmware `chipone/icn8505-HAMP0002.fw`, which the entry is
+  written to extract from the tablet's own UEFI. — **verified that the entry says
+  this**; the blob itself was *not* found in either published BIOS image, see
+  [60-bios-firmware.md](60-bios-firmware.md)
 - The patch series that added it, with the firmware's size and SHA-256:
   <https://patchwork.kernel.org/project/linux-input/patch/20200111145703.533809-11-hdegoede@redhat.com/>
 - Audio: the `Hampoo` / `D2D3_Vi8A1` quirk in
@@ -545,7 +547,7 @@ What it offers, with what we could establish about each:
   Wi-Fi power save to stop firmware crashes.
 - Agrees with this repo that both cameras are unusable.
 
-## A second, independent copy of the touchscreen firmware
+## Where the second copy of the touchscreen firmware comes from
 
 <https://github.com/Dax89/chuwi-dev> — **inspected, not tested here**
 

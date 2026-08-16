@@ -73,10 +73,12 @@ records the tablet in his own hardware notes as
 `Accel: BOSC0200 -> BMA250E, mount-matrix ok`
 ([90-references.md](90-references.md#hans-de-goedes-notes-on-this-exact-tablet)).
 
-That is two independent statements from the person best placed to know, but
-neither is a reading of *your* DSDT: the ACPI tables sit compressed inside the
-BIOS image and were not decompressed here, so this repo has not confirmed `ROTM`
-in the firmware directly. The one-line check below is the confirmation.
+Note what that is and is not. Both statements come from the **same person**, so they
+are one source saying something twice, not two sources agreeing — it is simply the
+best-placed source there is. And neither is a reading of *your* DSDT: the ACPI tables
+sit compressed inside the BIOS image and were not decompressed here, so this repo has
+not confirmed `ROTM` in the firmware directly. The one-line check below is the
+confirmation.
 
 So the orientation reference survives unfilled DMI. Confirm on your unit:
 
