@@ -581,8 +581,7 @@ filename from the ACPI `_SUB` object, not from DMI, and it looks in
 Chuwi's own Windows driver contains it:
 
 ```sh
-./scripts/extract-touchscreen-fw.sh --download        # ~217 MiB, once
-sudo ./scripts/extract-touchscreen-fw.sh --inf chpntsc.inf --install
+sudo ./scripts/extract-touchscreen-fw.sh --download --install    # ~217 MiB
 sudo modprobe -r chipone_icn8505 && sudo modprobe chipone_icn8505
 dmesg | grep -i icn8505
 ```

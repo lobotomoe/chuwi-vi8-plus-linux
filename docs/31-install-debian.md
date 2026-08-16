@@ -1,9 +1,15 @@
 # Installing Debian 13 "trixie"
 
+> **Not performed on this tablet.** Lubuntu is the install that was actually
+> carried out here ([30-install-lubuntu.md](30-install-lubuntu.md)). What follows
+> is derived from the Debian installer's source and the contents of the ISO, both
+> read and cited, but nobody has run it end to end on a Vi8 Plus. Treat the
+> reasoning as sound and the outcome as expected rather than observed.
+
 This is the path with the fewest surprises. The Debian installer detects 32-bit
 firmware on its own and installs `grub-efi-ia32` **from the ISO's own package
-pool**, so it finishes correctly even with no network at all. Nothing in this
-guide needs a repair step afterwards.
+pool**, so it should finish correctly even with no network at all, with no repair
+step afterwards.
 
 The one thing Debian does not do for you is boot: its ISOs ship only
 `bootx64.efi`, so the stick still needs `artifacts/bootia32.efi` added. That is

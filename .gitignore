@@ -10,6 +10,12 @@ payload/
 reports/
 backups/
 
+# Vendor touchscreen firmware extracted by scripts/extract-touchscreen-fw.sh.
+# Chuwi's, not ours, and not licensed for redistribution - the script exists so
+# that nobody has to commit it. bootia32.efi is different: that one is GPL GRUB,
+# and artifacts/PROVENANCE.md says so.
+artifacts/icn8505-*.fw
+
 # Editor / OS noise
 .DS_Store
 *.swp

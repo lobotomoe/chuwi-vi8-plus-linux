@@ -182,7 +182,7 @@ anything.
 No, and this is the part worth reading carefully, because the reasoning is not
 obvious from the outside.
 
-All four broken quirks come down to one thing: the tablet reports
+All three broken quirks come down to one thing: the tablet reports
 `To be filled by O.E.M.` as its system vendor and product name, so no kernel
 quirk matches ([the full explanation is in
 01-hardware.md](01-hardware.md#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-three-things-at-once)).
@@ -246,7 +246,7 @@ touchscreen, Wi-Fi and audio.** A BIOS update on a working unit is a downgrade.
 AMI's DMI editor exists as `AMIDEWIN` (Windows), `AMIDEDOS`, and `AMIDEEFI` — a
 UEFI-shell build, which is what this tablet could use, given a 32-bit (IA32)
 binary. Setting the two system fields to the values the kernel expects would make
-**all four** quirks match at once:
+**all three** quirks match at once:
 
 ```
 sys_vendor   = Hampoo

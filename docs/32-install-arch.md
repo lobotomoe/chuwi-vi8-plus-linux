@@ -1,5 +1,11 @@
 # Installing Arch Linux
 
+> **Not performed on this tablet.** Lubuntu is the install that was actually
+> carried out here ([30-install-lubuntu.md](30-install-lubuntu.md)). The claim
+> that the Arch ISO boots unmodified comes from inspecting the image, not from
+> watching it boot on a Vi8 Plus. Everything after that is standard Arch practice
+> adapted to this hardware, and is unobserved here.
+
 Arch is the odd one out here: its ISO is the **only** one that boots this tablet
 with no modification at all, and its bootloader story is the cleanest — but you
 type every step yourself.

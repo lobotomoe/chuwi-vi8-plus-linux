@@ -230,3 +230,38 @@ touches a real device.
 - **This tablet is from 2016.** Cherry Trail is slow and its Linux support, while
   complete, is maintained by very few people. Expect a usable browsing/media/terminal
   machine, not a fast one.
+
+---
+
+## How much of this has actually been done
+
+Individual claims carry their own markers — **verified on the unit** means someone
+watched it happen, **verified** on its own means a file, image or source tree was
+read. This is the summary, because the rest of the document reads with one voice and
+that voice is not uniformly earned.
+
+**Done on the tablet, start to finish.** One unit. Built the install medium, booted
+it, installed Lubuntu 26.04 to the eMMC, and it runs: graphics, eMMC, microSD,
+network. Wi-Fi was brought up by hand and the fix is recorded. The firmware setup
+menu was walked through and photographed. The failure modes in the touchscreen and
+Wi-Fi sections are copied out of that unit's own `dmesg`.
+
+**Derived from sources, never executed here.**
+
+| Thing | What it rests on |
+|---|---|
+| [Debian](docs/31-install-debian.md) and [Arch](docs/32-install-arch.md) guides | ISO contents and installer source, read. **Neither was installed on this tablet** |
+| [`make-media.ps1`](scripts/make-media.ps1) | Never run — no Windows machine was involved |
+| `restore-emmc.sh`, `postinstall-*.sh`, `dump-bios.sh` | Argument handling is unit-tested; none has run on the tablet |
+| `extract-touchscreen-fw.sh` | Every path exercised except `--install`, which needs the tablet |
+| The three [`patches/`](patches/) | Apply cleanly to mainline. Never compiled, never booted |
+| Battery, backlight, suspend, HDMI, Bluetooth, audio, cameras | Not exercised on the installed system |
+
+**The single-point-of-failure claim.** All three patches hard-code BIOS date
+`12/11/2015`, which came from **a photograph of the setup screen**, not from
+`/sys/class/dmi/id/bios_date`. If that string differs by a character the patches
+match nothing. Confirming it is the first item in
+[`patches/README.md`](patches/README.md).
+
+**Everything is n=1.** One tablet, one BIOS build, one chip revision (a0). Where
+this repo says "some units", that is other owners' reports, marked as such.

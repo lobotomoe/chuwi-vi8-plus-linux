@@ -138,7 +138,7 @@ tested on hardware or submitted; [`patches/README.md`](../patches/README.md)
 lists what has to be confirmed first.
 
 The other route is to write the two system strings back into the firmware with
-AMI's DMI editor, which would make all four quirks match at once. Untested here;
+AMI's DMI editor, which would make all three quirks match at once. Untested here;
 the risks are in [60-bios-firmware.md](60-bios-firmware.md#what-would-actually-fix-it).
 
 ### If your tablet reports something else entirely
@@ -304,8 +304,7 @@ That is the primary source: a signed vendor package (`Chpntsc.cat`, DriverVer
 reads it back out and checks the result against a known hash:
 
 ```sh
-./scripts/extract-touchscreen-fw.sh --download            # ~217 MiB, once
-sudo ./scripts/extract-touchscreen-fw.sh --inf chpntsc.inf --install
+sudo ./scripts/extract-touchscreen-fw.sh --download --install     # ~217 MiB
 ```
 
 Run without `--name` it reads the name your own kernel asked for out of `dmesg`,
