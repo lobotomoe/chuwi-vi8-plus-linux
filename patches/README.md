@@ -139,7 +139,7 @@ for f in bios_version bios_date sys_vendor product_name product_sku \
 done
 ```
 
-Expected, from what has been verified so far:
+What the tablet actually returns:
 
 ```
 bios_version   [P03_C806.108]
@@ -151,13 +151,27 @@ board_vendor   [Hampoo]
 board_name     [Cherry Trail CR]
 ```
 
-**Trailing spaces decide whether patch 0002 works.** DMI strings routinely carry
-them — the BIOS image parsed for this repo has a system serial that is a single
-space — and they are invisible in ordinary output. `DMI_MATCH` is a substring
-test and tolerates them, but patch 0002 uses `DMI_EXACT_MATCH` on
-`board_vendor` and `board_name`, which does not. If either bracket shows
-`[Hampoo ]` rather than `[Hampoo]`, the entry must either include the space or
-switch to `DMI_MATCH`.
+— **verified on the unit**, and it matches the prediction from the BIOS image
+field for field.
+
+That settles the two things these patches were waiting on.
+
+**No trailing spaces.** DMI strings routinely carry them — the BIOS image parsed
+for this repo has a system serial that is a single space — and they are invisible
+in ordinary output. `DMI_MATCH` is a substring test and tolerates them, but patch
+0002 uses `DMI_EXACT_MATCH` on `board_vendor` and `board_name`, which does not.
+Every bracket above closes flush against its value, so `DMI_EXACT_MATCH` is safe
+and patch 0002 needs no change. This is also the right test to have run: sysfs
+and `DMI_MATCH` both read the same stored `dmi_ident[]` strings, so what the
+brackets show is exactly what the match sees.
+
+**The existing upstream entry cannot fire on this unit, and now that is
+observed rather than argued.** Mainline matches `DMI_SYS_VENDOR` `Hampoo` and
+`DMI_PRODUCT_NAME` `D2D3_Vi8A1`; both fields hold the placeholder here. Note
+that `Hampoo` *is* present — in `board_vendor`, which upstream does not look at.
+The new entry keys on the three fields that are populated, and all three match:
+`board_vendor` `Hampoo`, `board_name` `Cherry Trail CR`, `bios_date`
+`12/11/2015`.
 
 Copy the output rather than retyping it. `Cherry Trail CR` and `CherryTrail CR`
 both exist on this hardware — the first is the board name, the second is the
@@ -167,10 +181,15 @@ between a patch that matches and one that silently does nothing.
 `sudo ./scripts/collect-hw-report.sh` captures all of these in one file, along
 with everything else worth having.
 
-If `bios_version` reads `P03_C806.108`, consider adding
-`DMI_MATCH(DMI_BIOS_VERSION, "P03_C806.108")` to each entry — it is far more
-specific than the date and would remove any risk of catching another Hampoo
-board built the same day. It was left out only because it is unverified.
+`bios_version` reads `P03_C806.108` on this unit — **verified**. Adding
+`DMI_MATCH(DMI_BIOS_VERSION, "P03_C806.108")` to each entry is therefore an
+option now that it is no longer a guess: it is far more specific than the date
+and would remove any risk of catching another Hampoo board built the same day.
+It is still left out deliberately, because it would also stop the entries
+matching a unit running `.109`, and nothing suggests that build behaves
+differently — the two images carry the same placeholder SMBIOS defaults
+([60-bios-firmware.md](../docs/60-bios-firmware.md#what-changed-between-108-and-109)).
+The date is the looser key on purpose.
 
 ## Testing
 

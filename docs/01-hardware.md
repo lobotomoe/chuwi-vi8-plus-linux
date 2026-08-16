@@ -46,6 +46,12 @@ board_name:    Cherry Trail CR
 
 — **verified on the unit**
 
+**You can spot it without running anything.** The Ubuntu installer builds the
+default hostname out of the same DMI, so on an affected unit the shell prompt
+reads `chuwi@chuwi-tobefilledbyoem` — the placeholder, lowercased and stripped of
+punctuation. — **verified on the unit**. A prompt like that is the cheapest
+possible confirmation that everything below applies to your tablet.
+
 Chuwi left the two system fields at the SMBIOS placeholder. The board fields are
 correct, but almost every kernel quirk matches on the **system** fields, so none of
 them fire:

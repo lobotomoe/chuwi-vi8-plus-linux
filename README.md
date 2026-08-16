@@ -259,11 +259,14 @@ Wi-Fi sections are copied out of that unit's own `dmesg`.
 | Battery, backlight, suspend, HDMI, Bluetooth, audio, cameras | Not exercised on the installed system |
 
 **The date all three patches depend on.** They hard-code BIOS date
-`12/11/2015`. That was a photograph of the setup screen until the `P03_C806.108`
-image was obtained, which contains the same string —
-`BIOS Date: 12/11/2015 21:15:52 Ver: 1ATFG007` — timestamp and all. It should
-still be read off `/sys/class/dmi/id/bios_date` before sending, since that is
-what `DMI_MATCH` compares against.
+`12/11/2015`. That was a photograph of the setup screen, then the `P03_C806.108`
+image was obtained carrying the same string —
+`BIOS Date: 12/11/2015 21:15:52 Ver: 1ATFG007` — timestamp and all, and it has
+now been read off the running kernel as `/sys/class/dmi/id/bios_date`. Not three
+independent sources — all three trace back to the same firmware build — but three
+ways of reading it that could each have disagreed, and did not. The third is the
+one that counts, because it is the string `DMI_MATCH` is handed. The full DMI
+capture is in [patches/README.md](patches/README.md).
 
 **Everything is n=1.** One tablet, one BIOS build, one chip revision (a0). Where
 this repo says "some units", that is other owners' reports, marked as such.
