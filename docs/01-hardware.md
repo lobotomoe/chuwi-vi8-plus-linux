@@ -553,6 +553,20 @@ channels the wrong way round. The `bytcr_rt5651.c` quirk can be forced with the
 module's `quirk=` parameter if you are prepared to work out the bitmask, but that
 has not been tried here.
 
+The placeholder is visible here too. ALSA builds the card's long name out of the
+same DMI fields, so `aplay -l` on an affected unit reports:
+
+```
+1 [rt5651         ]: SOF - sof-bytcht rt5651
+                     Hampoo-TobefilledbyO.E.M.-TobefilledbyO.E.M.-CherryTrailCR
+```
+
+— **verified on the unit**. Two things worth reading off that line. The card is
+driven through **SOF** rather than the legacy SST path, and the machine driver
+doing it is still `snd_soc_sst_bytcr_rt5651` — loaded, and in use — which is the
+module [`patches/0003`](../patches/) modifies, so the quirk table is the right
+place to fix this on a current kernel.
+
 ### Accelerometer / auto-rotation — Bosch BOSC0200
 
 - Driver: `bmc150_accel`
@@ -567,7 +581,35 @@ The hwdb entry matches on `svnHampoo:pnD2D3_Vi8A1`, so on a unit with
 [unfilled DMI](#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-three-things-at-once)
 the mount matrix is not applied and auto-rotation has no idea which way is up. The
 accelerometer itself still works — you can copy the matrix into a local hwdb rule
-matched on something your unit actually reports.
+matched on something your unit actually reports. This is the `modalias` to match
+against, read off the tablet:
+
+```
+dmi:bvnAmericanMegatrendsInc.:bvrP03_C806.108:bd12/11/2015:br5.11:svnTobefilledbyO.E.M.:pnTobefilledbyO.E.M.:pvrTobefilledbyO.E.M.:rvnHampoo:rnCherryTrailCR:rvrTobefilledbyO.E.M.:cvnToBeFilledByO.E.M.:ct3:cvrToBeFilledByO.E.M.:skuMRD:pfaCherryTrailCR:
+```
+
+— **verified on the unit**. Note `rvnHampoo:rnCherryTrailCR`, the board fields, as
+the only usable anchors; and note that the placeholder is spelled two ways in the
+same string — `svnTobefilledbyO.E.M.` but `cvnToBeFilledByO.E.M.` — so a rule that
+matches one capitalisation will not match the other.
+
+**Binding is not the problem; reading it is.** The device does appear, as
+`iio:device0` under `i2c-BOSC0200:00`, but `iio-sensor-proxy` cannot get samples
+out of it:
+
+```
+Could not find trigger name associated with .../i2c-BOSC0200:00/iio:device0
+Buffer '/dev/iio:device0' did not have data within 0.5s
+```
+
+— **verified on the unit**. So auto-rotation fails for a second, separate reason
+beyond the missing mount matrix: no IIO trigger is registered, so the buffered
+read that `iio-sensor-proxy` performs never returns data. A plausible cause is
+that the driver got no usable interrupt from ACPI and therefore registered no
+data-ready trigger, which would leave polling as the only route — **untested
+hypothesis**, and worth confirming with `ls /sys/bus/iio/devices/` and
+`cat /sys/bus/iio/devices/iio:device0/in_accel_*_raw` before anyone chases it.
+If the raw reads work while buffered reads do not, that diagnosis is right.
 
 ### Power — X-Powers AXP288 PMIC
 

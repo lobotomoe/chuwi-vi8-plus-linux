@@ -127,9 +127,9 @@ kernel symbols.
 | Wi-Fi (BCM43430) | Yes | **Works after a manual NVRAM copy** — see below. 2.4 GHz only, the radio has no 5 GHz |
 | Touchscreen (Chipone ICN8505) | Yes | **Does not work out of the box** — the DMI quirk does not match, so the firmware is never extracted. Fixable without a kernel patch: the filename comes from ACPI, and Chuwi's own driver package carries the firmware |
 | Audio (RT5651) | Yes | Untested; the quirk does not match, so expect wrong channel mapping |
-| Accelerometer / auto-rotation | Yes | Untested, but **not** DMI-dependent — the mount matrix comes from ACPI `ROTM`. LXQt still needs a helper to act on it |
-| Battery, charging (AXP288) | Yes | Untested here; the maintainer records it working. Charges at 2 A only from a USB-A charger via an A-to-C cable — no PD, and C-to-C gives 500 mA |
-| Backlight | Yes | Untested here; the maintainer records it working |
+| Accelerometer / auto-rotation | Partly | **The sensor binds** — `BOSC0200` appears as `iio:device0` — but `iio-sensor-proxy` cannot read it: *"Could not find trigger name"*, then *"Buffer did not have data within 0.5s"*. So orientation is exposed by ACPI `ROTM` as designed, and userspace still does not rotate |
+| Battery, charging (AXP288) | Yes | **Works** — `axp288_fuel_gauge` reports capacity, voltage and current; `axp288_charger` reports the USB supply online. Charges at 2 A only from a USB-A charger via an A-to-C cable — no PD, and C-to-C gives 500 mA |
+| Backlight | Yes | **Works** — `intel_backlight` present and readable |
 | micro-HDMI | Yes | Untested |
 | Bluetooth (BCM43430 over UART) | Yes | Untested. Needs an `.hcd` from `bluez-firmware`, **not** `linux-firmware` — and no distribution ships one for an a0 chip |
 | Suspend | Partly | Untested here. The maintainer's table scores it as suspending but **not** reaching S0i3, so expect idle drain |
@@ -256,7 +256,7 @@ Wi-Fi sections are copied out of that unit's own `dmesg`.
 | `restore-emmc.sh`, `postinstall-*.sh`, `dump-bios.sh` | Argument handling is unit-tested; none has run on the tablet |
 | `extract-touchscreen-fw.sh` | Every path exercised except `--install`, which needs the tablet |
 | The three [`patches/`](patches/) | Apply cleanly to mainline. Never compiled, never booted |
-| Battery, backlight, suspend, HDMI, Bluetooth, audio, cameras | Not exercised on the installed system |
+| Suspend, HDMI, Bluetooth, audio, cameras | Not exercised on the installed system |
 
 **The date all three patches depend on.** They hard-code BIOS date
 `12/11/2015`. That was a photograph of the setup screen, then the `P03_C806.108`
