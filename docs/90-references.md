@@ -149,8 +149,10 @@ the deep power state, and battery drain while suspended should be expected to ma
 
 **[`x86-codec-info`](https://github.com/jwrdegoede/sunxi-fedora-scripts/blob/master/x86-codec-info)**
 — per-tablet audio routing. The Vi8 Plus line reads
-`mono / mono in2 / JD1_1`, which independently confirms three of the four flags in
-[`patches/0003`](../patches/) without anyone having to boot a kernel.
+`mono / mono in2 / JD1_1`, confirming the mono speaker, the IN2 microphone mapping
+and the jack-detect source in [`patches/0003`](../patches/) without anyone having to
+boot a kernel. `HP_LR_SWAPPED` is not covered by that table and remains uncorroborated
+outside the kernel's own entry.
 
 **[`brcmfmac-notes`](https://github.com/jwrdegoede/sunxi-fedora-scripts/blob/master/brcmfmac-notes)**
 — Wi-Fi and Bluetooth firmware per tablet. His Vi8 Plus is
@@ -547,16 +549,22 @@ What it offers, with what we could establish about each:
 
 <https://github.com/Dax89/chuwi-dev> — **inspected, not tested here**
 
-A Chipone reverse-engineering repository aimed at the Chuwi Hi10, unconnected to
-the Vi8 Plus work above. It carries raw controller dumps named by ACPI `_SUB`
-string, `hi10/HAMP0001.bin` through `HAMP0005.bin`, plus an out-of-tree
-`chipone_ts` driver and a Vi10 Ultimate DSDT.
+A Chipone reverse-engineering repository aimed at the Chuwi Hi10. It carries raw
+controller dumps named by ACPI `_SUB` string, `hi10/HAMP0001.bin` through
+`HAMP0005.bin`, plus an out-of-tree `chipone_ts` driver and a Vi10 Ultimate DSDT.
 
 `HAMP0002.bin` — the `_SUB` this tablet's touchscreen reports — is **byte-identical
 to the file in `sciboy12/vi8-plus-linux-fixes`**, confirmed with `cmp`: both 34884
-bytes, both SHA-256 `d9db81b9…c99327`. Two people who do not appear to know each
-other uploaded the same bytes, which is about as much provenance as an
-unredistributable vendor blob gets.
+bytes, both SHA-256 `d9db81b9…c99327`.
+
+That is one source, not two. This copy was committed **2016-07-15**, the other
+**2025-07-30**, nine years later; the later one is most plausibly a copy of this one
+or of a shared vendor original. Do not read the match as independent corroboration.
+
+What it does establish is that this file is **contemporaneous with the hardware** and
+comes from someone who was writing a driver for the controller, which is better
+standing than an undated upload. Treat `Dax89/chuwi-dev` as the origin and
+`sciboy12` as a mirror.
 
 `HAMP0001` and `HAMP0005` share the same 34884-byte length and the same prefix but
 hash differently — they are sibling tablets' firmware for the same controller, and

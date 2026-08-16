@@ -271,9 +271,15 @@ publish an ICN8505 image for this controller:
 | [`sciboy12/vi8-plus-linux-fixes`](https://github.com/sciboy12/vi8-plus-linux-fixes) | `firmware/chipone/icn8505-HAMP0002.fw` | 34884 | `d9db81b9…c99327` |
 | [`Dax89/chuwi-dev`](https://github.com/Dax89/chuwi-dev) | `hi10/HAMP0002.bin` | 34884 | `d9db81b9…c99327` |
 
-They are **byte-identical** — verified with `cmp`. Two independent uploads of the same
-bytes is meaningful provenance, and both carry the correct `b0 07 00 00 e4 07 00 00`
-prefix, so this is a real ICN8505 image for `_SUB` = `HAMP0002`.
+They are **byte-identical** — verified with `cmp` — and carry the correct
+`b0 07 00 00 e4 07 00 00` prefix, so this is a real ICN8505 image for `_SUB` =
+`HAMP0002`.
+
+Resist the obvious reading: that is **one source, not two**. `Dax89/chuwi-dev`
+committed it in **2016**, `sciboy12` in **2025**, so the later copy is almost
+certainly downstream of the earlier one. What the 2016 date does buy is that the file
+is contemporaneous with the hardware and came from someone writing a driver for this
+controller — better standing than an undated blob, but not corroboration.
 
 It is still **34884 bytes rather than the 35012 the kernel pins**, and the obvious
 explanation is wrong: appending or prepending 128 zero or `0xff` bytes does not produce
@@ -334,6 +340,59 @@ brcmfmac: brcmf_fw_alloc_request: using brcm/brcmfmac43430a0-sdio for chip BCM43
 ```
 
 — **verified on the unit**: revision **a0**.
+
+##### What `a0` and `a1` actually are
+
+Not tablet revisions. They are **silicon steppings of the Broadcom BCM43430 die** —
+mask revisions of the chip inside the AmPak module, changed by the module vendor
+during production. Two CWI519s with the same model number, the same carton and the
+same BIOS can differ here. Nothing on the outside of the tablet says which you have,
+and it is not a "Rev 1 / Rev 2" of the product.
+
+The kernel knows three steppings, keyed on the chip's `chiprev` register:
+
+| `chiprev` | Stepping | Wi-Fi firmware basename | Bluetooth name in `btbcm` |
+|---|---|---|---|
+| 0 | A0 | `brcm/brcmfmac43430a0-sdio` | `BCM4343A0` (LMP subver `0x2122`) |
+| 1 | A1 | `brcm/brcmfmac43430-sdio` — **no suffix** | `BCM43430A1` (LMP subver `0x2209`) |
+| ≥ 2 | B0 | `brcm/brcmfmac43430b0-sdio` | `BCM43430B0` |
+
+Two traps live in that table. The A1 Wi-Fi basename carries **no revision suffix** at
+all — it is the historical default from before the other steppings existed, which is
+exactly why `linux-firmware`'s file for this board has no `a0` in its name and why an
+a0 unit silently finds nothing. And the Bluetooth side spells the same two steppings
+inconsistently: `BCM4343A0` against `BCM43430A1`, one digit apart.
+
+B0 is a later part — it is the one in the Raspberry Pi Zero W — and is not expected in
+a 2015-2016 tablet.
+
+##### How to tell which one you have
+
+From software only. The module is soldered to the board under an unmarked shield, so
+there is no part number to read even with the case open, and the DMI serial is no help
+either: this BIOS ships `product_serial` as a single space. The `dmesg` line above is
+the answer — `BCM43430/0` is a0, `BCM43430/1` is a1.
+
+##### When the switch happened
+
+Suggestive rather than settled. Chuwi serial numbers appear to encode the build month
+as `YYMM` after the `Q32G22` prefix, and the driver maintainer's collection notes both
+serials and chip revisions for the sibling Hi8:
+
+| Serial | Reads as | Model | Revision |
+|---|---|---|---|
+| `Q32G22**1509**10320` | 2015-09 | Hi8 (CWI509) | a0 |
+| `Q32G22**1512**035xx` | 2015-12 | Hi8 (CWI509) | a0 |
+| `PQ32G22**1604**11929` | 2016-04 | Hi8 Pro (CWI513) | a0 |
+| `Q32G22**1605**05024` | 2016-05 | Hi8 (CWI509) | **a1** |
+
+Seven serials across his Chuwi tablets all carry a valid month in those positions,
+which is what makes the reading credible; none of it is documented by Chuwi. On that
+evidence the changeover falls around mid-2016, and this tablet's BIOS date of
+2015-12-11 sits comfortably on the a0 side — which is what it turned out to be.
+
+Useful as a prior when buying a second-hand unit. Not a substitute for the `dmesg`
+check.
 
 That matters because the NVRAM `linux-firmware` ships for this tablet is
 `brcmfmac43430**-sdio.Hampoo-D2D3_Vi8A1.txt` — no `a0`, so it came from a unit with the
