@@ -37,9 +37,12 @@ is the difference between "slow" and "unusable" when a browser is open.
 
 ## Screen rotation
 
-The accelerometer is a Bosch BOSC0200 on the `bmc150_accel` driver, and systemd's
-hwdb already carries the correct mount matrix for `Hampoo`/`D2D3_Vi8A1`, so
-there is nothing to calibrate:
+The accelerometer is a Bosch BOSC0200 on the `bmc150_accel` driver. systemd's
+hwdb carries the correct mount matrix for this tablet — but under
+`Hampoo`/`D2D3_Vi8A1`, so it only applies if your unit reports those strings.
+On a unit with [unfilled DMI](01-hardware.md#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-four-things-at-once)
+nothing matches and rotation has no orientation reference; rotate by hand as
+below. There is no userspace workaround for the matrix itself.
 
 ```sh
 sudo apt install iio-sensor-proxy       # or: pacman -S iio-sensor-proxy
@@ -138,9 +141,15 @@ If you get a "Dummy Output" instead of a real card, see
 
 ## Touchscreen
 
-Nothing to install. The kernel matches the DMI strings, loads
-`chipone_icn8505`, and pulls the controller's firmware out of the tablet's own
-UEFI image. Confirm:
+On a unit whose DMI is filled in, there is nothing to install: the kernel
+matches the strings, loads `chipone_icn8505`, and pulls the controller's
+firmware out of the tablet's own UEFI image.
+
+**On the reference tablet this does not happen** — the DMI is unfilled, so the
+quirk never matches and the driver probe fails for want of firmware. The
+workaround, and how to get the firmware out of your own flash, are in
+[01-hardware.md](01-hardware.md#touchscreen--chipone-icn8505). Confirm which
+case you are in:
 
 ```sh
 dmesg | grep -i icn8505
@@ -152,9 +161,15 @@ An on-screen keyboard is worth having if you ever use it without the hub:
 
 ## Wi-Fi and Bluetooth
 
-Wi-Fi needs nothing beyond `linux-firmware`, which every distribution installs
-by default. It is **2.4 GHz only** — that is the BCM43430 radio, not a driver
-limitation, and no amount of configuration will make 5 GHz networks appear.
+Wi-Fi needs `linux-firmware`, which every distribution installs by default — but
+on the reference tablet that was **not enough**, and `wlan0` never appeared. The
+calibration data is shipped under a name derived from the DMI strings, so an
+unfilled unit cannot reach it, and an `a0`-revision radio cannot reach it either.
+One file copy and a reboot fix it; the recipe is in
+[01-hardware.md](01-hardware.md#wi-fi--bluetooth--ampak-ap6212-broadcom-bcm43430).
+
+It is **2.4 GHz only** — that is the BCM43430 radio, not a driver limitation,
+and no amount of configuration will make 5 GHz networks appear.
 
 Bluetooth is the same chip over a UART. Check:
 

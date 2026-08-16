@@ -329,25 +329,22 @@ The two ways another computer can reach that chip:
 - **A hardware SPI programmer** — a CH341A and an SOIC-8 clip on the chip
   itself. Here flashrom on macOS is genuinely useful, because it drives *the
   programmer* (`-p ch341a_spi`), not the tablet. This is also the only route
-  that still works on a tablet that will not power on.
+  that still works on a tablet that will not power on. It must be a **1.8 V**
+  programmer; the common 3.3 V ones will damage this chip.
 
 ## If it goes wrong: DnX mode
 
-Cherry Trail SoCs carry a firmware-level recovery mode, and unlike Bay Trail they
-integrate the USB gadget PHY into the SoC — so it is available even on tablets
-that only ever shipped Windows.
+Power on holding **volume-up and volume-down together** and the tablet enumerates
+as a fastboot device, from which a working EFI binary can be handed to it. That
+is the escape hatch for corrupted settings and bad flashes, and Cherry Trail is
+the good case for it — the USB gadget PHY is on the SoC, so it works even on
+units that only ever shipped Windows.
 
-Power on holding **volume-up and volume-down together**. The tablet enumerates as
-a fastboot device, and Hans de Goede's method is to hand it an EFI binary to run:
-
-```sh
-fastboot flash osloader some-efi-binary.efi
-fastboot boot some-android-boot.img
-```
-
-That is the escape hatch for corrupted BIOS settings and bad flashes. The
-hardware fallback below it is an SPI programmer (CH341A and an SOIC-8 clip) on
-the flash chip itself, which requires opening the tablet.
+The full procedure, with the prebuilt binaries, the cable-swap trick that makes
+the recovered setup menu usable, and what owners of this exact model report,
+is in
+[50-troubleshooting.md](50-troubleshooting.md#dnx-mode-the-software-recovery-before-you-reach-for-a-programmer).
+Read it before flashing, not after.
 
 ## What could not be determined
 

@@ -536,8 +536,13 @@ kernels) and an EFI boot. If you somehow booted without EFI, the touchscreen
 cannot work — check `ls /sys/firmware/efi`.
 
 If `product_name` is not `D2D3_Vi8A1`, the kernel's DMI table does not match
-your unit and it will not enable the touchscreen. Attach
-`scripts/collect-hw-report.sh` output to a report upstream rather than guessing.
+your unit and it will not enable the touchscreen. On the reference tablet it
+reads `To be filled by O.E.M.`, which is what the BIOS itself ships — this is
+the common case, not an exotic one, and it breaks three other things at the
+same time. The cause, the workaround and how to pull the firmware out of your
+own flash are in
+[01-hardware.md](01-hardware.md#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-four-things-at-once).
+There are prepared kernel patches for it in [`patches/`](../patches/).
 
 ## Wi-Fi does not see the network
 
@@ -549,6 +554,12 @@ ip link
 dmesg | grep -i brcmfmac
 rfkill list
 ```
+
+**If there is no `wlan0` at all**, this is not a network problem — the chip
+never initialised, because it could not find its calibration data. That is the
+expected state on a fresh install of this tablet. Fix it with the file copy in
+[01-hardware.md](01-hardware.md#wi-fi--bluetooth--ampak-ap6212-broadcom-bcm43430),
+and reboot rather than reloading the module.
 
 ## Everything is just slow
 
