@@ -57,7 +57,13 @@ entry and keep their current behaviour.
 tablet.** What was verified here is that the tablet's *own* nvram works on an a0
 radio, by copying it to `brcmfmac43430a0-sdio.txt` by hand. `ilife-S806` is a
 different file, chosen because it is the only a0-named candidate from the same
-module. Prove it before sending:
+module.
+
+The choice has one piece of outside support: Chuwi's own driver package for the
+Vi8 Plus is distributed as `Hi8_Pro_drivers_C806_X64.zip` — the vendor treats
+the two tablets as a single `C806` platform, which is the premise the kernel's
+existing Hi8 Pro entry rests on. That is corroboration, not a test. Prove it
+before sending:
 
 ```sh
 sudo cp /lib/firmware/brcm/brcmfmac43430a0-sdio.ilife-S806.txt \

@@ -59,6 +59,25 @@ but nothing for the Vi8 Plus.
 `P03_C806.108` is listed on needrom as part of the full stock Windows 10 ROM
 (`VI8 PLUS WIN10.CHUWI.S.10.TH2.1212.V200`); the BIOS is not published separately.
 
+### Chuwi's own "BIOS download" thread does not contain a BIOS
+
+The official forum thread titled *"[Singleboot] Chuwi Vi8 Plus Windows 10, Bios,
+Driver Download"* is the obvious place to look for something newer. It offers
+three things, and none of them is a BIOS: a MediaFire folder of the Windows 10
+32-bit system, `Hi8_Pro_drivers_C806_X64.zip`, and a tutorial document. Whatever
+BIOS is in there is bundled inside the Windows ROM, and going by needrom's
+listing of the same ROM that would be `.108` — **older** than the `.109` in the
+archives described below.
+
+So `P03_C806.109`, 2016-02-25, remains the last BIOS Chuwi published for this
+tablet, and it is already in the material examined here.
+
+That driver filename is worth noticing on its own: Chuwi ships **Hi8 Pro**
+drivers for the Vi8 Plus, and `C806` is the same platform code as this tablet's
+`P03_C806` BIOS. The two models are one hardware platform as far as the vendor
+is concerned, which independently corroborates the kernel's note that they carry
+the same AmPak AP6212 Wi-Fi module.
+
 ---
 
 ## What is actually in the two archives
