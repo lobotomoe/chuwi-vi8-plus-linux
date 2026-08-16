@@ -125,7 +125,7 @@ kernel symbols.
 | Graphics (Cherry Trail, `i915`) | Yes | **Works**, accelerated, no `nomodeset` needed |
 | eMMC, microSD | Yes | **Works** — installed to eMMC, ran the installer off a card |
 | Wi-Fi (BCM43430) | Yes | **Works after a manual NVRAM copy** — see below. 2.4 GHz only, the radio has no 5 GHz |
-| Touchscreen (Chipone ICN8505) | Yes | **Does not work out of the box** — the DMI quirk does not match, so the firmware is never extracted. Fixable by supplying the file; the filename comes from ACPI, not DMI |
+| Touchscreen (Chipone ICN8505) | Yes | **Does not work out of the box** — the DMI quirk does not match, so the firmware is never extracted. Fixable without a kernel patch: the filename comes from ACPI, and Chuwi's own driver package carries the firmware |
 | Audio (RT5651) | Yes | Untested; the quirk does not match, so expect wrong channel mapping |
 | Accelerometer / auto-rotation | Yes | Untested, but **not** DMI-dependent — the mount matrix comes from ACPI `ROTM`. LXQt still needs a helper to act on it |
 | Battery, charging (AXP288) | Yes | Untested here; the maintainer records it working. Charges at 2 A only from a USB-A charger via an A-to-C cable — no PD, and C-to-C gives 500 mA |
@@ -188,6 +188,7 @@ and stays under the GPL v3+ — [`LICENSE`](LICENSE),
 | `fetch-offline-payload.sh` | macOS, Linux | Downloads `grub-efi-ia32-bin` to carry on the stick |
 | `collect-hw-report.sh` | tablet | One file with DMI, firmware bitness, drivers, audio, power |
 | `dump-bios.sh` | tablet | Reads the SPI flash twice, verifies, extracts the touchscreen firmware. Never writes |
+| `extract-touchscreen-fw.sh` | macOS, Linux | Pulls the ICN8505 firmware out of Chuwi's own driver INF, hash-checked |
 | `backup-emmc.sh` | tablet | Compressed image of the eMMC to an external disk, before wiping |
 | `restore-emmc.sh` | tablet | Writes that image back, checksum-verified, to get Windows back |
 | `postinstall-grub-ia32.sh` | tablet | Installs a 32-bit GRUB into the installed system's ESP |

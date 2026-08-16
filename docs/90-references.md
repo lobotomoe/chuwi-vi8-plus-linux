@@ -549,6 +549,32 @@ What it offers, with what we could establish about each:
   Wi-Fi power save to stop firmware crashes.
 - Agrees with this repo that both cameras are unusable.
 
+## Chuwi's own driver package — the primary source for the touchscreen firmware
+
+`Hi8_Pro_drivers_C806_X64.zip`, 227034543 bytes, SHA-256
+`92a4163ec7d0388888a31666ef8340d2056e3ec866639d9cdd7275dac817561f`. Linked from
+Chuwi's own Vi8 Plus forum thread, mirrored on MediaFire and on Chuwi's Box
+account.
+
+- <https://www.mediafire.com/file/180vqqbk3rus2s1/Hi8_Pro_drivers_C806_X64.zip/file>
+- <https://chuwiinnovationtechnologyshenz.box.com/s/wwqnnrtpe0lsd90nrzlux47q04cvwp56>
+
+— **verified** by downloading and unpacking it.
+
+`drivers_C806_X64/TP_X64/chpntsc.inf` (DriverVer 04/21/2016, catalogue
+`Chpntsc.cat`) holds all seven ICN8505 firmware blobs as hex under
+`[Chpntsc_Device_Firmware.AddReg]`, keyed by ACPI `_SUB` name. This is where the
+copies floating around GitHub ultimately come from —
+[`scripts/extract-touchscreen-fw.sh`](../scripts/extract-touchscreen-fw.sh) reads
+them straight out of it.
+
+Also in the package, both worth knowing:
+
+- `Wifi_x64` is **Realtek** (`netrtwlans.inf`, *"Realtek Wireless 802.11b/g/n
+  SDIO"*, DriverVer 04/29/2016), not Broadcom.
+- `Bt_x64` contains **no Bluetooth driver**: it holds `prnms009.inf`,
+  `Class=Printer`, `Provider="Microsoft"` — Microsoft Print to PDF.
+
 ## Where the second copy of the touchscreen firmware comes from
 
 <https://github.com/Dax89/chuwi-dev> — **inspected, not tested here**

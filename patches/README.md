@@ -59,11 +59,22 @@ radio, by copying it to `brcmfmac43430a0-sdio.txt` by hand. `ilife-S806` is a
 different file, chosen because it is the only a0-named candidate from the same
 module.
 
-The choice has one piece of outside support: Chuwi's own driver package for the
-Vi8 Plus is distributed as `Hi8_Pro_drivers_C806_X64.zip` — the vendor treats
-the two tablets as a single `C806` platform, which is the premise the kernel's
-existing Hi8 Pro entry rests on. That is corroboration, not a test. Prove it
-before sending:
+The choice had one piece of outside support: Chuwi's own driver package for the
+Vi8 Plus is distributed as `Hi8_Pro_drivers_C806_X64.zip`, so the vendor treats
+the two tablets as a single `C806` platform — the premise the kernel's existing
+Hi8 Pro entry rests on.
+
+**That support is weaker than it looks, now that the package has been opened.**
+Its Wi-Fi driver is `netrtwlans.inf` / `rtwlans.sys`, *"Realtek Wireless
+802.11b/g/n SDIO"* — not Broadcom at all. So a single `C806` driver bundle covers
+units with at least two different radios, and "same platform code" does not imply
+"same Wi-Fi module". The dual-boot BIOS says the same thing from the other side:
+its DSDT declares `OBDA8723`, a Realtek part, where the single-OS image does not.
+
+Which leaves the `ilife-S806` choice resting on the module identification alone —
+still reasonable, since `brcmfmac/dmi.c` states outright that *"The Chuwi Hi8 Pro
+uses the same Ampak AP6212 module as the Chuwi Vi8 Plus"*, but it is one source,
+not two. Prove it before sending:
 
 ```sh
 sudo cp /lib/firmware/brcm/brcmfmac43430a0-sdio.ilife-S806.txt \

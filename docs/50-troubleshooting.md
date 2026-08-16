@@ -569,12 +569,28 @@ kernels) and an EFI boot. If you somehow booted without EFI, the touchscreen
 cannot work — check `ls /sys/firmware/efi`.
 
 If `product_name` is not `D2D3_Vi8A1`, the kernel's DMI table does not match
-your unit and it will not enable the touchscreen. On the reference tablet it
+your unit and it will not extract the firmware. On the reference tablet it
 reads `To be filled by O.E.M.`, which is what the BIOS itself ships — this is
-the common case, not an exotic one, and it breaks three other things at the
-same time. The cause, the workaround and how to pull the firmware out of your
-own flash are in
+the common case, not an exotic one, and it breaks two other things at the same
+time. The cause is in
 [01-hardware.md](01-hardware.md#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-three-things-at-once).
+
+**You can fix this without a patched kernel.** The driver builds the firmware
+filename from the ACPI `_SUB` object, not from DMI, and it looks in
+`/lib/firmware` before it looks in UEFI. So all that is missing is the file, and
+Chuwi's own Windows driver contains it:
+
+```sh
+./scripts/extract-touchscreen-fw.sh --download        # ~217 MiB, once
+sudo ./scripts/extract-touchscreen-fw.sh --inf chpntsc.inf --install
+sudo modprobe -r chipone_icn8505 && sudo modprobe chipone_icn8505
+dmesg | grep -i icn8505
+```
+
+The script picks the right blob by reading the name your kernel asked for, and
+refuses to install anything whose SHA-256 it does not recognise. If you would
+rather use the copy from your own flash, `sudo ./scripts/dump-bios.sh` gets that
+one instead.
 There are prepared kernel patches for it in [`patches/`](../patches/).
 
 ## Wi-Fi does not see the network

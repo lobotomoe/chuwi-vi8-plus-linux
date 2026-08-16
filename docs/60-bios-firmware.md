@@ -72,11 +72,27 @@ archives described below.
 So `P03_C806.109`, 2016-02-25, remains the last BIOS Chuwi published for this
 tablet, and it is already in the material examined here.
 
-That driver filename is worth noticing on its own: Chuwi ships **Hi8 Pro**
-drivers for the Vi8 Plus, and `C806` is the same platform code as this tablet's
-`P03_C806` BIOS. The two models are one hardware platform as far as the vendor
-is concerned, which independently corroborates the kernel's note that they carry
-the same AmPak AP6212 Wi-Fi module.
+That driver package is worth having anyway, and not for the drivers. Chuwi ships
+**Hi8 Pro** drivers for the Vi8 Plus — `C806` is the same platform code as this
+tablet's `P03_C806` BIOS — and inside it, `TP_X64/chpntsc.inf` carries the
+**ICN8505 touchscreen firmware**, all seven `HAMP000x` blobs, as hex in an
+`AddReg` section. That is the vendor's own signed copy of the file the kernel's
+quirk cannot fetch on a unit with unfilled DMI. See
+[01-hardware.md](01-hardware.md#chuwi-ships-the-firmware-itself-in-its-own-driver)
+and [`scripts/extract-touchscreen-fw.sh`](../scripts/extract-touchscreen-fw.sh).
+
+Two other things in that package are worth recording, because both contradict
+assumptions that are easy to make:
+
+- Its **Wi-Fi driver is Realtek**, `netrtwlans.inf` / `rtwlans.sys`, *"Realtek
+  Wireless 802.11b/g/n SDIO"*. So one `C806` bundle serves units with different
+  radios, and shared platform code does **not** imply the same Wi-Fi module.
+- Its **`Bt_x64` folder contains no Bluetooth driver.** What is in there is
+  `prnms009.inf`, `Class=Printer`, `Provider="Microsoft"` — Microsoft's
+  Print-to-PDF driver, misfiled. Do not go looking there for the `.hcd`.
+
+— **verified** by extracting and reading the package (SHA-256
+`92a4163e…17561f`).
 
 ---
 

@@ -276,32 +276,74 @@ firmware and nothing else.
 That makes the touchscreen the one broken component you can fix today without
 building a kernel.
 
-Getting the file means pulling it out of your own firmware — it is not redistributed
-anywhere. The kernel records exactly what to look for: **35012 bytes**, starting with
-`b0 07 00 00 e4 07 00 00`, SHA-256
+There are two ways to get the file. `linux-firmware` does not carry it, but Chuwi's
+own Windows driver does — that is the easy route, below. The other is to pull the
+copy out of your own flash, which is the only way to get the exact blob the kernel
+pins: **35012 bytes**, starting with `b0 07 00 00 e4 07 00 00`, SHA-256
 `93e549e0b6a2b4b3889634975ea81378729b8b829eb5ca7f125134f4307cfc7c`.
 
-`sudo ./scripts/dump-bios.sh` does the whole job: it reads the flash twice, refuses a
+`sudo ./scripts/dump-bios.sh` does that job: it reads the flash twice, refuses a
 dump the two reads disagree on, searches it for that prefix and installs the result
 only if the hash matches.
 
-Second-hand copies exist, and they agree with each other. Two unrelated people
-publish an ICN8505 image for this controller:
+#### Chuwi ships the firmware itself, in its own driver
 
-| Source | File | Size | SHA-256 |
-|---|---|---|---|
-| [`sciboy12/vi8-plus-linux-fixes`](https://github.com/sciboy12/vi8-plus-linux-fixes) | `firmware/chipone/icn8505-HAMP0002.fw` | 34884 | `d9db81b9…c99327` |
-| [`Dax89/chuwi-dev`](https://github.com/Dax89/chuwi-dev) | `hi10/HAMP0002.bin` | 34884 | `d9db81b9…c99327` |
+You do not need to dump your flash and you do not need a stranger's copy. Chuwi's
+Windows touch driver carries the firmware inside its INF as hex, in a section keyed
+by the same `HAMP000x` names the ACPI `_SUB` reports:
 
-They are **byte-identical** — verified with `cmp` — and carry the correct
-`b0 07 00 00 e4 07 00 00` prefix, so this is a real ICN8505 image for `_SUB` =
-`HAMP0002`.
+```
+[Chpntsc_Device_Firmware.AddReg]
+HKR,,"HAMP0001",0x00000001,b0,07,00,00,e4,07,00,00,...
+HKR,,"HAMP0002",0x00000001,b0,07,00,00,e4,07,00,00,...
+...through HAMP0007
+```
 
-Resist the obvious reading: that is **one source, not two**. `Dax89/chuwi-dev`
-committed it in **2016**, `sciboy12` in **2025**, so the later copy is almost
-certainly downstream of the earlier one. What the 2016 date does buy is that the file
-is contemporaneous with the hardware and came from someone writing a driver for this
-controller — better standing than an undated blob, but not corroboration.
+That is the primary source: a signed vendor package (`Chpntsc.cat`, DriverVer
+04/21/2016), not a re-upload. [`scripts/extract-touchscreen-fw.sh`](../scripts/extract-touchscreen-fw.sh)
+reads it back out and checks the result against a known hash:
+
+```sh
+./scripts/extract-touchscreen-fw.sh --download            # ~217 MiB, once
+sudo ./scripts/extract-touchscreen-fw.sh --inf chpntsc.inf --install
+```
+
+Run without `--name` it reads the name your own kernel asked for out of `dmesg`,
+which is the only authoritative answer for your unit.
+
+| `_SUB` | Size | SHA-256 |
+|---|---|---|
+| `HAMP0001` | 34980 | `3e0f9cd2…ff7c58` |
+| `HAMP0002` | 34900 | `e895933d…ba092b` |
+| `HAMP0003` | 38580 | `5a08fb42…8f6c47` |
+| `HAMP0004` | 38580 | `25c059c4…2e124b` |
+| `HAMP0005` | 34884 | `4f1deaf3…c897ba` |
+| `HAMP0006` | 38580 | `921c04b4…9b88ff` |
+| `HAMP0007` | 38580 | `7cb400fe…2fffc5` |
+
+— **verified** by extracting all seven from the package.
+
+#### There is more than one build of this firmware
+
+Do not expect the hashes to line up across sources. For `HAMP0002` alone there are
+three different blobs in circulation:
+
+| Where | Size | SHA-256 |
+|---|---|---|
+| Kernel's pinned value, from **UEFI** | 35012 | `93e549e0…7cfc7c` |
+| Chuwi driver package, 2016-04-21 | 34900 | `e895933d…ba092b` |
+| [`Dax89/chuwi-dev`](https://github.com/Dax89/chuwi-dev) and [`sciboy12`](https://github.com/sciboy12/vi8-plus-linux-fixes), byte-identical to each other | 34884 | `d9db81b9…c99327` |
+
+The two GitHub copies are **one source, not two** — Dax89 committed in 2016,
+sciboy12 in 2025 — and both are almost certainly an older vendor INF, since
+`HAMP0004` from that repository is **byte-identical** to the one this script pulls
+out of the 2016-04-21 package. So the lineage is clear; only the version differs.
+
+None of this stops any of them working. The pinned length and hash are how the
+kernel finds the blob in EFI memory; a file in `/lib/firmware` is loaded as-is, and
+the driver's post-upload length and CRC32 checks compare against the file it just
+sent, so they verify the I2C transfer rather than the file's provenance. Start with
+the vendor package's copy — it is the one with a signature behind it.
 
 It is still **34884 bytes rather than the 35012 the kernel pins**, and the obvious
 explanation is wrong: appending or prepending 128 zero or `0xff` bytes does not produce
