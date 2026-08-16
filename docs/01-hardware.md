@@ -395,6 +395,19 @@ direction is the controller firmware's business. Untested hypothesis, and the
 experiment that would settle it is cheap: load the 34884-byte build and see
 whether the axes flip.
 
+Two things about that experiment are worth knowing before running it, both read
+out of `icn8505_try_fw_upload()`:
+
+- **The firmware goes to SRAM, not to any flash on the controller.** The driver's
+  own comments say *"Send the firmware to SRAM"* and *"Boot controller from
+  SRAM"*. Nothing is written persistently, so a wrong build cannot brick the
+  touchscreen — cutting power discards it.
+- **Swapping the file and reloading the module does nothing.** `icn8505_upload_fw()`
+  reads register `0x000a` first and skips the upload entirely if it returns
+  `0x85`, meaning the controller is already running. So a new blob needs the
+  controller to lose power: a full poweroff, not `modprobe -r` and not
+  necessarily a warm reboot.
+
 Fix it in userspace meanwhile. This is a calibration matrix, which is what it is
 for — it survives reboots and works under both X11 and Wayland:
 
