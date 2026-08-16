@@ -1,4 +1,4 @@
-platform/x86: touchscreen_dmi: Add info for the Chuwi Vi8 Plus with unfilled DMI
+platform/x86: touchscreen_dmi: Add second Chuwi Vi8 Plus entry
 
 Some Chuwi Vi8 Plus (CWI519) units leave the SMBIOS system fields at the
 placeholder string, reporting "To be filled by O.E.M." for both sys_vendor

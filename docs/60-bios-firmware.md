@@ -466,13 +466,23 @@ Stated plainly, because guessing here is how tablets get bricked:
   string search reaches. `sudo ./scripts/dump-bios.sh` on the tablet settles it.
 - **What `.109` actually changed.** Only that it is distributed as a microSD
   ("TF card") reading fix. Whether that affects the SD slot's inability to appear
-  as a boot device ([13-split-media.md](13-split-media.md)) is untested. The
-  `.108` image is needed to diff against; a copy is linked from a 2017 write-up
-  and has not been downloaded or checked here —
+  as a boot device ([13-split-media.md](13-split-media.md)) is untested, because
+  the `.108` image needed to diff against could not be obtained.
+
+  **The `.108` download that circulates is not `.108`.** A 2017 write-up titled
+  *"How to upgrade the Chuwi Vi8 Plus BIOS?"* says *"Current version:
+  P03_C806.108"* and links a MEGA file. That file was downloaded and is
+  `Vi8 Plus BIOS.rar`, SHA-256 `b03b953c…c2482` — **byte-identical to the archive
+  already examined here**, which contains `.109` and the dual-boot image and no
+  `.108` at all. — **verified**
+
   <https://mega.nz/#!ZhZEGbAR!nU3qqsNt175V7xtCeiNDugItaZvzuRQ4eXNNTtMoKG8>
-  (via <http://billyfung2010.blogspot.com/2017/04/how-to-upgrade-chuwi-vi8-plus-bios.html>).
-  Note it ships under the **same** `P03_C806.rom.exe` filename as `.109`, so the
-  executable's name tells you nothing about which version is inside.
+  (via <http://billyfung2010.blogspot.com/2017/04/how-to-upgrade-chuwi-vi8-plus-bios.html>)
+
+  The confusion is easy to make, because both releases ship under the **same**
+  `P03_C806.rom.exe` filename — the executable's name tells you nothing about
+  which version is inside. As far as this repository can establish, `.108` is
+  available only inside the full stock Windows ROM on needrom, never separately.
 - **Whether AMIDEEFI runs on this firmware**, and its exact switch names.
 
 Sources for this page are in [90-references.md](90-references.md#bios--uefi-firmware).

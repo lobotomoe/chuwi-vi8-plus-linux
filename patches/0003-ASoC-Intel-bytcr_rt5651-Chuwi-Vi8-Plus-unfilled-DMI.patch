@@ -1,12 +1,12 @@
-ASoC: Intel: bytcr_rt5651: Add quirk for Chuwi Vi8 Plus with unfilled DMI
+ASoC: Intel: bytcr_rt5651: Add quirk for Chuwi Vi8 Plus
 
-Some Chuwi Vi8 Plus (CWI519) units report "To be filled by O.E.M." for both
-sys_vendor and product_name, so the existing Vi8 Plus quirk cannot match and
-the mono-speaker, swapped-headphone and IN2 microphone corrections are not
-applied.
+Some Chuwi Vi8 Plus (CWI519) units report "To be filled by O.E.M." for
+both sys_vendor and product_name, so the existing Vi8 Plus quirk cannot
+match and the mono-speaker, swapped-headphone and IN2 microphone
+corrections are not applied.
 
-Add a second entry keyed on the board fields plus the BIOS date, carrying the
-same quirk flags as the existing entry.
+Add a second entry keyed on the board fields plus the BIOS date,
+carrying the same quirk flags as the existing entry.
 
 Signed-off-by: Your Name <your.email@example.com>
 ---

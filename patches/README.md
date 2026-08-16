@@ -53,11 +53,25 @@ from the same AmPak AP6212 module — precisely what the existing Chuwi Hi8 Pro
 entry does. The `chiprev` field in `brcmf_dmi_data` means a1 units never hit this
 entry and keep their current behaviour.
 
-**This is the one place where the patch loads data nobody has tested on this
-tablet.** What was verified here is that the tablet's *own* nvram works on an a0
-radio, by copying it to `brcmfmac43430a0-sdio.txt` by hand. `ilife-S806` is a
-different file, chosen because it is the only a0-named candidate from the same
-module.
+This used to be the one place where the patch loaded data nobody had tested on
+this tablet. It is not any more: the two files carry **identical parameters**.
+Strip the comments and both are the same 35 lines, same SHA-256:
+
+```sh
+strip() { grep -v '^#' "$1" | grep -v '^[[:space:]]*$' | sort; }
+diff <(strip brcmfmac43430-sdio.Hampoo-D2D3_Vi8A1.txt) \
+     <(strip brcmfmac43430a0-sdio.ilife-S806.txt)      # no output
+strip brcmfmac43430-sdio.Hampoo-D2D3_Vi8A1.txt | sha256sum
+# b852086122b09010b6c5c9c7bbdfda87365a089e7f7f3985aed306a1525a3f9e
+```
+
+— **verified** against both files as `linux-firmware` ships them. The only
+difference between them is one comment line naming the tablet.
+
+Since the tablet's own nvram is confirmed working on an a0 radio — copied to
+`brcmfmac43430a0-sdio.txt` by hand — pointing the quirk at `ilife-S806` loads
+byte-for-byte the same calibration. The remaining risk is not the data but
+whether the *filename* resolves as expected on a real boot.
 
 The choice had one piece of outside support: Chuwi's own driver package for the
 Vi8 Plus is distributed as `Hi8_Pro_drivers_C806_X64.zip`, so the vendor treats
@@ -160,10 +174,24 @@ dmesg | grep -iA6 'quirk'
 ```
 
 `0xC23412` is `BYT_RT5651_DEFAULT_QUIRKS | IN2_MAP | HP_LR_SWAPPED |
-MONO_SPEAKER`. Two of its components (`JD1_1`, `OVCD_SF_0P75`) were derived from
-the enum ordering rather than read from a header, so treat the number as a
-starting point — the driver decodes and logs whatever it applied, which tells
-you immediately whether it is right.
+MONO_SPEAKER`, and every term is read from a header rather than inferred:
+
+| Term | Value | Source |
+|---|---|---|
+| `IN2_MAP` | `0x000002` | third member of the map enum, bits 3:0 |
+| `JD1_1` | `0x000010` | `RT5651_JD1_1` = 1, shifted into bits 7:4 |
+| `OVCD_TH_2000UA` | `0x001400` | `20 << 8` |
+| `OVCD_SF_0P75` | `0x002000` | `RT5651_OVCD_SF_0P75` = 1, shifted into bits 14:13 |
+| `MCLK_EN` | `0x020000` | `BIT(17)` |
+| `HP_LR_SWAPPED` | `0x400000` | `BIT(22)` |
+| `MONO_SPEAKER` | `0x800000` | `BIT(23)` |
+
+The four codec-side constants come from `include/dt-bindings/sound/rt5651.h`,
+the rest from `bytcr_rt5651.c` itself. `DEFAULT_QUIRKS` is `0x23410`; OR the
+other three in and the total is `0xC23412`. — **verified**
+
+The driver still decodes and logs whatever it applied, which is the real
+confirmation.
 
 The flags themselves are on firmer ground than the encoding. The patch copies the
 existing upstream `Chuwi Vi8 Plus (CWI519)` entry verbatim and changes only the
@@ -226,8 +254,23 @@ Replace it with your own name and address. That line is the Developer
 Certificate of Origin — a real legal statement that you wrote the patch and may
 submit it — so it is deliberately not pre-filled.
 
-Read `Documentation/process/submitting-patches.rst` before the first send, and
-run `scripts/checkpatch.pl` on each file from inside a kernel tree.
+Read `Documentation/process/submitting-patches.rst` before the first send.
+
+`scripts/checkpatch.pl --strict` has been run on all three:
+
+```
+total: 1 errors, 0 warnings, 0 checks
+```
+
+The one error in each is `Missing Signed-off-by: line by nominal patch author ''`,
+which is the placeholder above doing its job — checkpatch compares the sign-off
+against the `From:` author, and these files have neither filled in. Replace the
+sign-off with your own name and that error goes away.
+
+It found real problems the first time round: over-long commit-description lines
+in 0002 and 0003, and an 80-character subject on 0001. Those are fixed. Re-run it
+after any edit — the limit is 75 columns for both subject and body, and a wrapped
+line is one of the more common reasons a first patch gets bounced.
 
 You do not need a company behind you. Roughly half the commits to
 `touchscreen_dmi.c` come from personal addresses — gmail, yandex, protonmail,

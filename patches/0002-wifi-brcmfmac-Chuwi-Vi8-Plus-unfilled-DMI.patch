@@ -1,20 +1,24 @@
-wifi: brcmfmac: Add DMI nvram filename quirk for Chuwi Vi8 Plus with unfilled DMI
+wifi: brcmfmac: Add nvram filename quirk for Chuwi Vi8 Plus
 
-Some Chuwi Vi8 Plus (CWI519) units report "To be filled by O.E.M." for both
-sys_vendor and product_name, so the fallback board_type built from those two
-fields becomes a name no nvram file will ever have, and the radio never
-initialises.
+Some Chuwi Vi8 Plus (CWI519) units report "To be filled by O.E.M." for
+both sys_vendor and product_name, so the fallback board_type built from
+those two fields becomes a name no nvram file will ever have, and the
+radio never initialises.
 
 The nvram which linux-firmware carries for this tablet,
-brcmfmac43430-sdio.Hampoo-D2D3_Vi8A1.txt, only exists under the revision-less
-name and so is unreachable on a chip-revision 0 (a0) unit, which looks for
-brcmfmac43430a0-sdio.*. Both revisions shipped in this model. Point the quirk
-at ilife-S806 instead, which is present as an a0 build and is the same AP6212
-module; the chiprev check keeps a1 units on their existing path.
+brcmfmac43430-sdio.Hampoo-D2D3_Vi8A1.txt, only exists under the
+revision-less name and so is unreachable on a chip-revision 0 (a0) unit,
+which looks for brcmfmac43430a0-sdio.*. Both revisions shipped in this
+model. Point the quirk at ilife-S806 instead, which is present as an a0
+build and is the same AP6212 module; the chiprev check keeps a1 units on
+their existing path.
 
-The board's own nvram data is confirmed to work on an a0 unit, by copying it
-to brcmfmac43430a0-sdio.txt by hand: the a0/a1 split is in the file name, not
-in the calibration data.
+Its contents are identical to this tablet's own nvram: stripped of
+comments both files are the same 35 parameters, sha256
+b852086122b09010b6c5c9c7bbdfda87365a089e7f7f3985aed306a1525a3f9e. That
+data is confirmed to work on an a0 unit, by copying the tablet's file to
+brcmfmac43430a0-sdio.txt by hand. The a0/a1 split is in the file name,
+not in the calibration data.
 
 Signed-off-by: Your Name <your.email@example.com>
 ---
