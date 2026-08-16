@@ -11,6 +11,20 @@ one. The rest of this page is the evidence for that, and what does help instead.
 Everything below marked **verified** was established by parsing the actual
 firmware images — SHA-256 in the table further down — not from forum claims.
 
+You do not have to take any of it on trust.
+[`scripts/inspect-bios-image.py`](../scripts/inspect-bios-image.py) re-derives
+the identity, region map, SMBIOS placeholder, touchscreen-firmware and ACPI
+findings from an image in one run:
+
+```sh
+python3 -m venv venv && venv/bin/pip install uefi-firmware
+venv/bin/python scripts/inspect-bios-image.py P03_C806.109
+```
+
+It is read-only and never touches a device. Where it cannot reach a conclusion —
+an Insyde image its unpacker does not handle, say — it says so rather than
+reporting an absence.
+
 ---
 
 ## Which BIOS am I running

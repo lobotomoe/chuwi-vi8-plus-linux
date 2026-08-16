@@ -71,17 +71,33 @@ DSDT has one. Extracted from `P03_C806.109` and read directly:
 
 ```
 Device ACC2:
-  _HID  BOSC0200        (offset 50051)
+  _HID  BOSC0200
   _CID  BOSC0200
   _DDN  "Accelerometer"
   _UID  7
   _CRS  ... \_SB.PCI0.I2C3
-  ROTM  "0 -1 0"  "-1 0 0"  "0 0 1"     (offset 50159)
+  ROTM  "0 -1 0"  "-1 0 0"  "0 0 1"
 ```
 
 — **verified by extracting the DSDT from the published BIOS image.** `ROTM` sits
-inside the `ACC2` device scope, 108 bytes after its `_HID`, and carries the matrix
-literally. The same object with the same values is in the dual-boot image.
+inside the `ACC2` device scope, about 100 bytes after its `_HID`, and carries the
+matrix literally. The same object with the same values is in the dual-boot image.
+
+Re-derive it yourself rather than taking this on trust:
+
+```sh
+python3 -m venv venv && venv/bin/pip install uefi-firmware
+venv/bin/python scripts/inspect-bios-image.py P03_C806.109
+```
+
+```
+    BOSC0200   x2   at 50055, 50070
+    ROTM       x1   at 50163
+    mount matrix: 0 -1 0 / -1 0 0 / 0 0 1
+```
+
+The offsets are positions inside the extracted DSDT, so they shift with the
+extraction method; the structure is what matters.
 
 So the orientation reference survives unfilled DMI, and you know in advance what it
 should say. Confirm on your unit:
@@ -258,12 +274,18 @@ declares. From the DSDT extracted out of `P03_C806.109`:
 
 ```
 Device TCS1:
-  _HID  CHPN0001        (offset 50769)
+  _HID  CHPN0001
   _CID  PNP0C50
-  _SUB  HAMP0002        (offset 50798)
+  _SUB  HAMP0002
 ```
 
-— **verified by extracting the DSDT from the published BIOS image.**
+— **verified by extracting the DSDT from the published BIOS image**, which
+`scripts/inspect-bios-image.py` reports as:
+
+```
+    CHPN0001 _SUB -> HAMP0002
+    kernel will request chipone/icn8505-HAMP0002.fw
+```
 
 The lookup order settles the rest. `firmware_request_platform()` is documented in the
 kernel as trying the filesystem first and falling back to the UEFI copy only *"if

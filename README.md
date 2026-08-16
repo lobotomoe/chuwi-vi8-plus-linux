@@ -189,6 +189,7 @@ and stays under the GPL v3+ — [`LICENSE`](LICENSE),
 | `collect-hw-report.sh` | tablet | One file with DMI, firmware bitness, drivers, audio, power |
 | `dump-bios.sh` | tablet | Reads the SPI flash twice, verifies, extracts the touchscreen firmware. Never writes |
 | `extract-touchscreen-fw.sh` | macOS, Linux | Pulls the ICN8505 firmware out of Chuwi's own driver INF, hash-checked |
+| `inspect-bios-image.py` | macOS, Linux | Re-derives every firmware claim in [60-bios-firmware.md](docs/60-bios-firmware.md) from a BIOS image. Read-only |
 | `backup-emmc.sh` | tablet | Compressed image of the eMMC to an external disk, before wiping |
 | `restore-emmc.sh` | tablet | Writes that image back, checksum-verified, to get Windows back |
 | `postinstall-grub-ia32.sh` | tablet | Installs a 32-bit GRUB into the installed system's ESP |
