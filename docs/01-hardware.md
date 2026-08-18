@@ -804,9 +804,20 @@ less than the tablet draws with a hub attached — it discharges while plugged i
 plain **USB-A charger with a USB-A-to-C cable**.
 
 **A charger that is detected is not a charger that is feeding you.** On the
-reference unit `upower` reported the line supply `online: yes` while the battery
-sat at `state: discharging`, draining 2.3 W — the whole idle consumption. The
-tablet was running off the battery with the cable in.
+reference unit the input was capped at **500 mA** while the battery supplied the
+rest:
+
+```
+axp288_charger/input_current_limit:  500000
+axp288_charger/online:               1
+axp288_fuel_gauge/status:            Discharging
+axp288_fuel_gauge/current_now:      -496000
+```
+
+The 496 mA leaving the battery against a 500 mA cap is the arithmetic of a
+machine drawing roughly an ampere and being allowed half of it. Capacity fell
+from 95 % to 86 % over an idle session with the cable in. — **verified on the
+unit**
 
 Two things in `axp288_charger` cause that, and one is fixable from userspace:
 

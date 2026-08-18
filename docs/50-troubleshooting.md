@@ -559,12 +559,35 @@ outside and neither left a trace.
 
 Things to try, in order:
 
-1. **Raise the charger's input current limit.** What was measured here: the line
-   supply reads `online` while the battery discharges at 2.3 W, so the tablet is
-   running off the battery with the cable in — and the battery is what browns out
-   on peaks. What is *inferred*: that a too-low input current limit is why. The
-   limit itself has not been read on this unit yet, and this fix is untested.
-   Check `status` on the fuel gauge while plugged in; `Discharging` is the tell.
+1. **Raise the charger's input current limit.** On the reference unit the numbers
+   leave no room for interpretation:
+
+   ```
+   axp288_charger/input_current_limit:  500000   (500 mA)
+   axp288_charger/online:               1
+   axp288_fuel_gauge/status:            Discharging
+   axp288_fuel_gauge/current_now:      -496000   (496 mA out of the battery)
+   ```
+
+   The deficit equals the cap. The tablet draws about an ampere, is permitted
+   half of it from the wall, and takes the rest out of a ten-year-old battery —
+   while plugged in and reporting `online`. Capacity fell from 95 % to 86 %
+   across an idle session on the charger. — **verified on the unit**
+
+   That is the whole freeze story: at a consumption peak — a radio coming up, the
+   CPU stepping — the machine needs one and a half to two amps, may take 0.5 A,
+   and the battery has to cover the difference. Which is exactly what its own
+   maintainer describes it failing to do.
+
+   ```sh
+   echo 2000000 | sudo tee /sys/class/power_supply/axp288_charger/input_current_limit
+   ```
+
+   Then re-read `status`. **The limit is permission, not delivery**: if the supply
+   cannot actually source 2 A, VBUS sags, and since the driver pins `Vhold` at
+   4.4 V the charger throttles straight back. Still `Discharging` after raising it
+   means the problem is the supply — use a plain USB-A 2 A charger on an A-to-C
+   cable, direct, no hub.
 
    ```sh
    cat /sys/class/power_supply/axp288_charger/input_current_limit
