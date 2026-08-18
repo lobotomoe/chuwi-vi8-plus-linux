@@ -525,7 +525,30 @@ use degrades 2.4 GHz Wi-Fi throughput. That is the hardware.
 
 ## Random freezes
 
-A long-standing complaint on Chuwi's Atom tablets. Two things to try, in order:
+A long-standing complaint on Chuwi's Atom tablets. It happens on the reference
+unit too, and what the journal says about it points at one cause.
+
+**They correlate with idle, not with load.** Three boots on that tablet ended
+without a shutdown sequence after **21, 22 and 23 seconds**, against a normal
+17-second boot. Reading the tail of each shows a different last service every
+time — `gpu-manager` and `logind` in one, `bluetoothd` starting its SDP server
+in the next, `iio-sensor-proxy` in the third. No service is common to them. What
+is common is the moment: a few seconds after boot finishes and the machine first
+has nothing to do. A fourth boot died 19 minutes in, while idle, and the owner
+independently reports it freezing while sitting on the screensaver. — **observed
+on the unit**
+
+That is the signature of the SoC entering a deep C-state and not coming back,
+which is why item 1 below is item 1. It also rules out the other obvious reading:
+screen blanking cannot explain a freeze 22 seconds into boot, with the boot log
+still lit on the panel.
+
+Worth knowing what it is *not*, since all three were checked here: no OOM, swap
+untouched with 1.1 GiB still available, and no I/O or eMMC error anywhere in the
+journal. Memory pressure and failing storage both look plausible from the outside
+and neither left a trace.
+
+Two things to try, in order:
 
 1. In the firmware setup, set C-States to `C1`. Costs battery life. This is the
    fix people report most often, though it was established on the Bay Trail
