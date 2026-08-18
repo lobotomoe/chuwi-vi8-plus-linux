@@ -68,6 +68,34 @@ thermal_temps_c() {
   printf '%s' "${out:-?}"
 }
 
+# The hottest zone and which one it is, as "<name> <celsius>".
+#
+# As a *temperature* the maximum lies, which is why the recorder above does not
+# use it. As a safety ceiling for a load test it is the right question -- "is
+# anything too hot" rather than "how hot is the die" -- and the constant-20 C
+# policy device can never be the answer to it.
+#
+# The name is not decoration. The first abort in the field read 100 C during a
+# Wi-Fi scan, on a tablet that had just held 67 C through ten minutes of every
+# core at full load. A number that implausible is a question about the sensor,
+# and it cannot be asked without knowing which sensor said it.
+hottest_zone() {
+  local zone raw max=0 max_name=none
+  for zone in "$THERMAL"/thermal_zone*; do
+    [ -d "$zone" ] || continue
+    raw=$(read_or_empty "$zone/temp")
+    case $raw in
+    '' | *[!0-9-]*) continue ;;
+    esac
+    raw=$((raw / 1000))
+    [ "$raw" -gt "$max" ] || continue
+    max=$raw
+    max_name=$(read_or_empty "$zone/type")
+    max_name=${max_name:-?}
+  done
+  printf '%s %s' "$max_name" "$max"
+}
+
 # The GT frequency file has moved around and the card number is not fixed -- it
 # is card1 on the reference unit, because card0 is taken. Resolve it once rather
 # than hard-coding a path that silently reports "?" forever.

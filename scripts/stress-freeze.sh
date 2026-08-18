@@ -153,24 +153,6 @@ esac
 # shellcheck source-path=SCRIPTDIR source=lib-freeze-sample.sh
 source "$(dirname -- "${BASH_SOURCE[0]}")/lib-freeze-sample.sh"
 
-# The sampler deliberately does not reduce the zones to one number, because as a
-# temperature reading the maximum lies -- see the comment there. As a safety
-# ceiling it is exactly right: the question is not "how hot is the die" but "is
-# anything too hot", and the constant-20 C policy device can never be the answer.
-thermal_max_c() {
-  local zone raw max=0
-  for zone in "$THERMAL"/thermal_zone*; do
-    [ -d "$zone" ] || continue
-    raw=$(read_or_empty "$zone/temp")
-    case $raw in
-    '' | *[!0-9-]*) continue ;;
-    esac
-    raw=$((raw / 1000))
-    [ "$raw" -le "$max" ] || max=$raw
-  done
-  printf '%s' "$max"
-}
-
 sync_cmd() {
   if sync --data "$log_path" 2>/dev/null; then return 0; fi
   sync
@@ -271,18 +253,38 @@ sync_cmd
 trap 'finish INTERRUPTED "$elapsed" 130' INT TERM HUP
 
 elapsed=0
+peak=0
+peak_name=none
+zones_seen=$(thermal_zone_names)
 start_load
 log "phase $phase for ${duration}s, aborting above ${max_temp}C; Ctrl-C to stop"
 
 while [ "$elapsed" -lt "$duration" ]; do
-  hot=$(thermal_max_c)
-  printf 't=%s elapsed=%ss phase=%s temp=%sC\n' \
-    "$(date +%H:%M:%S)" "$elapsed" "$phase" "$(thermal_temps_c)" >>"$log_path"
+  read -r hot_name hot <<<"$(hottest_zone)"
+
+  # Zones register as their drivers probe, so the set is not fixed for the run.
+  # Without this the temp= columns would silently shift under a reader who had
+  # only the header to go by -- and a zone appearing mid-run is itself a lead,
+  # since the first implausible reading here showed up during the radio phase.
+  zones_now=$(thermal_zone_names)
+  if [ "$zones_now" != "$zones_seen" ]; then
+    mark "thermal zones $zones_now"
+    zones_seen=$zones_now
+  fi
+
+  printf 't=%s elapsed=%ss phase=%s temp=%sC hottest=%s@%sC\n' \
+    "$(date +%H:%M:%S)" "$elapsed" "$phase" "$(thermal_temps_c)" \
+    "$hot_name" "$hot" >>"$log_path"
   sync_cmd
 
+  if [ "$hot" -gt "$peak" ]; then
+    peak=$hot
+    peak_name=$hot_name
+  fi
+
   if [ "$hot" -gt "$max_temp" ]; then
-    log "aborting: ${hot}C is above the ${max_temp}C ceiling"
-    finish "ABORTED-HOT-${hot}C" "$elapsed" 0
+    log "aborting: $hot_name reads ${hot}C, above the ${max_temp}C ceiling"
+    finish "ABORTED-HOT-$hot_name-${hot}C" "$elapsed" 0
   fi
 
   # Backgrounded and waited on for the same reason as the recorder: bash defers
@@ -294,5 +296,5 @@ while [ "$elapsed" -lt "$duration" ]; do
 done
 
 stop_load
-mark "stress end $phase SURVIVED after ${elapsed}s $(date '+%Y-%m-%d %H:%M:%S %z')"
-log "survived ${elapsed}s of $phase, peak $(thermal_max_c)C"
+mark "stress end $phase SURVIVED after ${elapsed}s peak $peak_name ${peak}C $(date '+%Y-%m-%d %H:%M:%S %z')"
+log "survived ${elapsed}s of $phase, peak ${peak}C on $peak_name"

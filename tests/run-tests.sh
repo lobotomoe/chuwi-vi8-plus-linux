@@ -261,6 +261,28 @@ expect_contains "the charger and gauge are read straight through" \
 expect_contains "a GPU with no frequency file reports unknown, not zero" \
   "gpu=?MHz" "$sample_out"
 
+# The load test's ceiling names the zone it tripped on, because the first abort
+# in the field read an implausible 100 C and the message did not say from where.
+hot_out=$(
+  THERMAL="$fake/thermal" bash -c 'source "$1"; hottest_zone' _ \
+    "$SCRIPTS/lib-freeze-sample.sh"
+)
+expect_contains "the ceiling names the hottest zone, not just its reading" \
+  "PNIT 59" "$hot_out"
+
+# A zone reporting garbage must be attributable, which is the whole point of
+# carrying the name: 100 C on acpitz and 100 C on the die mean different things.
+mkdir -p "$fake/thermal/thermal_zone9"
+printf 'bogus_zone' >"$fake/thermal/thermal_zone9/type"
+printf '100000' >"$fake/thermal/thermal_zone9/temp"
+hot_out=$(
+  THERMAL="$fake/thermal" bash -c 'source "$1"; hottest_zone' _ \
+    "$SCRIPTS/lib-freeze-sample.sh"
+)
+expect_contains "a zone appearing later can be named as the one that tripped" \
+  "bogus_zone 100" "$hot_out"
+rm -rf "$fake/thermal/thermal_zone9"
+
 # The names line must not be repeated while the set of zones is unchanged --
 # it is a marker for a set that grew, not decoration on every sample.
 zone_lines=$(printf '%s\n' "$sample_out" | grep -c -- '--- thermal zones')
