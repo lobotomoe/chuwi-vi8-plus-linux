@@ -838,10 +838,31 @@ accepted, the value read back as `2000000`, and the battery then drained *faster
 source it, VBUS sags into the 4.4 V `Vhold` floor and the charger throttles
 straight back.
 
+The 500 mA is not a fault or a worn part. It is the driver following the USB
+spec, and the branch is right there in `axp288_charger`:
+
+```c
+} else if (extcon_get_state(edev, EXTCON_CHG_USB_SDP) > 0) {
+        current_limit = 500000;      /* SDP  -> 500 mA */
+} else if (extcon_get_state(edev, EXTCON_CHG_USB_CDP) > 0) {
+        current_limit = 1500000;     /* CDP  -> 1.5 A  */
+} else if (extcon_get_state(edev, EXTCON_CHG_USB_DCP) > 0) {
+        current_limit = 2000000;     /* DCP  -> 2 A    */
+}
+```
+
+A hub looks like a Standard Downstream Port, so it gets the 500 mA a downstream
+port is entitled to. A dumb wall charger enumerates as a Dedicated Charging Port
+and gets 2 A. **So the rule is not "avoid this hub" but "do not power this tablet
+through a hub at all"** — the tablet needs more than 500 mA to run, so any SDP
+source leaves it eating the battery. Charger direct, or an OTG charging hub with
+a supply behind it.
+
 One practical trap: `axp288_charger` was **absent from sysfs entirely** on one
 boot, leaving only `axp288_fuel_gauge`, so the write failed with `No such file or
-directory` while charging carried on regardless. Check with
-`ls /sys/class/power_supply/` before concluding anything from a failed write.
+directory` while charging carried on regardless — nothing had set a limit, and
+the hardware default was more generous than the driver's SDP verdict. Check
+`ls /sys/class/power_supply/` before reading anything into a failed write.
 
 Two things in `axp288_charger` cause that, and one is fixable from userspace:
 
