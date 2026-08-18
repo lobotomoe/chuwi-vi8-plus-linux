@@ -582,6 +582,35 @@ the final line is the state the machine was in when it died. That single line
 distinguishes most of what follows: a current spike, a thermal climb, and a jump
 into a deep idle state look nothing alike.
 
+**Then try to provoke one, rather than waiting.** Every freeze so far has cost a
+couple of hours of idling, which is why several theories have been argued and none
+settled. `stress-freeze.sh` loads one subsystem at a time while the recorder
+watches:
+
+```sh
+sudo ./scripts/stress-freeze.sh --list
+sudo ./scripts/stress-freeze.sh --phase idle     # the control, first
+sudo ./scripts/stress-freeze.sh --phase cpu
+sudo ./scripts/stress-freeze.sh --phase wifi
+```
+
+**One phase at a time is the whole design, not a limitation.** A combined run that
+ends in a freeze is consistent with every hypothesis on this page and separates
+none of them, so there is no `--phase all` and asking for one is an error. Two
+other things are built in for the same reason: the run aborts above 80 °C, so a
+thermal shutdown can never be written up afterwards as a freeze, and `--phase idle`
+loads nothing at all — if the tablet dies during *that*, none of the other phases
+prove anything.
+
+Start with `wifi` if you only run one. The boot freezes land on `wpa_supplicant`
+and `brcmfmac` coming up, and between freezes NetworkManager scans in the
+background every couple of minutes, so it is the only phase aimed at the current
+lead. `cpu` and `gpu` are worth running mostly for the negative result: a tablet
+that survives half an hour of either is not simply too weak or too hot.
+
+It refuses to run unless the recorder service is active, because a freeze caught
+without a record is a wasted freeze and a wasted power cycle.
+
 `--report` marks only the genuine freezes `DIED HERE`. It knows the difference
 because each session records the boot id and writes an end marker when it is
 asked to stop, so restarting the recorder, shutting the machine down and the

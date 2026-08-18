@@ -160,6 +160,24 @@ expect_fail "watch-freeze.sh reports a missing log rather than an empty one" 1 "
 expect_fail "make-media.sh rejects a missing ISO" 1 "no such ISO" -- \
   "$SCRIPTS/make-media.sh" --iso /nonexistent.iso --device /dev/null
 
+# The point of the load test is that one phase runs at a time; a combined run
+# would end in a freeze consistent with every hypothesis and decide none. That
+# is a design decision, so it gets a test rather than a comment alone.
+expect_fail "stress-freeze.sh refuses a combined run" 1 "separates nothing" -- \
+  "$SCRIPTS/stress-freeze.sh" --phase all
+expect_fail "stress-freeze.sh rejects an unknown phase" 1 "unknown phase: disk" -- \
+  "$SCRIPTS/stress-freeze.sh" --phase disk
+expect_fail "stress-freeze.sh requires a phase" 1 "--phase is required" -- \
+  "$SCRIPTS/stress-freeze.sh"
+expect_fail "stress-freeze.sh rejects a non-numeric duration" 1 "whole number of seconds" -- \
+  "$SCRIPTS/stress-freeze.sh" --phase cpu --duration abc
+expect_fail "stress-freeze.sh rejects a run too short to mean anything" 1 "proves nothing when it passes" -- \
+  "$SCRIPTS/stress-freeze.sh" --phase cpu --duration 30
+expect_fail "stress-freeze.sh rejects a non-numeric ceiling" 1 "whole number of degrees" -- \
+  "$SCRIPTS/stress-freeze.sh" --phase cpu --max-temp hot
+expect_ok "stress-freeze.sh --list names the control phase" "idle   nothing. The control." -- \
+  "$SCRIPTS/stress-freeze.sh" --list
+
 # A whole SHA256SUMS line pasted into --sha256 must be named as such, not
 # reported as a checksum mismatch.
 expect_fail "make-media.sh rejects a pasted SHA256SUMS line" 1 "only the 64-character digest" -- \

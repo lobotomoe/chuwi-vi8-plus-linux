@@ -188,6 +188,7 @@ and stays under the GPL v3+ — [`LICENSE`](LICENSE),
 | `fetch-offline-payload.sh` | macOS, Linux | Downloads `grub-efi-ia32-bin` to carry on the stick |
 | `collect-hw-report.sh` | tablet | One file with DMI, firmware bitness, drivers, audio, power |
 | `watch-freeze.sh` | tablet | Records power, thermals, load and CPU idle states to disk, flushed every sample, so a hard freeze leaves evidence |
+| `stress-freeze.sh` | tablet | Loads one subsystem at a time — CPU, GPU, RAM, Wi-Fi, or nothing as a control — to provoke the freeze instead of waiting hours for one |
 | `dump-bios.sh` | tablet | Reads the SPI flash twice, verifies, extracts the touchscreen firmware. Never writes |
 | `extract-touchscreen-fw.sh` | macOS, Linux | Pulls the ICN8505 firmware out of Chuwi's own driver INF, hash-checked |
 | `inspect-bios-image.py` | macOS, Linux | Re-derives every firmware claim in [60-bios-firmware.md](docs/60-bios-firmware.md) from a BIOS image. Read-only |
