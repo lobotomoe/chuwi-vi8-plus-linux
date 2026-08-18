@@ -559,10 +559,12 @@ outside and neither left a trace.
 
 Things to try, in order:
 
-1. **Raise the charger's input current limit.** The driver's default leaves this
-   tablet drawing less than it consumes, so it runs off the battery with the
-   charger plugged in — and the battery is what browns out on peaks. Check
-   `status` on the fuel gauge while plugged in; `Discharging` is the tell.
+1. **Raise the charger's input current limit.** What was measured here: the line
+   supply reads `online` while the battery discharges at 2.3 W, so the tablet is
+   running off the battery with the cable in — and the battery is what browns out
+   on peaks. What is *inferred*: that a too-low input current limit is why. The
+   limit itself has not been read on this unit yet, and this fix is untested.
+   Check `status` on the fuel gauge while plugged in; `Discharging` is the tell.
 
    ```sh
    cat /sys/class/power_supply/axp288_charger/input_current_limit
