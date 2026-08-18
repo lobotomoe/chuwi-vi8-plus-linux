@@ -661,13 +661,27 @@ On a unit with [unfilled DMI](#some-units-ship-with-the-dmi-fields-unfilled-and-
 this quirk does not fire, and unlike Wi-Fi and the touchscreen there is no
 DMI-independent fallback.
 
-**In practice the speaker is fine anyway.** On the reference tablet — DMI unfilled,
-so the quirk cannot have matched — `speaker-test -c 2 -t wav -l 1` announces both
-"Front Left" and "Front Right" audibly through the single physical speaker, with
-nothing lost. **Verified on the unit.** Something below the machine driver already
-mixes the two channels down; the quirk was never the thing making that work. An
-earlier revision of this file predicted half the audio would disappear, which was
-wrong.
+**In practice the speaker is fine anyway.** The driver says outright which bits it
+ended up with:
+
+```
+bytcr_rt5651 bytcr_rt5651: quirk IN2_MAP enabled
+bytcr_rt5651 bytcr_rt5651: quirk MCLK_EN enabled
+```
+
+— **read off the unit**. No `MONO_SPEAKER`, so the DMI entry did not match and the
+driver is running on its built-in default. And yet `speaker-test -c 2 -t wav -l 1`
+announces both "Front Left" and "Front Right" audibly through the single physical
+speaker, with nothing lost — **verified on the unit**. Something below the machine
+driver already combines the two channels; the quirk was never what made that work.
+An earlier revision of this file predicted half the audio would disappear, which
+was wrong.
+
+The components string does reach userspace, though, and there is direct evidence of
+it: `wpctl status` names the capture device **"Built-in Audio Internal Microphone on
+IN2"** — **verified on the unit**. That "on IN2" is UCM reading `cfg-mic:in2` out of
+the string the machine driver built. So the mechanism works; it is only the two
+missing bits that never got into it.
 
 So `MONO_SPEAKER` is worth setting for correctness, not for rescue. The half of the
 quirk still unverified here is `HP_LR_SWAPPED` — that needs headphones and an ear.
