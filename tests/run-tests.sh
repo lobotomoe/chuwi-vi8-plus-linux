@@ -74,6 +74,16 @@ expect_ok() {
   esac
 }
 
+# Checks that text already captured contains a substring.
+#   expect_contains <name> <substring> <haystack>
+expect_contains() {
+  local name=$1 want=$2 haystack=$3
+  case $haystack in
+  *"$want"*) pass "$name" ;;
+  *) fail "$name" "did not contain '$want' in: $haystack" ;;
+  esac
+}
+
 # ---------------------------------------------------------------------------
 group "Static analysis"
 
@@ -128,7 +138,7 @@ group "Usage and argument handling"
 
 for s in make-media.sh backup-emmc.sh restore-emmc.sh postinstall-grub-ia32.sh \
   postinstall-tune.sh check-iso-ia32.sh fetch-bootia32.sh fetch-offline-payload.sh \
-  collect-hw-report.sh watch-freeze.sh; do
+  collect-hw-report.sh watch-freeze.sh stress-freeze.sh; do
   set +o errexit
   out=$("$SCRIPTS/$s" --help 2>&1)
   status=$?
@@ -178,6 +188,22 @@ expect_fail "stress-freeze.sh rejects a non-numeric ceiling" 1 "whole number of 
 expect_ok "stress-freeze.sh --list names the control phase" "idle   nothing. The control." -- \
   "$SCRIPTS/stress-freeze.sh" --list
 
+# The GPU phase once looped `glmark2 || sleep 1` with glmark2 unable to reach the
+# display, spun on the error for ten minutes and reported "survived". These two
+# pin the assumptions the fix rests on, since a load test that passes without
+# loading anything is worse than no load test at all.
+loop_status=$(
+  bash -c 'while false; do :; done; exit 1' >/dev/null 2>&1
+  printf 'status=%s' $?
+)
+expect_contains "a load command that fails takes the phase down with it" \
+  "status=1" "$loop_status"
+
+liveness=$(bash -c 'bash -c "exit 3" & p=$!; sleep 1
+  kill -0 "$p" 2>/dev/null && printf alive || printf gone' 2>/dev/null)
+expect_contains "an exited load is detectable, not a zombie that reads as alive" \
+  "gone" "$liveness"
+
 # A whole SHA256SUMS line pasted into --sha256 must be named as such, not
 # reported as a checksum mismatch.
 expect_fail "make-media.sh rejects a pasted SHA256SUMS line" 1 "only the 64-character digest" -- \
@@ -197,14 +223,6 @@ group "watch-freeze.sh sampling"
 
 # Every sysfs root in lib-freeze-sample.sh is overridable so the sampler can be
 # run against a tree shaped like the tablet, from a machine that is not it.
-expect_contains() {
-  local name=$1 want=$2 haystack=$3
-  case $haystack in
-  *"$want"*) pass "$name" ;;
-  *) fail "$name" "did not contain '$want' in: $haystack" ;;
-  esac
-}
-
 fake=$(mktemp -d)
 mkdir -p "$fake"/thermal "$fake"/psy/axp288_fuel_gauge "$fake"/psy/axp288_charger \
   "$fake"/cpuidle/state0 "$fake"/cpuidle/state1 "$fake"/cpufreq "$fake"/drm

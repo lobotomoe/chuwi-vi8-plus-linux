@@ -187,6 +187,7 @@ finish() {
 }
 
 require_phase_tools() {
+  require_cmd timeout
   case $phase in
   cpu | mem) require_cmd stress-ng ;;
   wifi) require_cmd nmcli ;;
@@ -199,30 +200,48 @@ require_phase_tools() {
   esac
 }
 
+# No phase sets its own duration and no phase swallows a failure. Both rules are
+# here because of one bad run: the GPU phase looped `glmark2 || sleep 1`, glmark2
+# could not reach the display, and the loop spun on the error for ten minutes and
+# reported "survived". The arithmetic gave it away afterwards -- the phase peaked
+# 4 C above the idle control, on a machine where the screensaver alone costs 15 C
+# -- but a load test that passes without loading anything is worse than no test.
+#
+# So: every load runs until this script kills it, and a load that stops on its
+# own is an error the sampling loop reports. stress-ng's --timeout is gone for
+# the same reason, since it would otherwise exit near the end and trip the check.
 start_load() {
+  # A dead man's switch, well past the run so it can never trip the liveness
+  # check above. It exists for the case this script does not get to clean up --
+  # SIGKILL, or the freeze we are hunting -- which would otherwise leave every
+  # core pinned by an orphaned load until someone noticed.
+  local deadman=$((duration + 300))
+
   case $phase in
   cpu)
-    stress-ng --cpu "$(nproc)" --cpu-method all --timeout "${duration}s" \
+    timeout "${deadman}s" stress-ng --cpu "$(nproc)" --cpu-method all \
       >/dev/null 2>&1 &
     ;;
   mem)
-    stress-ng --vm 2 --vm-bytes 75% --vm-method all --verify \
-      --timeout "${duration}s" >/dev/null 2>&1 &
+    timeout "${deadman}s" stress-ng --vm 2 --vm-bytes 75% --vm-method all \
+      --verify >/dev/null 2>&1 &
     ;;
   gpu)
-    # Looped rather than --run-forever so it works with either binary, and so a
-    # benchmark that exits early restarts instead of quietly ending the phase.
-    bash -c "while :; do $gpu_cmd >/dev/null 2>&1 || sleep 1; done" &
+    # Restarts on a clean exit -- a benchmark run finishing is normal -- and
+    # exits non-zero the moment one fails, which takes the whole phase down.
+    timeout "${deadman}s" bash -c "while $gpu_cmd >/dev/null 2>&1; do :; done; exit 1" &
     ;;
   wifi)
     # A rescan every few seconds is what NetworkManager already does between
-    # freezes; this only removes the waiting.
-    bash -c 'while :; do nmcli device wifi rescan >/dev/null 2>&1 || true; sleep 5; done' &
+    # freezes; this only removes the waiting. A rescan can legitimately fail
+    # while one is already in flight, so this one does tolerate a failure.
+    timeout "${deadman}s" bash -c \
+      'while :; do nmcli device wifi rescan >/dev/null 2>&1 || true; sleep 5; done' &
     ;;
   idle)
     # The control loads nothing. Deliberately still a process, so every phase
     # goes down the same path and a bug in the harness cannot hide here.
-    bash -c 'while :; do sleep 60; done' &
+    timeout "${deadman}s" bash -c 'while :; do sleep 60; done' &
     ;;
   esac
   load_pid=$!
@@ -260,6 +279,14 @@ start_load
 log "phase $phase for ${duration}s, aborting above ${max_temp}C; Ctrl-C to stop"
 
 while [ "$elapsed" -lt "$duration" ]; do
+  # A load that ended by itself means the phase stopped loading anything, and
+  # every second after that is a clean run being manufactured out of nothing.
+  if ! kill -0 "$load_pid" 2>/dev/null; then
+    log "the $phase load stopped on its own after ${elapsed}s -- this run proves nothing"
+    load_pid=
+    finish "LOAD-DIED" "$elapsed" 1
+  fi
+
   read -r hot_name hot <<<"$(hottest_zone)"
 
   # Zones register as their drivers probe, so the set is not fixed for the run.
