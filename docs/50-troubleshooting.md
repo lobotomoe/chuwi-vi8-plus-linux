@@ -652,6 +652,15 @@ The last desktop sample before a freeze was 70 °C with the GPU at 400 MHz and t
 charge current fallen from 1024 to 592 mA — the system drawing more of the 2 A
 budget, not the supply giving less. — **measured**
 
+**The GPU is doing the work, so a software-rendering theory does not hold.** Two
+numbers from the same samples settle it without installing anything. `gpu=` sits
+at 200 MHz idle and moves to 400 MHz exactly while the screensaver runs, and
+`gt_cur_freq_mhz` exists only under `i915` — a GPU with nothing to do stays on its
+bottom step. And `busy=` reads 14 % through the same window, where a full-screen
+GL animation at 800x1280 falling back to `llvmpipe` would cost multiples of that
+across four Airmont cores. — **measured**. The natural reading of "the graphics
+are broken, so the CPU overheats" fails on both halves.
+
 **Boot freezes land at 16-23 s of uptime**, three of three. The one sample
 captured at the edge read 77 °C and `busy=90%` at `up=23`, on a SoC that had been
 running 70 °C six minutes earlier and never cooled.
