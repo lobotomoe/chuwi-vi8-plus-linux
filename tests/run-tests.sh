@@ -55,6 +55,25 @@ expect_fail() {
   esac
 }
 
+# Runs a command that must succeed and checks its output.
+#   expect_ok <name> <substring of output> -- cmd...
+expect_ok() {
+  local name=$1 want_text=$2 out status
+  shift 3 # name, text, and the literal --
+  set +o errexit
+  out=$("$@" 2>&1)
+  status=$?
+  set -o errexit
+  if [ "$status" -ne 0 ]; then
+    fail "$name" "exited $status: $out"
+    return
+  fi
+  case $out in
+  *"$want_text"*) pass "$name" ;;
+  *) fail "$name" "output did not contain '$want_text': $out" ;;
+  esac
+}
+
 # ---------------------------------------------------------------------------
 group "Static analysis"
 
@@ -150,6 +169,67 @@ expect_fail "make-media.sh rejects a truncated digest" 1 "64 hex characters" -- 
 expect_fail "make-media.sh rejects an over-long FAT32 label" 1 "11 characters at most" -- \
   "$SCRIPTS/make-media.sh" --iso "$REPO_ROOT/artifacts/bootia32.efi" --device /dev/null \
   --label THIS_LABEL_IS_TOO_LONG
+
+# ---------------------------------------------------------------------------
+group "watch-freeze.sh --report classification"
+
+# Three different things end a session and only one of them is a freeze. Reading
+# a systemctl restart as a crash sent an evening down the wrong hypothesis, so
+# each verdict is pinned here.
+freeze_log=$(mktemp)
+cat >"$freeze_log" <<'EOF'
+--- session start 2026-08-18 10:00:00 +0400
+--- boot aaaa-1111
+--- kernel 7.0.0-14-generic
+t=10:00:01 up=16 temp=55C
+--- session start 2026-08-18 10:00:30 +0400
+--- boot aaaa-1111
+t=10:00:31 up=46 temp=57C
+--- session end TERM 2026-08-18 10:01:00 +0400
+--- session start 2026-08-18 10:02:00 +0400
+--- boot aaaa-1111
+t=10:02:01 up=136 temp=70C
+--- session start 2026-08-18 10:05:00 +0400
+--- boot bbbb-2222
+t=10:05:01 up=15 temp=52C
+EOF
+
+expect_ok "a restart within one boot is not a freeze" \
+  "recorder restarted, machine kept running" -- \
+  "$SCRIPTS/watch-freeze.sh" --report --log "$freeze_log"
+expect_ok "a session ending on SIGTERM is not a freeze" "=== stopped cleanly," -- \
+  "$SCRIPTS/watch-freeze.sh" --report --log "$freeze_log"
+expect_ok "a session with no end marker and a new boot id is a freeze" \
+  "DIED HERE -- no clean stop, and the machine rebooted" -- \
+  "$SCRIPTS/watch-freeze.sh" --report --log "$freeze_log"
+
+# Logs recorded before the boot id was written still have to be readable, and
+# the only signal left in them is uptime restarting.
+legacy_log=$(mktemp)
+cat >"$legacy_log" <<'EOF'
+--- session start 2026-08-18 16:20:13 +0400
+t=16:24:07 up=346 temp=67C
+--- session start 2026-08-18 16:24:13 +0400
+t=16:29:02 up=642 temp=71C
+--- session start 2026-08-18 16:29:03 +0400
+t=16:29:48 up=688 temp=70C
+--- session start 2026-08-18 16:36:49 +0400
+t=16:36:55 up=23 temp=77C
+EOF
+
+expect_ok "a legacy log still separates a restart from a death" \
+  "DIED HERE -- no clean stop, and uptime restarted" -- \
+  "$SCRIPTS/watch-freeze.sh" --report --log "$legacy_log"
+
+legacy_verdicts=$("$SCRIPTS/watch-freeze.sh" --report --log "$legacy_log" | grep -c 'DIED HERE')
+if [ "$legacy_verdicts" -eq 1 ]; then
+  pass "a legacy log calls exactly one of its three ends a death"
+else
+  fail "a legacy log calls exactly one of its three ends a death" \
+    "found $legacy_verdicts DIED HERE verdicts, expected 1"
+fi
+
+rm -f "$freeze_log" "$legacy_log"
 
 # ---------------------------------------------------------------------------
 group "FAT32 size boundary"

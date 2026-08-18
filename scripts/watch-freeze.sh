@@ -40,8 +40,8 @@ Usage: ${0##*/} [--log PATH] [--interval SECONDS]
   (no mode)     Sample until interrupted, appending to the log.
   --install     Install and start a systemd service that does that from boot,
                 early enough to catch the freezes that happen during one.
-  --report      Show what the machine was doing at the end of each session that
-                did not shut down cleanly.
+  --report      Show what the machine was doing at the end of every session, and
+                which of those ends was a freeze rather than a restart or a stop.
 
   --log PATH        Where to write (default: $LOG_DEFAULT)
   --interval SECS   Seconds between samples (default: $INTERVAL_DEFAULT)
@@ -309,14 +309,31 @@ sync_cmd() {
   sync
 }
 
+# systemd sends SIGTERM on stop and on shutdown, so a session that ends without
+# this marker ended without anyone asking it to. That is the whole distinction
+# the report needs, and it cannot be recovered afterwards -- write it now.
+finish() {
+  printf -- '--- session end %s %s\n' "$1" "$(date '+%Y-%m-%d %H:%M:%S %z')" \
+    >>"$log_path"
+  sync_cmd
+  exit 0
+}
+
 run_recorder() {
-  local dir
+  local dir sleeper
   dir=$(dirname -- "$log_path")
   [ -d "$dir" ] || die "no such directory: $dir"
   : >>"$log_path" || die "cannot write to $log_path (try sudo)"
 
+  trap 'finish TERM' TERM
+  trap 'finish INT' INT
+  trap 'finish HUP' HUP
+
   {
     printf -- '--- session start %s\n' "$(date '+%Y-%m-%d %H:%M:%S %z')"
+    # Unique per boot, so the report can tell a recorder restart from a machine
+    # that went away and came back.
+    printf -- '--- boot %s\n' "$(read_or_empty /proc/sys/kernel/random/boot_id)"
     printf -- '--- kernel %s\n' "$(uname -r)"
     printf -- '--- cmdline %s\n' "$(read_or_empty /proc/cmdline)"
     printf -- '--- cpuidle driver %s, states %s\n' \
@@ -331,7 +348,12 @@ run_recorder() {
   while :; do
     sample_line >>"$log_path"
     sync_cmd
-    sleep "$interval"
+    # Backgrounded and waited on rather than run in the foreground: bash defers
+    # a trap until the current command finishes, so a foreground sleep would
+    # swallow the shutdown signal for up to one interval and lose the marker.
+    sleep "$interval" &
+    sleeper=$!
+    wait "$sleeper" || true
   done
 }
 
@@ -372,33 +394,80 @@ EOF
 # A session that ended in a freeze has no clean end -- the next thing in the log
 # is another "session start". So the interesting lines are the ones immediately
 # before each of those, and the last line of the file if the machine is up now.
+#
+# Three things end a session and only one of them is a freeze, so the report has
+# to say which: a restart of the recorder alone, an orderly stop or shutdown, and
+# the machine going away underneath it. Calling all three "session ended here"
+# invites reading a systemctl restart as a crash, which is exactly what happened
+# the first time this log was read.
 report() {
   [ -r "$log_path" ] || die "no log at $log_path (run --install first)"
   local tail_len=12
   awk -v tail_len="$tail_len" '
-    /^--- session start/ {
-      if (n > 0) {
-        printf "\n=== session ended here, %s\n", started
-        for (i = (n > tail_len ? n - tail_len : 0); i < n; i++) print "  " buf[i % tail_len]
+    function uptime_of(line) {
+      if (match(line, /up=[0-9]+/))
+        return substr(line, RSTART + 3, RLENGTH - 3) + 0
+      return -1
+    }
+    function verdict(i,   k, next_first) {
+      if (i == sessions)
+        return clean[i] ? "stopped cleanly, nothing running since" : "current session"
+      if (clean[i])
+        return "stopped cleanly"
+
+      # Same boot id means only the recorder went away. A different one means
+      # the machine did, and nobody asked it to.
+      if (boot[i] != "" && boot[i + 1] != "") {
+        if (boot[i] == boot[i + 1])
+          return "recorder restarted, machine kept running"
+        return "DIED HERE -- no clean stop, and the machine rebooted"
       }
-      started = substr($0, 19)
-      n = 0
+
+      # Logs written before boot ids were recorded. Uptime that keeps climbing
+      # across the gap says the machine did not reboot; anything else says it
+      # did, since a fresh boot restarts the count.
+      next_first = -1
+      for (k = i + 1; k <= sessions; k++)
+        if (samples[k] > 0) { next_first = first_up[k]; break }
+      if (next_first < 0 || last_up[i] < 0)
+        return "ended, cause unknown (log predates boot ids)"
+      if (next_first > last_up[i])
+        return "recorder restarted, machine kept running"
+      return "DIED HERE -- no clean stop, and uptime restarted"
+    }
+    /^--- session start/ {
+      sessions++
+      started[sessions] = substr($0, 19)
+      samples[sessions] = 0
       next
     }
+    /^--- boot / { if (sessions > 0) boot[sessions] = $3; next }
+    /^--- session end/ { if (sessions > 0) clean[sessions] = 1; next }
     /^--- / { next }
-    { buf[n % tail_len] = $0; n++ }
+    {
+      if (sessions == 0) next
+      buf[sessions "," (samples[sessions] % tail_len)] = $0
+      if (samples[sessions] == 0) first_up[sessions] = uptime_of($0)
+      last_up[sessions] = uptime_of($0)
+      samples[sessions]++
+    }
     END {
-      if (n > 0) {
-        printf "\n=== current session, %s\n", started
-        for (i = (n > tail_len ? n - tail_len : 0); i < n; i++) print "  " buf[i % tail_len]
+      for (i = 1; i <= sessions; i++) {
+        printf "\n=== %s, started %s\n", verdict(i), started[i]
+        if (samples[i] == 0) {
+          print "  (no samples -- it did not survive to the first one)"
+          continue
+        }
+        for (j = (samples[i] > tail_len ? samples[i] - tail_len : 0); j < samples[i]; j++)
+          print "  " buf[i "," (j % tail_len)]
       }
     }
   ' "$log_path"
 
   printf '\n'
-  log "Each block is the last ${tail_len} samples of a session. A session that ends"
-  log "without a clean shutdown ended in a freeze -- read its final line as the"
-  log "state the machine was in when it stopped."
+  log "Each block is the last ${tail_len} samples of a session. Only the blocks"
+  log "marked DIED HERE are freezes -- read the final line of one as the state the"
+  log "machine was in when it stopped."
 }
 
 case $mode in

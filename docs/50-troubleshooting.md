@@ -545,6 +545,13 @@ the final line is the state the machine was in when it died. That single line
 distinguishes most of what follows: a current spike, a thermal climb, and a jump
 into a deep idle state look nothing alike.
 
+`--report` marks only the genuine freezes `DIED HERE`. It knows the difference
+because each session records the boot id and writes an end marker when it is
+asked to stop, so restarting the recorder, shutting the machine down and the
+machine vanishing underneath it are three distinguishable endings rather than one
+ambiguous gap. Worth insisting on: the first reading of this log counted two
+`systemctl restart`s as crashes.
+
 **They cluster at the tail of boot.** Five boots on that tablet ended without a
 shutdown sequence, three of them after **21, 22 and 23 seconds** against a normal
 17-second boot. Reading the tail of each shows a different last service every
