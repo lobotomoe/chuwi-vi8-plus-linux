@@ -526,7 +526,24 @@ use degrades 2.4 GHz Wi-Fi throughput. That is the hardware.
 ## Random freezes
 
 A long-standing complaint on Chuwi's Atom tablets. It happens on the reference
-unit too, and what the journal says about it points at one cause.
+unit too.
+
+**Start by recording, not by guessing.** A hard hang gives the kernel no chance
+to flush anything, so the journal simply stops and every theory below looks
+equally plausible from the wreckage. One evening of reading journal tails
+produced three incompatible explanations and no way to choose between them.
+
+```sh
+sudo ./scripts/watch-freeze.sh --install    # samples from boot, flushed to disk
+# ... wait for a freeze, power-cycle, then:
+sudo ./scripts/watch-freeze.sh --report
+```
+
+It writes power, thermals, load, CPU frequency, GPU clock and per-C-state entry
+counts every few seconds and forces each line to disk before taking the next, so
+the final line is the state the machine was in when it died. That single line
+distinguishes most of what follows: a current spike, a thermal climb, and a jump
+into a deep idle state look nothing alike.
 
 **They cluster at the tail of boot.** Five boots on that tablet ended without a
 shutdown sequence, three of them after **21, 22 and 23 seconds** against a normal

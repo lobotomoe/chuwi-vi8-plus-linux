@@ -105,7 +105,7 @@ group "Usage and argument handling"
 
 for s in make-media.sh backup-emmc.sh restore-emmc.sh postinstall-grub-ia32.sh \
   postinstall-tune.sh check-iso-ia32.sh fetch-bootia32.sh fetch-offline-payload.sh \
-  collect-hw-report.sh; do
+  collect-hw-report.sh watch-freeze.sh; do
   set +o errexit
   out=$("$SCRIPTS/$s" --help 2>&1)
   status=$?
@@ -127,6 +127,13 @@ expect_fail "restore-emmc.sh with no arguments prints usage" 2 "Usage:" -- \
 
 expect_fail "make-media.sh rejects an unknown argument" 1 "unknown argument" -- \
   "$SCRIPTS/make-media.sh" --wat
+
+expect_fail "watch-freeze.sh rejects a non-numeric interval" 1 "whole number of seconds" -- \
+  "$SCRIPTS/watch-freeze.sh" --interval abc
+expect_fail "watch-freeze.sh rejects an interval below the floor" 1 "costs more than it measures" -- \
+  "$SCRIPTS/watch-freeze.sh" --interval 0
+expect_fail "watch-freeze.sh reports a missing log rather than an empty one" 1 "no log at" -- \
+  "$SCRIPTS/watch-freeze.sh" --report --log /nonexistent/freeze.log
 expect_fail "make-media.sh rejects a missing ISO" 1 "no such ISO" -- \
   "$SCRIPTS/make-media.sh" --iso /nonexistent.iso --device /dev/null
 
