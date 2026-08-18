@@ -776,16 +776,38 @@ Things to try, in order:
    for why this is needed and what the driver does with `Vhold`.
 2. Confirm you are not swapping to eMMC. `swapon --show` should list a zram
    device and nothing else.
-3. In the firmware setup, set C-States to `C1`. Costs battery life, and see the
-   VLP52 caveat above before expecting much — the reports behind it are Bay
-   Trail. The Aptio build on this tablet has no `Power` tab — with
-   `SHOW ALL ITEM` on, the submenu to open is **`Advanced` ->
-   `PPM Configuration`**. See [20-uefi-setup.md](20-uefi-setup.md#what-to-change).
+3. Take the deep C-states away — but do it at runtime, not in the firmware and
+   not on the kernel command line. Every idle state has a writable `disable`
+   attribute, so the experiment needs no reboot and is undone by writing `0`
+   back:
 
-   Check which driver is actually in charge first: if
-   `/sys/devices/system/cpu/cpuidle/current_driver` says `intel_idle` — it does
-   on this unit — then the kernel is not reading the firmware's ACPI C-state
-   tables at all, and this setting may do nothing.
+   ```sh
+   # what the states are and in what order -- do not assume the numbering
+   head -v /sys/devices/system/cpu/cpu0/cpuidle/state*/name
+
+   # everything deeper than C1 off, now
+   for s in /sys/devices/system/cpu/cpu*/cpuidle/state[2-9]; do
+     echo 1 | sudo tee "$s/disable" >/dev/null
+   done
+   ```
+
+   The recorder's `idle=` column then shows the deep counters going flat, which
+   is how you know the change took rather than assuming it. That check is not
+   available with `intel_idle.max_cstate=1`, which needs a reboot to apply and
+   another to undo.
+
+   The firmware route — `C-States: C1` — is the worst of the three. The Aptio
+   build here has no `Power` tab; with `SHOW ALL ITEM` on it is under
+   **`Advanced` -> `PPM Configuration`** ([20-uefi-setup.md](20-uefi-setup.md#what-to-change)).
+   But `/sys/devices/system/cpu/cpuidle/current_driver` says `intel_idle` on this
+   unit, and `intel_idle` carries its own per-model tables instead of reading the
+   firmware's ACPI `_CST`, so the setting may do nothing at all.
+
+   Expect little either way, and see the VLP52 caveat above: the erratum behind
+   the popular advice is Bay Trail, and this is Airmont. **The boot freezes argue
+   against C-states on their own** — they land 16-23 s in, while services are
+   still starting. That is the busiest the machine ever is, and a deep-idle bug
+   needs a machine that has gone to sleep.
 4. Kernel parameters another Vi8 Plus owner reports as their freeze fix:
 
    ```
