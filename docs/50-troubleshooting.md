@@ -528,36 +528,62 @@ use degrades 2.4 GHz Wi-Fi throughput. That is the hardware.
 A long-standing complaint on Chuwi's Atom tablets. It happens on the reference
 unit too, and what the journal says about it points at one cause.
 
-**They correlate with idle, not with load.** Three boots on that tablet ended
-without a shutdown sequence after **21, 22 and 23 seconds**, against a normal
+**They cluster at the tail of boot.** Five boots on that tablet ended without a
+shutdown sequence, three of them after **21, 22 and 23 seconds** against a normal
 17-second boot. Reading the tail of each shows a different last service every
-time — `gpu-manager` and `logind` in one, `bluetoothd` starting its SDP server
-in the next, `iio-sensor-proxy` in the third. No service is common to them. What
-is common is the moment: a few seconds after boot finishes and the machine first
-has nothing to do. A fourth boot died 19 minutes in, while idle, and the owner
-independently reports it freezing while sitting on the screensaver. — **observed
-on the unit**
+time — `gpu-manager` and `logind`, `bluetoothd` starting its SDP server,
+`iio-sensor-proxy`, and twice `wpa_supplicant` with `NetworkManager`. No service
+is common to them. A sixth died 19 minutes in while idle, and the owner reports
+it freezing on the screensaver. — **observed on the unit**
 
-That is the signature of the SoC entering a deep C-state and not coming back,
-which is why item 1 below is item 1. It also rules out the other obvious reading:
-screen blanking cannot explain a freeze 22 seconds into boot, with the boot log
-still lit on the panel.
+**Three of those five are the moment a radio powers up** — Bluetooth once, Wi-Fi
+twice. That is a current peak, not an idle moment, and it is why the charger is
+item 1 below.
 
-Worth knowing what it is *not*, since all three were checked here: no OOM, swap
-untouched with 1.1 GiB still available, and no I/O or eMMC error anywhere in the
-journal. Memory pressure and failing storage both look plausible from the outside
-and neither left a trace.
+The reading to be careful with is the popular one. Every search for this points
+at deep C-states and `intel_idle.max_cstate=1`, and the erratum behind that is
+**VLP52, which is Bay Trail only**: the patch written for it matches a single
+model, `case 0x37: /* BYT */`, and was never merged. This tablet reports
+`family:model:stepping 0x6:4c:3`, and `0x4c` is Airmont — the Cherry Trail core,
+a different generation. So the famous fix rests on an erratum this CPU does not
+have. Cheap to try, but not the thing to try first. — **verified** by reading the
+patch and the CPU model off the unit
 
-Two things to try, in order:
+What the timing does rule out is screen blanking, which cannot explain a freeze
+22 seconds in with the boot log still lit on the panel.
 
-1. In the firmware setup, set C-States to `C1`. Costs battery life. This is the
-   fix people report most often, though it was established on the Bay Trail
-   generation rather than this one. The Aptio build on this tablet has no `Power`
-   tab — with `SHOW ALL ITEM` on, the submenu to open is **`Advanced` ->
-   `PPM Configuration`**. See [20-uefi-setup.md](20-uefi-setup.md#what-to-change).
+Worth knowing what it is *not*, since all of these were checked here: no OOM,
+swap untouched with 1.1 GiB still available, and no I/O or eMMC error anywhere in
+the journal. Memory pressure and failing storage both look plausible from the
+outside and neither left a trace.
+
+Things to try, in order:
+
+1. **Raise the charger's input current limit.** The driver's default leaves this
+   tablet drawing less than it consumes, so it runs off the battery with the
+   charger plugged in — and the battery is what browns out on peaks. Check
+   `status` on the fuel gauge while plugged in; `Discharging` is the tell.
+
+   ```sh
+   cat /sys/class/power_supply/axp288_charger/input_current_limit
+   echo 2000000 | sudo tee /sys/class/power_supply/axp288_charger/input_current_limit
+   ```
+
+   See [01-hardware.md](01-hardware.md#ports-otg-and-charging-while-a-hub-is-attached)
+   for why this is needed and what the driver does with `Vhold`.
 2. Confirm you are not swapping to eMMC. `swapon --show` should list a zram
    device and nothing else.
-3. Kernel parameters another Vi8 Plus owner reports as their freeze fix:
+3. In the firmware setup, set C-States to `C1`. Costs battery life, and see the
+   VLP52 caveat above before expecting much — the reports behind it are Bay
+   Trail. The Aptio build on this tablet has no `Power` tab — with
+   `SHOW ALL ITEM` on, the submenu to open is **`Advanced` ->
+   `PPM Configuration`**. See [20-uefi-setup.md](20-uefi-setup.md#what-to-change).
+
+   Check which driver is actually in charge first: if
+   `/sys/devices/system/cpu/cpuidle/current_driver` says `intel_idle` — it does
+   on this unit — then the kernel is not reading the firmware's ACPI C-state
+   tables at all, and this setting may do nothing.
+4. Kernel parameters another Vi8 Plus owner reports as their freeze fix:
 
    ```
    usbcore.autosuspend=-1 pcie_aspm=off intel_idle.max_cstate=1

@@ -128,7 +128,7 @@ kernel symbols.
 | Touchscreen (Chipone ICN8505) | Yes | **Dead out of the box, works after installing the firmware by hand** — the DMI quirk does not match, so nothing is extracted from UEFI. No kernel patch needed: the filename comes from ACPI, and Chuwi's own driver package carries the blob. Done on this unit; the axes then come out rotated 180°, corrected with a libinput matrix |
 | Audio (RT5651) | Yes | Untested; the quirk does not match, so expect wrong channel mapping |
 | Accelerometer / auto-rotation | Partly | **The sensor binds** — `BOSC0200` appears as `iio:device0` — but `iio-sensor-proxy` cannot read it: *"Could not find trigger name"*, then *"Buffer did not have data within 0.5s"*. So orientation is exposed by ACPI `ROTM` as designed, and userspace still does not rotate |
-| Battery, charging (AXP288) | Yes | **Works** — `axp288_fuel_gauge` reports capacity, voltage and current; `axp288_charger` reports the USB supply online. Charges at 2 A only from a USB-A charger via an A-to-C cable — no PD, and C-to-C gives 500 mA |
+| Battery, charging (AXP288) | Yes | **Reports correctly, charges badly** — `axp288_fuel_gauge` reports capacity, voltage and current. But the supply can read `online` while the battery *discharges*: the driver's input current limit is left too low, and it must be raised by hand. No PD; 2 A only from a USB-A charger via an A-to-C cable, 500 mA from C-to-C. Suspected cause of the freezes |
 | Backlight | Yes | **Works** — `intel_backlight` present and readable |
 | micro-HDMI | Yes | Untested |
 | Bluetooth (BCM43430 over UART) | Yes | Untested. Needs an `.hcd` from `bluez-firmware`, **not** `linux-firmware` — and no distribution ships one for an a0 chip |

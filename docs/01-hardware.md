@@ -803,6 +803,41 @@ A modern PD charger reached over a C-to-C cable commonly settles on 500 mA, whic
 less than the tablet draws with a hub attached — it discharges while plugged in. Use a
 plain **USB-A charger with a USB-A-to-C cable**.
 
+**A charger that is detected is not a charger that is feeding you.** On the
+reference unit `upower` reported the line supply `online: yes` while the battery
+sat at `state: discharging`, draining 2.3 W — the whole idle consumption. The
+tablet was running off the battery with the cable in.
+
+Two things in `axp288_charger` cause that, and one is fixable from userspace:
+
+- **The input current limit.** It is a discrete ladder — 100, 500, 900, 1500,
+  2000 mA and up — and what gets negotiated may be far below what the supply can
+  give. The driver exposes it **writable** through sysfs
+  (`POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT` appears in both
+  `property_is_writeable` and `set_property`), so no raw register poking is
+  needed:
+
+  ```sh
+  cat /sys/class/power_supply/axp288_charger/input_current_limit   # µA
+  echo 2000000 | sudo tee /sys/class/power_supply/axp288_charger/input_current_limit
+  ```
+
+  The driver clears its internal `valid` flag on that write, so expect the value
+  to be reconsidered when the charger is next re-detected.
+- **`Vhold`, which is not exposed at all.** The driver pins it to the vendor
+  default with the comment *"Set Vhold to the factory default / recommended
+  4.4V"*. Vhold is the input-voltage floor: if VBUS sags under that — a thin
+  cable, a long one, a hub — the charger throttles its input rather than pulling
+  the rail down further. Hans de Goede's own procedure for this exact model
+  lowers it to 4.3 V with `i2cset`, alongside setting the input current to 2 A.
+  That is a raw PMIC register write; treat it as the step after the sysfs one,
+  not before it.
+
+This is not a footnote on this tablet. The same notes record its battery as
+*"dead (browns out on consumption peaks)"*, needing *"always have a charger
+connected"* — and starving the charger is what forces the battery to carry the
+peaks. See [50-troubleshooting.md](50-troubleshooting.md#random-freezes).
+
 A data-only hub leaves the tablet on battery, so charge to 100 % before you start and
 do not let the live session idle for an hour before you begin the install. But that is
 a property of the hub, not of the tablet: **a hub that passes 5 V through (an "OTG

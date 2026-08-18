@@ -115,10 +115,21 @@ overlap:
   so **KMS works on this model** and `nomodeset` is a workaround rather than the
   ceiling. — **not yet verified here**
 
-One caution: he notes `Battery is dead (browns out on consumption peaks)` and that
-his unit `needs to always have a charger connected`. That is his particular unit's
-battery, not a property of the model — though a ten-year-old original battery will
-behave the same way.
+- His reinstall procedure for this model **reconfigures the charger by hand**:
+  `static i2cset` to `set input current to 2A and vhold to 4.3V`. Read alongside
+  the entry above, that says the AXP288 does not negotiate anything like 2 A on
+  its own here, and that the 4.4 V input-voltage floor the driver programs is too
+  high for the cabling people actually use. — **the sysfs half of it is confirmed
+  possible**: `input_current_limit` is writable, so only `vhold` needs `i2cset`.
+  See [01-hardware.md](01-hardware.md#ports-otg-and-charging-while-a-hub-is-attached)
+
+One caution, and it turned out to be the most useful line in the file: he notes
+`Battery is dead (browns out on consumption peaks)` and that his unit `needs to
+always have a charger connected`. Easy to read as one worn-out battery — but he
+would not be raising the input current limit by hand if the charger were feeding
+the machine properly, and on the reference unit here the supply reported itself
+`online` while the battery discharged at 2.3 W. A ten-year-old cell and a starved
+charger produce the same symptom, and this tablet appears to have both.
 
 ### Three more files in the same repository
 
