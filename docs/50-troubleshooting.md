@@ -604,6 +604,26 @@ display controller keeps scanning out the framebuffer it was given while nothing
 else advances. — **observed**, and it argues against both the charger and the
 thermal readings below being the whole story.
 
+**The six thermal zones, and which of them lies.** — **read off the unit**
+
+```
+thermal_zone0  acpitz           43.6 C
+thermal_zone1  INT3400 Thermal  20.0 C
+thermal_zone2  STR0             43.6 C
+thermal_zone3  PNIT             59.0 C
+thermal_zone4  soc_dts0         53.0 C
+thermal_zone5  soc_dts1         50.0 C
+```
+
+`INT3400` is the DPTF policy device. It has no sensor behind it and reports a
+constant 20 °C. `soc_dts0` and `soc_dts1` are the SoC's own digital thermal
+sensors — the closest thing here to a die temperature. `PNIT` reads about 6 °C
+above them and is the hottest zone, which matters because the recorder used to
+log the maximum: every `temp=` in the older logs is `PNIT`, and every `temp=20C`
+in a first sample is `INT3400` being the only zone registered that early rather
+than a cold machine. It now records all six, with a `--- thermal zones` line
+naming them.
+
 **The screensaver costs 15-20 °C.** Idle with `xscreensaver` running: 67-71 °C,
 `gpu=400MHz`, load ~1.3. The same machine idle with it gone: 51-57 °C, `busy=3%`.
 The last desktop sample before a freeze was 70 °C with the GPU at 400 MHz and the

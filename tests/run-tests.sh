@@ -95,12 +95,16 @@ for f in "$SCRIPTS"/*.sh "$REPO_ROOT"/tests/*.sh; do
   fi
 done
 
-# lib.sh is sourced, never executed; a +x bit on it invites running it directly.
-if [ -x "$SCRIPTS/lib.sh" ]; then
-  fail "lib.sh is not executable" "it is a sourced library, mode should be 644"
-else
-  pass "lib.sh is not executable"
-fi
+# The lib*.sh files are sourced, never executed; a +x bit invites running one
+# directly, which for a library of function definitions does nothing at all.
+for f in "$SCRIPTS"/lib*.sh; do
+  name="${f#"$REPO_ROOT"/}"
+  if [ -x "$f" ]; then
+    fail "not executable: $name" "it is a sourced library, mode should be 644"
+  else
+    pass "not executable: $name"
+  fi
+done
 
 # ---------------------------------------------------------------------------
 group "Shipped artifact"
@@ -171,6 +175,109 @@ expect_fail "make-media.sh rejects an over-long FAT32 label" 1 "11 characters at
   --label THIS_LABEL_IS_TOO_LONG
 
 # ---------------------------------------------------------------------------
+group "watch-freeze.sh sampling"
+
+# Every sysfs root in lib-freeze-sample.sh is overridable so the sampler can be
+# run against a tree shaped like the tablet, from a machine that is not it.
+expect_contains() {
+  local name=$1 want=$2 haystack=$3
+  case $haystack in
+  *"$want"*) pass "$name" ;;
+  *) fail "$name" "did not contain '$want' in: $haystack" ;;
+  esac
+}
+
+fake=$(mktemp -d)
+mkdir -p "$fake"/thermal "$fake"/psy/axp288_fuel_gauge "$fake"/psy/axp288_charger \
+  "$fake"/cpuidle/state0 "$fake"/cpuidle/state1 "$fake"/cpufreq "$fake"/drm
+
+# The reference unit's zones and their real readings. INT3400 is a DPTF policy
+# device with no sensor behind it and always reports 20 C, which is why the
+# sampler records every zone instead of the maximum.
+zones=(acpitz:43600 "INT3400 Thermal:20000" STR0:43650 PNIT:59000
+  soc_dts0:53000 soc_dts1:50000)
+zone_index=0
+for z in "${zones[@]}"; do
+  mkdir -p "$fake/thermal/thermal_zone$zone_index"
+  printf '%s' "${z%:*}" >"$fake/thermal/thermal_zone$zone_index/type"
+  printf '%s' "${z##*:}" >"$fake/thermal/thermal_zone$zone_index/temp"
+  zone_index=$((zone_index + 1))
+done
+
+printf 'Charging' >"$fake/psy/axp288_fuel_gauge/status"
+printf '99' >"$fake/psy/axp288_fuel_gauge/capacity"
+printf '592000' >"$fake/psy/axp288_fuel_gauge/current_now"
+printf '4224000' >"$fake/psy/axp288_fuel_gauge/voltage_now"
+printf '1' >"$fake/psy/axp288_charger/online"
+printf '2000000' >"$fake/psy/axp288_charger/input_current_limit"
+printf 'C1' >"$fake/cpuidle/state0/name"
+printf 'C7S' >"$fake/cpuidle/state1/name"
+printf '10' >"$fake/cpuidle/state0/usage"
+printf '100' >"$fake/cpuidle/state1/usage"
+printf '1600000' >"$fake/cpufreq/scaling_cur_freq"
+printf 'cpu 100 0 100 800 0 0 0 0 0 0\n' >"$fake/stat"
+
+# Two samples: the first has nothing to subtract from, the second does. Between
+# them the counters advance by 100 busy jiffies out of 200 total.
+sample_out=$(
+  PSY="$fake/psy" CPUIDLE="$fake/cpuidle" THERMAL="$fake/thermal" DRM="$fake/drm" \
+    CPUFREQ="$fake/cpufreq" PROC_STAT="$fake/stat" \
+    bash -c '
+      source "$1"
+      sample_line
+      printf "cpu 150 0 150 900 0 0 0 0 0 0\n" >"$PROC_STAT"
+      printf "200" >"$CPUIDLE/state1/usage"
+      sample_line
+    ' _ "$SCRIPTS/lib-freeze-sample.sh"
+)
+
+expect_contains "every thermal zone is recorded, not the maximum" \
+  "temp=43/20/43/59/53/50C" "$sample_out"
+expect_contains "the zone names are announced before the first sample" \
+  "--- thermal zones acpitz,INT3400 Thermal,STR0,PNIT,soc_dts0,soc_dts1" "$sample_out"
+expect_contains "the first sample has no deltas to report" "busy=first%" "$sample_out"
+expect_contains "CPU utilisation comes from the jiffy counters" "busy=50%" "$sample_out"
+expect_contains "idle entries are reported as per-interval deltas" "idle=0/100" "$sample_out"
+expect_contains "the charger and gauge are read straight through" \
+  "bat=99% bst=Charging bcur=592mA bv=4224mV chg=1 ilim=2000mA" "$sample_out"
+expect_contains "a GPU with no frequency file reports unknown, not zero" \
+  "gpu=?MHz" "$sample_out"
+
+# The names line must not be repeated while the set of zones is unchanged --
+# it is a marker for a set that grew, not decoration on every sample.
+zone_lines=$(printf '%s\n' "$sample_out" | grep -c -- '--- thermal zones')
+if [ "$zone_lines" -eq 1 ]; then
+  pass "the zone names are announced once, not per sample"
+else
+  fail "the zone names are announced once, not per sample" \
+    "found $zone_lines announcements, expected 1"
+fi
+
+# A zone that registers late must re-announce, or the columns silently shift
+# under a header that no longer describes them. This is what boot looks like:
+# only the policy device exists at first.
+late_out=$(
+  PSY="$fake/psy" CPUIDLE="$fake/cpuidle" THERMAL="$fake/thermal-late" DRM="$fake/drm" \
+    CPUFREQ="$fake/cpufreq" PROC_STAT="$fake/stat" \
+    bash -c '
+      mkdir -p "$THERMAL/thermal_zone0"
+      printf "INT3400 Thermal" >"$THERMAL/thermal_zone0/type"
+      printf "20000" >"$THERMAL/thermal_zone0/temp"
+      source "$1"
+      sample_line
+      mkdir -p "$THERMAL/thermal_zone1"
+      printf "soc_dts0" >"$THERMAL/thermal_zone1/type"
+      printf "53000" >"$THERMAL/thermal_zone1/temp"
+      sample_line
+    ' _ "$SCRIPTS/lib-freeze-sample.sh"
+)
+expect_contains "a zone that appears later is announced when it does" \
+  "--- thermal zones INT3400 Thermal,soc_dts0" "$late_out"
+expect_contains "and its reading joins the sample line" "temp=20/53C" "$late_out"
+
+rm -rf "$fake"
+
+# ---------------------------------------------------------------------------
 group "watch-freeze.sh --report classification"
 
 # Three different things end a session and only one of them is a freeze. Reading
@@ -221,7 +328,8 @@ expect_ok "a legacy log still separates a restart from a death" \
   "DIED HERE -- no clean stop, and uptime restarted" -- \
   "$SCRIPTS/watch-freeze.sh" --report --log "$legacy_log"
 
-legacy_verdicts=$("$SCRIPTS/watch-freeze.sh" --report --log "$legacy_log" | grep -c 'DIED HERE')
+legacy_verdicts=$("$SCRIPTS/watch-freeze.sh" --report --log "$legacy_log" 2>/dev/null |
+  grep -c 'DIED HERE')
 if [ "$legacy_verdicts" -eq 1 ]; then
   pass "a legacy log calls exactly one of its three ends a death"
 else
