@@ -652,14 +652,31 @@ The last desktop sample before a freeze was 70 °C with the GPU at 400 MHz and t
 charge current fallen from 1024 to 592 mA — the system drawing more of the 2 A
 budget, not the supply giving less. — **measured**
 
-**The GPU is doing the work, so a software-rendering theory does not hold.** Two
-numbers from the same samples settle it without installing anything. `gpu=` sits
-at 200 MHz idle and moves to 400 MHz exactly while the screensaver runs, and
-`gt_cur_freq_mhz` exists only under `i915` — a GPU with nothing to do stays on its
-bottom step. And `busy=` reads 14 % through the same window, where a full-screen
-GL animation at 800x1280 falling back to `llvmpipe` would cost multiples of that
-across four Airmont cores. — **measured**. The natural reading of "the graphics
-are broken, so the CPU overheats" fails on both halves.
+**Acceleration works, so a software-rendering theory does not hold.** Xorg says so
+outright, and reading its log costs nothing — no `mesa-utils`, no network:
+
+```
+(II) modeset(0): glamor X acceleration enabled on Mesa Intel(R) HD Graphics (CHV)
+(II) modeset(0): glamor: Using OpenGL 4.6 context.
+(II) AIGLX: Loaded and initialized crocus
+```
+
+— **verified on the unit**. `CHV` is Cherryview, and `crocus` is the right driver
+for it, not a fallback: Mesa lists the Cherryview PCI IDs `0x22b0`-`0x22b3` in
+[`include/pci_ids/crocus_pci_ids.h`](https://gitlab.freedesktop.org/mesa/mesa/-/blob/main/include/pci_ids/crocus_pci_ids.h),
+with the renderer string `Intel(R) HD Graphics` that the log prints back. The
+newer `iris` covers later generations and is *not* the one to expect here.
+
+Two numbers from the recorder said the same thing before the log was read, and
+they are the cheap check if you have no X log to hand: `gpu=` sits at 200 MHz idle
+and moves to 400 MHz exactly while the screensaver runs — `gt_cur_freq_mhz` exists
+only under `i915`, and a GPU with nothing to do stays on its bottom step — while
+`busy=` reads 14 % through the same window, where a full-screen GL animation at
+800x1280 falling back to `llvmpipe` would cost multiples of that across four
+Airmont cores.
+
+So the reading that "the graphics are broken, and the CPU overheats doing their
+work" fails on both halves.
 
 **Boot freezes land at 16-23 s of uptime**, three of three. The one sample
 captured at the edge read 77 °C and `busy=90%` at `up=23`, on a SoC that had been
