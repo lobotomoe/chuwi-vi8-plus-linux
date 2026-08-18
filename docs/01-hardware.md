@@ -659,8 +659,18 @@ already compensates. Userspace needs the matching UCM profile, which is in
 
 On a unit with [unfilled DMI](#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-three-things-at-once)
 this quirk does not fire, and unlike Wi-Fi and the touchscreen there is no
-DMI-independent fallback: expect stereo routing on a mono speaker and headphone
-channels the wrong way round.
+DMI-independent fallback.
+
+**In practice the speaker is fine anyway.** On the reference tablet — DMI unfilled,
+so the quirk cannot have matched — `speaker-test -c 2 -t wav -l 1` announces both
+"Front Left" and "Front Right" audibly through the single physical speaker, with
+nothing lost. **Verified on the unit.** Something below the machine driver already
+mixes the two channels down; the quirk was never the thing making that work. An
+earlier revision of this file predicted half the audio would disappear, which was
+wrong.
+
+So `MONO_SPEAKER` is worth setting for correctness, not for rescue. The half of the
+quirk still unverified here is `HP_LR_SWAPPED` — that needs headphones and an ear.
 
 #### Forcing the quirk by hand
 

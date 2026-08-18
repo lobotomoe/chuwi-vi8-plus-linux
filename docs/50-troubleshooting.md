@@ -452,9 +452,46 @@ cat /proc/asound/cards
   `alsa-ucm-conf`, then `alsamixer` and unmute/raise the speaker channel — the
   kernel quirk for this tablet declares a mono speaker, so there is one output
   slider, not two.
-- Headphones swapped left/right: the kernel already compensates
-  (`BYT_RT5651_HP_LR_SWAPPED`). If they are still swapped, you are on a kernel
-  older than the quirk; update it.
+- Headphones swapped left/right: the kernel compensates
+  (`BYT_RT5651_HP_LR_SWAPPED`) — but only if the DMI quirk matched, which on a
+  unit with unfilled DMI it did not. Check with `dmesg | grep -i 'quirk.*enabled'`
+  and force it if needed; the bitmask is derived in
+  [01-hardware.md](01-hardware.md#forcing-the-quirk-by-hand). If the DMI *is*
+  filled in and they are still swapped, you are on a kernel older than the quirk.
+- One speaker but both channels audible: that is the normal, working state here,
+  not a symptom. See the note in
+  [01-hardware.md](01-hardware.md#audio--realtek-rt5651).
+
+## `monitor-sensor` says "Not Authorized: Sensor claim not allowed"
+
+Nothing to do with the accelerometer — you are running it over SSH. `iio-sensor-proxy`
+asks polkit for `net.hadess.SensorProxy.claim-sensor`, and the shipped policy is:
+
+```xml
+<allow_any>no</allow_any>
+<allow_inactive>no</allow_inactive>
+<allow_active>yes</allow_active>
+```
+
+An SSH login is an *inactive* session as far as logind is concerned, so the claim is
+refused before the sensor is ever touched. Confirm which side you are on:
+
+```sh
+loginctl show-session "$XDG_SESSION_ID" -p Active -p Remote -p Type
+```
+
+Run `monitor-sensor` from a terminal in the tablet's own desktop session instead. To
+test the hardware itself without the daemon or polkit in the way — which does work
+over SSH — read the raw channels and tilt the tablet between runs:
+
+```sh
+cat /sys/bus/iio/devices/iio:device0/name          # expect bmc150_accel
+grep -H . /sys/bus/iio/devices/iio:device*/in_accel_*_raw
+```
+
+Note that even in a local session the orientation *labels* will be wrong on a unit
+with unfilled DMI, because the mount matrix in systemd's hwdb is keyed on the same
+DMI strings. See [01-hardware.md](01-hardware.md#accelerometer--auto-rotation--bosch-bosc0200).
 
 ## There is no network icon in the tray
 
