@@ -819,6 +819,30 @@ machine drawing roughly an ampere and being allowed half of it. Capacity fell
 from 95 % to 86 % over an idle session with the cable in. — **verified on the
 unit**
 
+That was through a hub with its own power input. Moving the same charger
+**directly** to the tablet's port swung it by more than an ampere:
+
+```
+axp288_fuel_gauge/status:       Charging
+axp288_fuel_gauge/current_now:  576000
+```
+
+Charging the battery at 576 mA *while also running the system* is not possible
+under a 500 mA cap, so a directly attached charger negotiates a higher limit on
+its own. The hub was presenting itself as an ordinary 500 mA port. — **verified
+on the unit**
+
+Raising the limit by hand did **not** rescue the hub case: the write was
+accepted, the value read back as `2000000`, and the battery then drained *faster*
+(496 mA to 656 mA). The limit is permission, not delivery. If the supply cannot
+source it, VBUS sags into the 4.4 V `Vhold` floor and the charger throttles
+straight back.
+
+One practical trap: `axp288_charger` was **absent from sysfs entirely** on one
+boot, leaving only `axp288_fuel_gauge`, so the write failed with `No such file or
+directory` while charging carried on regardless. Check with
+`ls /sys/class/power_supply/` before concluding anything from a failed write.
+
 Two things in `axp288_charger` cause that, and one is fixable from userspace:
 
 - **The input current limit.** It is a discrete ladder — 100, 500, 900, 1500,
