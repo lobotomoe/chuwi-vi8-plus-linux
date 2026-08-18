@@ -624,6 +624,28 @@ in a first sample is `INT3400` being the only zone registered that early rather
 than a cold machine. It now records all six, with a `--- thermal zones` line
 naming them.
 
+**And the trip points say the freezes are not thermal.** — **read off the unit**
+
+```
+acpitz    critical 100.0 C
+STR0      passive 61.05 C   hot 82.05 C   critical 85.05 C
+PNIT      passive 85.05 C
+soc_dts0  passive 0 C, 0 C      (unprogrammed)
+soc_dts1  passive 0 C, 0 C      (unprogrammed)
+```
+
+Two of `STR0`'s passive trips read `-274000`, which is below absolute zero and
+means unset, as do the SoC sensors' zeroes. What is set is a throttling trip at
+61 °C and a critical one at 85 °C on the skin sensor. The hottest reading ever
+recorded here is 70-71 °C on `PNIT`, whose own trip is at 85 °C, so nothing has
+come close to a critical trip.
+
+That matters more than the margin, because of what a critical trip *does*: the
+thermal core powers the machine off. A tablet that overheated past a trip would
+be found switched off, not sitting on a lit frame of the boot log. Overheating
+would have to hang the hardware silently *below* every configured trip to explain
+what is actually seen, which is a much larger claim than "it runs warm".
+
 **The screensaver costs 15-20 °C.** Idle with `xscreensaver` running: 67-71 °C,
 `gpu=400MHz`, load ~1.3. The same machine idle with it gone: 51-57 °C, `busy=3%`.
 The last desktop sample before a freeze was 70 °C with the GPU at 400 MHz and the
