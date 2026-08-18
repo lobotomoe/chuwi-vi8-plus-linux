@@ -660,9 +660,54 @@ already compensates. Userspace needs the matching UCM profile, which is in
 On a unit with [unfilled DMI](#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-three-things-at-once)
 this quirk does not fire, and unlike Wi-Fi and the touchscreen there is no
 DMI-independent fallback: expect stereo routing on a mono speaker and headphone
-channels the wrong way round. The `bytcr_rt5651.c` quirk can be forced with the
-module's `quirk=` parameter if you are prepared to work out the bitmask, but that
-has not been tried here.
+channels the wrong way round.
+
+#### Forcing the quirk by hand
+
+The module takes a `quirk=` override — `module_param_named(quirk, quirk_override,
+int, 0444)` — so the table entry can be applied without a DMI match. The value,
+built from the constants in `bytcr_rt5651.c` and `include/dt-bindings/sound/rt5651.h`:
+
+| Bit | Constant | Value |
+| --- | --- | --- |
+| 17 | `BYT_RT5651_MCLK_EN` | `0x020000` |
+| 13 | `OVCD_SF_0P75` (`1 << 13`) | `0x002000` |
+| 8-12 | `OVCD_TH_2000UA` (`20 << 8`) | `0x001400` |
+| 4-7 | `JD1_1` (`1 << 4`) | `0x000010` |
+| 0-3 | `IN2_MAP` (enum index 2) | `0x000002` |
+| 22 | `BYT_RT5651_HP_LR_SWAPPED` | `0x400000` |
+| 23 | `BYT_RT5651_MONO_SPEAKER` | `0x800000` |
+| | **total** | **`0xC23412`** |
+
+The first five are `BYT_RT5651_DEFAULT_QUIRKS | BYT_RT5651_IN2_MAP`, which is also
+the driver's built-in default — so a unit that matches nothing is already running
+`0x23412`, and **the only difference the missing quirk makes is the top two bits**:
+mono speaker and swapped headphones.
+
+```sh
+echo 'options snd_soc_sst_bytcr_rt5651 quirk=0xC23412' |
+  sudo tee /etc/modprobe.d/chuwi-vi8-plus-audio.conf
+sudo reboot
+dmesg | grep -iE 'Overriding quirk|quirk MONO_SPEAKER'
+```
+
+Both bits are **advisory to userspace, not routing changes**: the machine driver
+only feeds them into the card's components string —
+
+```c
+snprintf(byt_rt5651_components, sizeof(byt_rt5651_components),
+         "cfg-spk:%s cfg-mic:%s%s",
+         (byt_rt5651_quirk & BYT_RT5651_MONO_SPEAKER) ? "1" : "2",
+         mic_name[BYT_RT5651_MAP(byt_rt5651_quirk)],
+         (byt_rt5651_quirk & BYT_RT5651_HP_LR_SWAPPED) ? " cfg-hp:lrswap" : "");
+```
+
+— and UCM picks the profile off that. So the symptom of the missing quirk is
+`cfg-spk:2` on a one-speaker tablet, and the fix only works with `alsa-ucm-conf`
+installed. `MONO_SPEAKER` is the one bit that announces itself in the log;
+`HP_LR_SWAPPED` has no `dev_info`, so headphones have to be judged by ear.
+
+The value is **derived from the kernel source, not yet confirmed on hardware**.
 
 The placeholder is visible here too. ALSA builds the card's long name out of the
 same DMI fields, so `aplay -l` on an affected unit reports:
