@@ -187,6 +187,10 @@ expect_fail "stress-freeze.sh rejects a non-numeric ceiling" 1 "whole number of 
   "$SCRIPTS/stress-freeze.sh" --phase cpu --max-temp hot
 expect_ok "stress-freeze.sh --list names the control phase" "idle   nothing. The control." -- \
   "$SCRIPTS/stress-freeze.sh" --list
+expect_ok "stress-freeze.sh offers the radio-init phase, not just the scan one" \
+  "wifi-reload" -- "$SCRIPTS/stress-freeze.sh" --list
+expect_fail "stress-freeze.sh still rejects an unknown wifi variant" 1 "unknown phase: wifi-off" -- \
+  "$SCRIPTS/stress-freeze.sh" --phase wifi-off
 
 # The GPU phase once looped `glmark2 || sleep 1` with glmark2 unable to reach the
 # display, spun on the error for ten minutes and reported "survived". These two

@@ -53,7 +53,7 @@ allow_no_recorder=no
 
 usage() {
   cat <<EOF
-Usage: ${0##*/} --phase <cpu|gpu|mem|wifi|idle> [options]
+Usage: ${0##*/} --phase <cpu|gpu|mem|wifi|wifi-reload|idle> [options]
        ${0##*/} --list
 
   --phase NAME         Which subsystem to load. One at a time, on purpose.
@@ -81,10 +81,17 @@ list_phases() {
   gpu    glmark2 on a loop, or glxgears. Needs an X session,
          so run it from the tablet or export DISPLAY=:0.      needs: glmark2
   wifi   a scan every few seconds, which is what
-         NetworkManager does in the background between
-         freezes. This is the phase that tests the actual
-         lead -- the boot freezes land on wpa_supplicant
-         and brcmfmac coming up.                              needs: nmcli
+         NetworkManager does in the background. Ten minutes
+         of this did not freeze the reference tablet, which
+         is what narrowed the lead to the phase below.        needs: nmcli
+  wifi-reload
+         brcmfmac unloaded and loaded again, on a loop --
+         the radio coming up from cold, over and over. Every
+         boot freeze on record lands on exactly that moment
+         and none on steady radio use, so this reproduces
+         the suspect event rather than its aftermath.
+         Needs root, and fails loudly if the module is held
+         rather than quietly cycling nothing.                 needs: modprobe
   idle   nothing. The control. If the tablet freezes during
          this, none of the phases above prove anything.       needs: nothing
 EOF
@@ -133,7 +140,7 @@ done
 }
 
 case $phase in
-cpu | gpu | mem | wifi | idle) ;;
+cpu | gpu | mem | wifi | wifi-reload | idle) ;;
 all) die "there is no 'all' phase on purpose -- a combined run separates nothing" ;;
 *) die "unknown phase: $phase (see --list)" ;;
 esac
@@ -191,6 +198,10 @@ require_phase_tools() {
   case $phase in
   cpu | mem) require_cmd stress-ng ;;
   wifi) require_cmd nmcli ;;
+  wifi-reload)
+    require_cmd modprobe
+    [ "$(id -u)" -eq 0 ] || die "--phase wifi-reload needs root to cycle the module"
+    ;;
   gpu)
     gpu_cmd=$(first_cmd glmark2 glxgears) ||
       die "neither glmark2 nor glxgears found (sudo apt install glmark2)"
@@ -237,6 +248,24 @@ start_load() {
     # while one is already in flight, so this one does tolerate a failure.
     timeout "${deadman}s" bash -c \
       'while :; do nmcli device wifi rescan >/dev/null 2>&1 || true; sleep 5; done' &
+    ;;
+  wifi-reload)
+    # The event every boot freeze on record sits on, repeated on demand: the
+    # radio coming up from cold, firmware and NVRAM and all. Ten minutes of
+    # scanning on an already-associated radio changed nothing, which is what
+    # pointed here.
+    #
+    # exit 1 on a failed modprobe rather than || true: if NetworkManager holds
+    # the module, every cycle would be a no-op and the phase would report a
+    # clean run having done nothing -- the exact failure the GPU phase already
+    # produced once.
+    timeout "${deadman}s" bash -c '
+      while :; do
+        modprobe -r brcmfmac || exit 1
+        sleep 2
+        modprobe brcmfmac || exit 1
+        sleep 8
+      done' &
     ;;
   idle)
     # The control loads nothing. Deliberately still a process, so every phase
