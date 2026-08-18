@@ -141,6 +141,24 @@ max_temp_c() {
   printf '%s' $((hottest / 1000))
 }
 
+# The GT frequency file has moved around and the card number is not fixed -- it
+# is card1 on the reference unit, because card0 is taken. Resolve it once rather
+# than hard-coding a path that silently reports "?" forever.
+find_gpu_freq_file() {
+  local candidate
+  for candidate in \
+    "$DRM"/card*/gt_cur_freq_mhz \
+    "$DRM"/card*/gt/gt0/rps_cur_freq_mhz \
+    "$DRM"/card*/device/tile0/gt0/freq0/cur_freq; do
+    [ -r "$candidate" ] || continue
+    printf '%s' "$candidate"
+    return 0
+  done
+  return 0
+}
+
+gpu_freq_file=$(find_gpu_freq_file)
+
 idle_state_names() {
   local state name names=
   for state in "$CPUIDLE"/state*; do
@@ -197,7 +215,7 @@ sample_line() {
   voltage=$(milli "$(read_or_empty "$PSY/axp288_fuel_gauge/voltage_now")")
   online=$(read_or_empty "$PSY/axp288_charger/online")
   ilim=$(milli "$(read_or_empty "$PSY/axp288_charger/input_current_limit")")
-  gpu=$(read_or_empty "$DRM/card0/gt_cur_freq_mhz")
+  gpu=$(read_or_empty "${gpu_freq_file:-/nonexistent}")
   khz=$(read_or_empty "$CPUFREQ/scaling_cur_freq")
   loadavg=$(read_or_empty /proc/loadavg)
   loadavg=${loadavg%% *}
@@ -244,6 +262,7 @@ run_recorder() {
     printf -- '--- cpuidle driver %s, states %s\n' \
       "$(read_or_empty /sys/devices/system/cpu/cpuidle/current_driver)" \
       "$(idle_state_names)"
+    printf -- '--- gpu freq from %s\n' "${gpu_freq_file:-not found}"
     printf -- '--- interval %ss, idle= fields are entries per interval\n' "$interval"
   } >>"$log_path"
   sync_cmd
