@@ -121,6 +121,7 @@ CPUIDLE=${CPUIDLE:-/sys/devices/system/cpu/cpu0/cpuidle}
 THERMAL=${THERMAL:-/sys/class/thermal}
 DRM=${DRM:-/sys/class/drm}
 CPUFREQ=${CPUFREQ:-/sys/devices/system/cpu/cpu0/cpufreq}
+PROC_STAT=${PROC_STAT:-/proc/stat}
 
 # Highest reading across all thermal zones, in whole degrees. Which zone is
 # hottest matters less than whether anything is climbing before a freeze.
@@ -183,6 +184,53 @@ idle_usage_now() {
 }
 
 prev_usage=
+prev_cpu_busy=
+prev_cpu_total=
+
+# Cumulative jiffy counters as "busy total".
+#
+# This exists because scaling_cur_freq cannot answer the question. Reading it
+# requires running this script, which wakes the CPU, so it reports near-maximum
+# whatever the machine was doing -- the instrument measuring its own footprint.
+# Jiffy counters are cumulative and immune to that.
+cpu_counters_now() {
+  local tag user nice system idle iowait irq softirq steal
+  # stderr first: redirections apply left to right, so a missing file would
+  # otherwise be reported by the shell before 2>/dev/null takes effect.
+  if ! read -r tag user nice system idle iowait irq softirq steal _ 2>/dev/null <"$PROC_STAT"; then
+    return 0
+  fi
+  [ "$tag" = cpu ] || return 0
+  printf '%s %s' \
+    $((user + nice + system + irq + softirq + steal)) \
+    $((user + nice + system + idle + iowait + irq + softirq + steal))
+}
+
+# Percentage of that time which was not idle since the previous sample. Split
+# from the reader above because the caller runs it in a command substitution,
+# and a subshell cannot carry the previous counters back -- the state has to
+# live in sample_line, exactly as it does for the idle-state deltas.
+cpu_busy_pct() {
+  local now=$1 busy total dbusy dtotal
+  read -r busy total <<<"$now"
+  case ${busy:-}${total:-} in
+  '' | *[!0-9]*)
+    printf '?'
+    return 0
+    ;;
+  esac
+  if [ -z "$prev_cpu_total" ]; then
+    printf 'first'
+    return 0
+  fi
+  dtotal=$((total - prev_cpu_total))
+  dbusy=$((busy - prev_cpu_busy))
+  [ "$dtotal" -gt 0 ] || {
+    printf '?'
+    return 0
+  }
+  printf '%s' $((dbusy * 100 / dtotal))
+}
 
 idle_deltas() {
   local now=$1 a b out='' i=0
@@ -207,7 +255,7 @@ idle_deltas() {
 }
 
 sample_line() {
-  local now_usage status capacity current voltage online ilim gpu loadavg khz uptime
+  local now_usage status capacity current voltage online ilim gpu loadavg khz uptime busy now_cpu
 
   status=$(read_or_empty "$PSY/axp288_fuel_gauge/status")
   capacity=$(read_or_empty "$PSY/axp288_fuel_gauge/capacity")
@@ -221,10 +269,12 @@ sample_line() {
   loadavg=${loadavg%% *}
   uptime=$(read_or_empty /proc/uptime)
   uptime=${uptime%%.*}
+  now_cpu=$(cpu_counters_now)
+  busy=$(cpu_busy_pct "$now_cpu")
 
   now_usage=$(idle_usage_now)
 
-  printf 't=%s up=%s bat=%s%% bst=%s bcur=%smA bv=%smV chg=%s ilim=%smA temp=%sC load=%s cpu=%sMHz gpu=%sMHz idle=%s\n' \
+  printf 't=%s up=%s bat=%s%% bst=%s bcur=%smA bv=%smV chg=%s ilim=%smA temp=%sC load=%s busy=%s%% cpu=%sMHz gpu=%sMHz idle=%s\n' \
     "$(date +%H:%M:%S)" \
     "${uptime:-?}" \
     "${capacity:-?}" \
@@ -235,12 +285,22 @@ sample_line() {
     "$ilim" \
     "$(max_temp_c)" \
     "${loadavg:-?}" \
+    "$busy" \
     "$((${khz:-0} / 1000))" \
     "${gpu:-?}" \
     "$(idle_deltas "$now_usage")"
 
   prev_usage=$now_usage
+  if [ -n "$now_cpu" ]; then
+    prev_cpu_busy=${now_cpu%% *}
+    prev_cpu_total=${now_cpu##* }
+  fi
 }
+
+# cpu= is the instantaneous requested frequency and is distorted by this script
+# waking the CPU to read it; busy= is the honest one. Kept because a frequency
+# pinned low while busy= is high would mean thermal throttling, which no other
+# column would show.
 
 # Data-only fsync of the one file, where available -- a full sync every few
 # seconds on eMMC is a cost with no benefit here.
