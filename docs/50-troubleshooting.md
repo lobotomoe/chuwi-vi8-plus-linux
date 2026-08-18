@@ -555,7 +555,8 @@ it freezing on the screensaver. — **observed on the unit**
 
 **Three of those five are the moment a radio powers up** — Bluetooth once, Wi-Fi
 twice. That is a current peak, not an idle moment, and it is why the charger is
-item 1 below.
+item 1 below. Read that alongside
+[what the recorder caught](#what-the-recorder-actually-caught), which weakens it.
 
 The reading to be careful with is the popular one. Every search for this points
 at deep C-states and `intel_idle.max_cstate=1`, and the erratum behind that is
@@ -573,6 +574,54 @@ Worth knowing what it is *not*, since all of these were checked here: no OOM,
 swap untouched with 1.1 GiB still available, and no I/O or eMMC error anywhere in
 the journal. Memory pressure and failing storage both look plausible from the
 outside and neither left a trace.
+
+### What the recorder actually caught
+
+Five session ends on the reference unit, two on the desktop and three during
+boot. — **measured on the unit**
+
+**The battery voltage never sags.** `bv=` sits between 4206 and 4259 mV in every
+sample of every session, including the last one written before each desktop
+freeze, with the charger negotiating 2 A and the pack at 99 %. A supply that
+collapses under a current peak should show up here, and it does not. Two caveats
+keep this from closing the question: the recorder samples every 5 s and a
+brownout is a millisecond event, and at the boot freezes there is **no power data
+at all** — `axp288_fuel_gauge` has not probed yet at 16-23 s, so those lines read
+`bat=?% bst=none`.
+
+**The panel stays lit with the last frame intact.** Every photographed freeze
+shows the boot log or the screensaver still on screen, backlight on. A supply
+collapse takes the backlight with it, and a thermal trip powers the machine down
+rather than parking it on a frame. What that picture does fit is a lockup: the
+display controller keeps scanning out the framebuffer it was given while nothing
+else advances. — **observed**, and it argues against both the charger and the
+thermal readings below being the whole story.
+
+**The screensaver costs 15-20 °C.** Idle with `xscreensaver` running: 67-71 °C,
+`gpu=400MHz`, load ~1.3. The same machine idle with it gone: 51-57 °C, `busy=3%`.
+The last desktop sample before a freeze was 70 °C with the GPU at 400 MHz and the
+charge current fallen from 1024 to 592 mA — the system drawing more of the 2 A
+budget, not the supply giving less. — **measured**
+
+**Boot freezes land at 16-23 s of uptime**, three of three. The one sample
+captured at the edge read 77 °C and `busy=90%` at `up=23`, on a SoC that had been
+running 70 °C six minutes earlier and never cooled.
+
+`pkill -f xscreensaver` does **not** stick — the LXQt session respawns it, and
+`ps` shows it back a minute later. Suppress the autostart entry instead:
+
+```sh
+xscreensaver-command -exit
+mkdir -p ~/.config/autostart
+printf '[Desktop Entry]\nType=Application\nName=xscreensaver\nHidden=true\n' \
+  > ~/.config/autostart/xscreensaver.desktop
+```
+
+**The one test worth doing during a freeze** costs nothing and splits the
+remaining hypotheses: press Caps Lock on the USB keyboard and watch its LED. The
+LED is driven by the kernel's HID layer, so if it still toggles the kernel is
+alive and only userspace is wedged; if it is dead, so is the kernel, and no
+amount of userspace tuning will help.
 
 Things to try, in order:
 
