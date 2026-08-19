@@ -194,8 +194,24 @@ stop_load() {
   load_pid=
 }
 
+# wifi-reload spends part of every cycle with the module out and NetworkManager
+# stopped. Whatever ends the run -- the timer, Ctrl-C, the ceiling, the load
+# dying mid-cycle -- must not leave the tablet in that state: it is in another
+# city, and an unreachable machine costs somebody a trip rather than a reboot.
+#
+# Best-effort by design. This runs on the way out, so a failure here must be
+# said out loud but must not replace the result the run was there to produce.
+restore_network() {
+  [ "$phase" = wifi-reload ] || return 0
+  modprobe brcmfmac 2>/dev/null ||
+    warn "could not reload brcmfmac -- the tablet may have no radio"
+  systemctl start NetworkManager.service 2>/dev/null ||
+    warn "could not start NetworkManager -- the tablet may be unreachable"
+}
+
 finish() {
   stop_load
+  restore_network
   mark "stress end $phase $1 after ${2}s $(date '+%Y-%m-%d %H:%M:%S %z')"
   exit "${3:-0}"
 }
@@ -376,5 +392,6 @@ while [ "$elapsed" -lt "$duration" ]; do
 done
 
 stop_load
+restore_network
 mark "stress end $phase SURVIVED after ${elapsed}s peak $peak_name ${peak}C $(date '+%Y-%m-%d %H:%M:%S %z')"
 log "survived ${elapsed}s of $phase, peak ${peak}C on $peak_name"
