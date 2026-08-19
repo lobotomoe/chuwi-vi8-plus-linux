@@ -29,6 +29,8 @@
 
 # shellcheck source-path=SCRIPTDIR source=lib.sh
 source "$(dirname -- "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source-path=SCRIPTDIR source=lib-stress-phases.sh
+source "$(dirname -- "${BASH_SOURCE[0]}")/lib-stress-phases.sh"
 
 LOG_DEFAULT=/var/log/chuwi-stress.log
 DURATION_DEFAULT=600
@@ -69,38 +71,6 @@ Run one phase, then power-cycle if it froze and read both logs:
 
   sudo ./scripts/watch-freeze.sh --report
   sudo tail -20 $LOG_DEFAULT
-EOF
-}
-
-list_phases() {
-  cat <<'EOF'
-  cpu    every core, all stress-ng CPU methods in turn.       needs: stress-ng
-  mem    75% of RAM written and read back with --verify.      needs: stress-ng
-         Not a substitute for memtest86+, which tests the
-         memory the kernel is sitting in and this cannot.
-  gpu    glmark2 on a loop, or glxgears. Needs an X session,
-         so run it from the tablet or export DISPLAY=:0.      needs: glmark2
-  wifi   a scan every few seconds, which is what
-         NetworkManager does in the background. Ten minutes
-         of this did not freeze the reference tablet, which
-         is what narrowed the lead to the phase below.        needs: nmcli
-  wifi-reload
-         NetworkManager stopped, brcmfmac unloaded and
-         loaded, NetworkManager started again, on a loop --
-         the radio coming up from cold with the stack on top
-         of it. Every boot freeze on record lands inside that
-         window and none on steady radio use, so this
-         reproduces the suspect event rather than its
-         aftermath. Needs root, and fails loudly rather than
-         quietly cycling nothing.
-         It drops the network every cycle, so over SSH on
-         wireless run it detached or the lost session ends
-         the run:
-           sudo setsid ./scripts/stress-freeze.sh \
-             --phase wifi-reload </dev/null &>/tmp/reload.log &
-                                                              needs: modprobe
-  idle   nothing. The control. If the tablet freezes during
-         this, none of the phases above prove anything.       needs: nothing
 EOF
 }
 
@@ -177,147 +147,14 @@ mark() {
   sync_cmd
 }
 
-load_pid=
-
-stop_load() {
-  [ -n "$load_pid" ] || return 0
-  kill "$load_pid" 2>/dev/null || true
-  # stress-ng reaps its own workers on SIGTERM; give it a moment before the
-  # blunt instrument, so a phase that ends normally does not leave orphans.
-  local waited=0
-  while kill -0 "$load_pid" 2>/dev/null && [ "$waited" -lt 10 ]; do
-    sleep 1
-    waited=$((waited + 1))
-  done
-  kill -KILL "$load_pid" 2>/dev/null || true
-  wait "$load_pid" 2>/dev/null || true
-  load_pid=
-}
-
-# wifi-reload spends part of every cycle with the module out and NetworkManager
-# stopped. Whatever ends the run -- the timer, Ctrl-C, the ceiling, the load
-# dying mid-cycle -- must not leave the tablet in that state: it is in another
-# city, and an unreachable machine costs somebody a trip rather than a reboot.
-#
-# Best-effort by design. This runs on the way out, so a failure here must be
-# said out loud but must not replace the result the run was there to produce.
-restore_network() {
-  [ "$phase" = wifi-reload ] || return 0
-  modprobe brcmfmac 2>/dev/null ||
-    warn "could not reload brcmfmac -- the tablet may have no radio"
-  systemctl start NetworkManager.service 2>/dev/null ||
-    warn "could not start NetworkManager -- the tablet may be unreachable"
-}
-
 finish() {
   stop_load
-  restore_network
+  restore_network "$phase"
   mark "stress end $phase $1 after ${2}s $(date '+%Y-%m-%d %H:%M:%S %z')"
   exit "${3:-0}"
 }
 
-require_phase_tools() {
-  require_cmd timeout
-  case $phase in
-  cpu | mem) require_cmd stress-ng ;;
-  wifi) require_cmd nmcli ;;
-  wifi-reload)
-    require_cmd modprobe systemctl
-    [ "$(id -u)" -eq 0 ] || die "--phase wifi-reload needs root to cycle the stack"
-    # Worth saying out loud rather than discovering: this phase takes the
-    # network down every cycle. Over SSH on the wireless interface that means
-    # the session dies with it, and the SIGHUP would end the run early -- see
-    # the --list note about running it detached.
-    warn "this phase stops NetworkManager repeatedly; the network drops every cycle"
-    ;;
-  gpu)
-    gpu_cmd=$(first_cmd glmark2 glxgears) ||
-      die "neither glmark2 nor glxgears found (sudo apt install glmark2)"
-    [ -n "${DISPLAY:-}" ] ||
-      die "no DISPLAY -- the GPU phase needs an X session (try DISPLAY=:0, or run it on the tablet)"
-    ;;
-  esac
-}
-
-# No phase sets its own duration and no phase swallows a failure. Both rules are
-# here because of one bad run: the GPU phase looped `glmark2 || sleep 1`, glmark2
-# could not reach the display, and the loop spun on the error for ten minutes and
-# reported "survived". The arithmetic gave it away afterwards -- the phase peaked
-# 4 C above the idle control, on a machine where the screensaver alone costs 15 C
-# -- but a load test that passes without loading anything is worse than no test.
-#
-# So: every load runs until this script kills it, and a load that stops on its
-# own is an error the sampling loop reports. stress-ng's --timeout is gone for
-# the same reason, since it would otherwise exit near the end and trip the check.
-start_load() {
-  # A dead man's switch, well past the run so it can never trip the liveness
-  # check above. It exists for the case this script does not get to clean up --
-  # SIGKILL, or the freeze we are hunting -- which would otherwise leave every
-  # core pinned by an orphaned load until someone noticed.
-  local deadman=$((duration + 300))
-
-  case $phase in
-  cpu)
-    timeout "${deadman}s" stress-ng --cpu "$(nproc)" --cpu-method all \
-      >/dev/null 2>&1 &
-    ;;
-  mem)
-    timeout "${deadman}s" stress-ng --vm 2 --vm-bytes 75% --vm-method all \
-      --verify >/dev/null 2>&1 &
-    ;;
-  gpu)
-    # Restarts on a clean exit -- a benchmark run finishing is normal -- and
-    # exits non-zero the moment one fails, which takes the whole phase down.
-    timeout "${deadman}s" bash -c "while $gpu_cmd >/dev/null 2>&1; do :; done; exit 1" &
-    ;;
-  wifi)
-    # A rescan every few seconds is what NetworkManager already does between
-    # freezes; this only removes the waiting. A rescan can legitimately fail
-    # while one is already in flight, so this one does tolerate a failure.
-    timeout "${deadman}s" bash -c \
-      'while :; do nmcli device wifi rescan >/dev/null 2>&1 || true; sleep 5; done' &
-    ;;
-  wifi-reload)
-    # The event every boot freeze on record sits on, repeated on demand: the
-    # radio coming up from cold, firmware and NVRAM and all. Ten minutes of
-    # scanning on an already-associated radio changed nothing, which is what
-    # pointed here.
-    #
-    # The whole stack, not just the module. A first attempt cycled brcmfmac
-    # alone and died on "Module brcmfmac is in use" -- NetworkManager holds it.
-    # Stopping NM first is what makes the removal possible, and it also makes
-    # this a far closer copy of the boot sequence: cold module, then NM and
-    # wpa_supplicant starting on top of it, then association. The photographed
-    # boot freezes land inside exactly that window, not before it.
-    #
-    # exit 1 rather than || true on everything that must work: a cycle that
-    # quietly does nothing would report a clean run, which is the same false
-    # pass the GPU phase already produced once. The one tolerated failure is
-    # stopping wpa_supplicant, which NetworkManager may run as a dbus-activated
-    # unit that is legitimately not there to stop.
-    timeout "${deadman}s" bash -c '
-      while :; do
-        systemctl stop NetworkManager.service || exit 1
-        systemctl stop wpa_supplicant.service 2>/dev/null || true
-        sleep 1
-        modprobe -r brcmfmac || exit 1
-        sleep 2
-        modprobe brcmfmac || exit 1
-        systemctl start NetworkManager.service || exit 1
-        sleep 15
-      done' &
-    ;;
-  idle)
-    # The control loads nothing. Deliberately still a process, so every phase
-    # goes down the same path and a bug in the harness cannot hide here.
-    timeout "${deadman}s" bash -c 'while :; do sleep 60; done' &
-    ;;
-  esac
-  load_pid=$!
-}
-
-gpu_cmd=
-require_phase_tools
+require_phase_tools "$phase"
 
 if ! systemctl is-active --quiet "$SERVICE"; then
   if [ "$allow_no_recorder" = no ]; then
@@ -344,15 +181,15 @@ elapsed=0
 peak=0
 peak_name=none
 zones_seen=$(thermal_zone_names)
-start_load
+start_load "$phase" "$duration" "$log_path"
 log "phase $phase for ${duration}s, aborting above ${max_temp}C; Ctrl-C to stop"
 
 while [ "$elapsed" -lt "$duration" ]; do
   # A load that ended by itself means the phase stopped loading anything, and
   # every second after that is a clean run being manufactured out of nothing.
-  if ! kill -0 "$load_pid" 2>/dev/null; then
+  if ! kill -0 "$LOAD_PID" 2>/dev/null; then
     log "the $phase load stopped on its own after ${elapsed}s -- this run proves nothing"
-    load_pid=
+    LOAD_PID=
     finish "LOAD-DIED" "$elapsed" 1
   fi
 
@@ -392,6 +229,6 @@ while [ "$elapsed" -lt "$duration" ]; do
 done
 
 stop_load
-restore_network
+restore_network "$phase"
 mark "stress end $phase SURVIVED after ${elapsed}s peak $peak_name ${peak}C $(date '+%Y-%m-%d %H:%M:%S %z')"
 log "survived ${elapsed}s of $phase, peak ${peak}C on $peak_name"
