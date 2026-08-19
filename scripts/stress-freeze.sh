@@ -85,13 +85,20 @@ list_phases() {
          of this did not freeze the reference tablet, which
          is what narrowed the lead to the phase below.        needs: nmcli
   wifi-reload
-         brcmfmac unloaded and loaded again, on a loop --
-         the radio coming up from cold, over and over. Every
-         boot freeze on record lands on exactly that moment
-         and none on steady radio use, so this reproduces
-         the suspect event rather than its aftermath.
-         Needs root, and fails loudly if the module is held
-         rather than quietly cycling nothing.                 needs: modprobe
+         NetworkManager stopped, brcmfmac unloaded and
+         loaded, NetworkManager started again, on a loop --
+         the radio coming up from cold with the stack on top
+         of it. Every boot freeze on record lands inside that
+         window and none on steady radio use, so this
+         reproduces the suspect event rather than its
+         aftermath. Needs root, and fails loudly rather than
+         quietly cycling nothing.
+         It drops the network every cycle, so over SSH on
+         wireless run it detached or the lost session ends
+         the run:
+           sudo setsid ./scripts/stress-freeze.sh \
+             --phase wifi-reload </dev/null &>/tmp/reload.log &
+                                                              needs: modprobe
   idle   nothing. The control. If the tablet freezes during
          this, none of the phases above prove anything.       needs: nothing
 EOF
@@ -199,8 +206,13 @@ require_phase_tools() {
   cpu | mem) require_cmd stress-ng ;;
   wifi) require_cmd nmcli ;;
   wifi-reload)
-    require_cmd modprobe
-    [ "$(id -u)" -eq 0 ] || die "--phase wifi-reload needs root to cycle the module"
+    require_cmd modprobe systemctl
+    [ "$(id -u)" -eq 0 ] || die "--phase wifi-reload needs root to cycle the stack"
+    # Worth saying out loud rather than discovering: this phase takes the
+    # network down every cycle. Over SSH on the wireless interface that means
+    # the session dies with it, and the SIGHUP would end the run early -- see
+    # the --list note about running it detached.
+    warn "this phase stops NetworkManager repeatedly; the network drops every cycle"
     ;;
   gpu)
     gpu_cmd=$(first_cmd glmark2 glxgears) ||
@@ -255,16 +267,28 @@ start_load() {
     # scanning on an already-associated radio changed nothing, which is what
     # pointed here.
     #
-    # exit 1 on a failed modprobe rather than || true: if NetworkManager holds
-    # the module, every cycle would be a no-op and the phase would report a
-    # clean run having done nothing -- the exact failure the GPU phase already
-    # produced once.
+    # The whole stack, not just the module. A first attempt cycled brcmfmac
+    # alone and died on "Module brcmfmac is in use" -- NetworkManager holds it.
+    # Stopping NM first is what makes the removal possible, and it also makes
+    # this a far closer copy of the boot sequence: cold module, then NM and
+    # wpa_supplicant starting on top of it, then association. The photographed
+    # boot freezes land inside exactly that window, not before it.
+    #
+    # exit 1 rather than || true on everything that must work: a cycle that
+    # quietly does nothing would report a clean run, which is the same false
+    # pass the GPU phase already produced once. The one tolerated failure is
+    # stopping wpa_supplicant, which NetworkManager may run as a dbus-activated
+    # unit that is legitimately not there to stop.
     timeout "${deadman}s" bash -c '
       while :; do
+        systemctl stop NetworkManager.service || exit 1
+        systemctl stop wpa_supplicant.service 2>/dev/null || true
+        sleep 1
         modprobe -r brcmfmac || exit 1
         sleep 2
         modprobe brcmfmac || exit 1
-        sleep 8
+        systemctl start NetworkManager.service || exit 1
+        sleep 15
       done' &
     ;;
   idle)
