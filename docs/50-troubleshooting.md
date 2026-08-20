@@ -638,6 +638,34 @@ symptom is nothing at all: no run, no marker in the stress log, and an empty
 `/tmp/reload.log` — the shell truncated it with the redirect and no process ever
 wrote to it. Easy to read as "the script is broken" when nothing has run yet.
 
+**`modprobe -r brcmfmac` fails with "Module brcmfmac is in use", and
+NetworkManager is not why.** That was the first guess on this tablet; stopping
+NetworkManager, `wpa_supplicant` and the interface itself changed nothing. The
+holder is `brcmfmac_wcc`:
+
+```
+--- refcnt 1
+--- module holders [brcmfmac_wcc]
+--- lsmod brcmfmac_wcc           12288  0
+--- lsmod brcmfmac              544768  1 brcmfmac_wcc
+```
+
+Kernel 6.x split the per-vendor firmware and regulatory hooks out of `brcmfmac`
+into their own module, which then registers back into it. `modprobe -r` does not
+walk that edge — it removes what a module depends *on*, not what depends on it —
+so the chain has to come apart from the top:
+
+```sh
+sudo modprobe -r brcmfmac_wcc   # takes brcmfmac and brcmutil with it
+sudo modprobe brcmfmac          # asks the kernel for its vendor module again
+```
+
+`stress-freeze.sh` reads `/sys/module/brcmfmac/holders/` and removes whatever is
+listed rather than naming `brcmfmac_wcc`, since the vendor module differs by chip.
+Note the second command is enough to restore the radio: `brcmfmac` requests its
+own vendor module when the chip probes, which is also what makes the phase a
+faithful copy of the boot sequence rather than an approximation of it.
+
 **A load test that passes without loading anything is worse than no test**, and
 this one did it once. The `gpu` phase looped `glmark2 || sleep 1`, `glmark2` could
 not reach the display, and the loop spun on the error for ten minutes and reported

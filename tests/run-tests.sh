@@ -208,6 +208,77 @@ liveness=$(bash -c 'bash -c "exit 3" & p=$!; sleep 1
 expect_contains "an exited load is detectable, not a zombie that reads as alive" \
   "gone" "$liveness"
 
+# `modprobe -r brcmfmac` failed on the tablet with "Module brcmfmac is in use"
+# until the diagnostics named the holder: brcmfmac_wcc, the vendor module recent
+# kernels split out, which registers back into brcmfmac. The chain has to come
+# apart from the top down, and these run that against a fake /sys with a fake
+# modprobe on PATH -- the removal order is the part that was wrong twice.
+modroot=$(mktemp -d)
+mkdir -p "$modroot/bin" "$modroot/sys/brcmfmac/holders/brcmfmac_wcc" \
+  "$modroot/sys/brcmfmac_wcc" "$modroot/net/wlan0/wireless"
+
+cat >"$modroot/bin/modprobe" <<'FAKE'
+#!/usr/bin/env bash
+# Records what it was asked to remove, and removes it from the fake tree. A
+# holder removal takes its now-unused dependency with it, exactly as the real
+# modprobe does -- which is why the caller must tolerate brcmfmac being gone
+# already rather than treating it as a failure.
+printf '%s\n' "$*" >>"$FAKE_MODPROBE_LOG"
+[ "${1:-}" = -r ] || exit 0
+[ -d "$FAKE_SYS/$2" ] || exit 1
+rm -rf "${FAKE_SYS:?}/$2"
+[ "$2" = brcmfmac_wcc ] && rm -rf "${FAKE_SYS:?}/brcmfmac"
+exit 0
+FAKE
+chmod 755 "$modroot/bin/modprobe"
+
+: >"$modroot/calls"
+unload_out=$(
+  PATH="$modroot/bin:$PATH" FAKE_SYS="$modroot/sys" \
+    FAKE_MODPROBE_LOG="$modroot/calls" SYSMODULE="$modroot/sys" \
+    bash -c '
+      source "$1"
+      unload_brcmfmac
+      status=$?
+      printf "status=%s calls=[%s]" "$status" "$(tr "\n" "," <"$FAKE_MODPROBE_LOG")"
+    ' _ "$SCRIPTS/lib-stress-phases.sh"
+)
+expect_contains "the holder comes out before brcmfmac, not after it" \
+  "calls=[-r brcmfmac_wcc,]" "$unload_out"
+expect_contains "brcmfmac already gone with its holder is the goal, not a failure" \
+  "status=0" "$unload_out"
+
+# The other direction: a holder that will not come out must fail the run rather
+# than fall through to a `modprobe -r brcmfmac` that would fail anyway, with the
+# less useful message.
+mkdir -p "$modroot/sys2/brcmfmac/holders/stuck_module"
+: >"$modroot/calls2"
+stuck_out=$(
+  PATH="$modroot/bin:$PATH" FAKE_SYS="$modroot/sys2" \
+    FAKE_MODPROBE_LOG="$modroot/calls2" SYSMODULE="$modroot/sys2" \
+    bash -c 'source "$1"; unload_brcmfmac; printf "status=%s" "$?"' _ \
+    "$SCRIPTS/lib-stress-phases.sh"
+)
+expect_contains "a holder that will not unload fails the cycle" "status=1" "$stuck_out"
+
+# A reload that brings no radio back would otherwise cycle nothing and report a
+# clean run -- the same false pass the GPU phase produced once.
+radio_out=$(
+  SYSNET="$modroot/net" bash -c 'source "$1"; wait_for_wireless 1; printf "status=%s" "$?"' \
+    _ "$SCRIPTS/lib-stress-phases.sh"
+)
+expect_contains "a wireless interface that is present is seen at once" \
+  "status=0" "$radio_out"
+
+radio_out=$(
+  SYSNET="$modroot/empty" bash -c 'source "$1"; wait_for_wireless 1; printf "status=%s" "$?"' \
+    _ "$SCRIPTS/lib-stress-phases.sh"
+)
+expect_contains "a reload that brings back no radio fails the cycle" \
+  "status=1" "$radio_out"
+
+rm -rf "$modroot"
+
 # A whole SHA256SUMS line pasted into --sha256 must be named as such, not
 # reported as a checksum mismatch.
 expect_fail "make-media.sh rejects a pasted SHA256SUMS line" 1 "only the 64-character digest" -- \

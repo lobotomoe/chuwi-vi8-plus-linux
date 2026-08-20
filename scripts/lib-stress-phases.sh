@@ -93,6 +93,59 @@ require_phase_tools() {
   esac
 }
 
+# Take brcmfmac out, holders first.
+#
+# `modprobe -r brcmfmac` failed here twice, for two different reasons. The first
+# guess was NetworkManager, and stopping it -- along with wpa_supplicant and the
+# interface -- changed nothing. The diagnostics added after that named the real
+# holder on the third attempt: `refcnt 1`, `holders [brcmfmac_wcc]`. Recent
+# kernels split the per-vendor firmware and regulatory hooks out of brcmfmac into
+# their own module, which then registers back into it, so the chain has to come
+# apart from the top down.
+#
+# The holders are read, not named. The split is recent, the vendor module differs
+# by chip, and hard-coding brcmfmac_wcc would fix this tablet while failing
+# silently on the next one. This is the same list the failure path prints, which
+# is the point: the diagnostic and the fix read from one source.
+#
+# The sysfs root is a local default rather than a global so the exported copy of
+# this function keeps it. A `bash -c` child inherits functions but not variables,
+# and an empty root here would glob nothing, find no holders and report success
+# without having unloaded anything.
+unload_brcmfmac() {
+  local sysmodule=${SYSMODULE:-/sys/module}
+  local entry holder
+  for entry in "$sysmodule"/brcmfmac/holders/*; do
+    [ -e "$entry" ] || continue
+    holder=${entry##*/}
+    modprobe -r "$holder" || return 1
+  done
+  # Removing a holder takes its now-unused dependencies down with it, so brcmfmac
+  # is usually already gone by this point. That is the goal, not a failure.
+  [ -d "$sysmodule/brcmfmac" ] || return 0
+  modprobe -r brcmfmac
+}
+
+# Wait for the radio to come back, up to <seconds>.
+#
+# The netdev does not exist the moment modprobe returns: firmware and NVRAM load
+# asynchronously over SDIO and the interface registers after that. Waited on
+# rather than assumed, because a cycle that unloads the module and gets no radio
+# back is not a test of the stack coming up -- it is the GPU phase's false pass
+# again, wearing a different subsystem.
+wait_for_wireless() {
+  local deadline=$1 waited=0 entry
+  local sysnet=${SYSNET:-/sys/class/net}
+  while [ "$waited" -lt "$deadline" ]; do
+    for entry in "$sysnet"/*/wireless; do
+      if [ -e "$entry" ]; then return 0; fi
+    done
+    sleep 1
+    waited=$((waited + 1))
+  done
+  return 1
+}
+
 # One cycle of the radio stack, repeated: the boot sequence on demand.
 #
 # Stopping NetworkManager alone was not enough on the reference tablet --
@@ -106,6 +159,10 @@ require_phase_tools() {
 # Exported and run under bash -c by name, so the body is real code shellcheck
 # can lint instead of a quoted string it will not look inside.
 wifi_reload_cycle() {
+  # Seconds to wait for the netdev after a reload. Generous on purpose: this is a
+  # slow SDIO radio, and the question being asked is "did it come back at all",
+  # not "how fast".
+  local register_timeout=20
   local w iface
   while :; do
     systemctl stop NetworkManager.service || exit 1
@@ -121,7 +178,7 @@ wifi_reload_cycle() {
     done
     sleep 1
 
-    if ! modprobe -r brcmfmac; then
+    if ! unload_brcmfmac; then
       local h holders=
       for h in /sys/module/brcmfmac/holders/*; do
         [ -e "$h" ] || continue
@@ -142,7 +199,16 @@ wifi_reload_cycle() {
     fi
 
     sleep 2
+    # brcmfmac asks the kernel for its own vendor module when the chip probes, so
+    # this pulls brcmfmac_wcc back in behind it -- the same order as at boot,
+    # which is the sequence this phase exists to reproduce.
     modprobe brcmfmac || exit 1
+    if ! wait_for_wireless "$register_timeout"; then
+      printf -- '--- wifi-reload: no wireless interface %ss after reload\n' \
+        "$register_timeout" >>"$MARKER"
+      sync
+      exit 1
+    fi
     systemctl start NetworkManager.service || exit 1
     sleep 15
   done
@@ -207,7 +273,7 @@ start_load() {
     # unit that is legitimately not there to stop.
     # A function rather than a quoted string, so shellcheck actually lints it.
     export MARKER=$log_path
-    export -f wifi_reload_cycle
+    export -f wifi_reload_cycle unload_brcmfmac wait_for_wireless
     timeout "${deadman}s" bash -c wifi_reload_cycle &
     ;;
   idle)
