@@ -602,11 +602,53 @@ thermal shutdown can never be written up afterwards as a freeze, and `--phase id
 loads nothing at all — if the tablet dies during *that*, none of the other phases
 prove anything.
 
-Start with `wifi` if you only run one. The boot freezes land on `wpa_supplicant`
-and `brcmfmac` coming up, and between freezes NetworkManager scans in the
-background every couple of minutes, so it is the only phase aimed at the current
-lead. `cpu` and `gpu` are worth running mostly for the negative result: a tablet
-that survives half an hour of either is not simply too weak or too hot.
+**What the phases have returned so far**, ten minutes each on the reference
+tablet, hottest zone in brackets:
+
+| Phase | Result | Peak |
+| --- | --- | --- |
+| `idle` (control) | survived | 59 °C |
+| `cpu` | survived | 67 °C |
+| `mem` | survived | 67 °C |
+| `wifi` (scan) | survived | — |
+| `gpu` | void — the load never started, see below | — |
+
+The control surviving is what makes the rest mean anything: load was a real
+variable in those runs, not a label on a machine that happens to stay up. And
+`cpu` and `mem` surviving retires a whole family of theories at once — a tablet
+that holds 67 °C through every core at full load and 75 % of RAM under `--verify`
+is not freezing because it is too weak, too hot, or short of memory.
+
+That is why `wifi-reload` exists, and it is the phase to run if you only run one.
+The `wifi` phase scans on an already-associated radio and changed nothing;
+`wifi-reload` unloads `brcmfmac` and brings the whole stack back up on a loop,
+which is the event every photographed boot freeze actually sits on. It needs root
+and it drops the network every cycle, so over SSH on wireless it must be launched
+detached — and the `sudo -v` first is not optional:
+
+```sh
+sudo -v
+sudo setsid ./scripts/stress-freeze.sh \
+  --phase wifi-reload </dev/null &>/tmp/reload.log &
+```
+
+A backgrounded `sudo` whose credential timestamp has expired reads the password
+from the terminal, takes `SIGTTIN` and stops before it ever execs the script. The
+symptom is nothing at all: no run, no marker in the stress log, and an empty
+`/tmp/reload.log` — the shell truncated it with the redirect and no process ever
+wrote to it. Easy to read as "the script is broken" when nothing has run yet.
+
+**A load test that passes without loading anything is worse than no test**, and
+this one did it once. The `gpu` phase looped `glmark2 || sleep 1`, `glmark2` could
+not reach the display, and the loop spun on the error for ten minutes and reported
+"survived 600s". Nothing in the run said otherwise; the arithmetic did, afterwards.
+The phase peaked 63 °C against 59 °C for the idle control, on a tablet where the
+screensaver alone is worth 15 °C, and the recorder had `gpu=200MHz` — the idle
+clock — on every line. Two things changed as a result: every load now runs until
+the script kills it, and the sampling loop checks each interval that the load is
+still alive and fails the run the moment it is not. That check has since caught a
+second false pass, so treat any earlier `SURVIVED` line without a `hottest=` field
+as unproven and run it again.
 
 It refuses to run unless the recorder service is active, because a freeze caught
 without a record is a wasted freeze and a wasted power cycle.

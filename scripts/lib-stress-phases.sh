@@ -39,7 +39,12 @@ list_phases() {
          quietly cycling nothing.
          It drops the network every cycle, so over SSH on
          wireless run it detached or the lost session ends
-         the run:
+         the run. Two commands, and the first is not
+         optional: a backgrounded sudo whose timestamp has
+         expired reads the password from the tty, takes
+         SIGTTIN and stops before exec -- no run, no log, no
+         error anywhere.
+           sudo -v
            sudo setsid ./scripts/stress-freeze.sh \
              --phase wifi-reload </dev/null &>/tmp/reload.log &
                                                               needs: modprobe
