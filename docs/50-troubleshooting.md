@@ -565,6 +565,25 @@ use degrades 2.4 GHz Wi-Fi throughput. That is the hardware.
 A long-standing complaint on Chuwi's Atom tablets. It happens on the reference
 unit too.
 
+> **Outcome on the reference unit: it was the screensaver.** Suppressing the
+> `xscreensaver` autostart — the recipe is further down this section — took it
+> from freezing within ~19 minutes of being left alone to **3 days 8 hours of
+> continuous uptime** — `up=287263` — through deliberate CPU, memory and GPU load
+> tests in between. The desktop freezes stopped and have not returned.
+>
+> **It was not the charger**, which was the other live theory. The last sample
+> before the final desktop freeze reads `chg=1 ilim=2000mA bat=99% bst=Charging`:
+> the supply was already at the full 2 A budget and the battery full. What that
+> same line also shows is `gpu=400MHz` and 70 °C at `busy=14%` — the screensaver
+> animating on an idle machine. Raising the input current limit is still worth
+> doing on a unit that reads 500 mA (item 1 below, and it was measured at 500 mA
+> here earlier), but it is not what was hanging this one.
+>
+> **The boot freezes are a separate, still-open question.** Three of three landed
+> at 16-23 s of uptime, and none has recurred — but the machine has not rebooted
+> since, so there has been no opportunity for one. Untested, not fixed. The next
+> reboot is the test, and the recorder is still installed to catch it.
+
 **Start by recording, not by guessing.** A hard hang gives the kernel no chance
 to flush anything, so the journal simply stops and every theory below looks
 equally plausible from the wreckage. One evening of reading journal tails
@@ -788,6 +807,12 @@ The last desktop sample before a freeze was 70 °C with the GPU at 400 MHz and t
 charge current fallen from 1024 to 592 mA — the system drawing more of the 2 A
 budget, not the supply giving less. — **measured**
 
+**Suppressing it is what ended the desktop freezes.** Before: repeated hangs
+within ~19 minutes of the machine being left alone, the longest recorded session
+11 minutes. After: `up=287263` — 3 days 8 hours, unbroken, with ten-minute `cpu`,
+`mem` and `gpu` load runs deliberately thrown at it in the middle. One variable
+changed. — **verified on the unit**
+
 **Acceleration works, so a software-rendering theory does not hold.** Xorg says so
 outright, and reading its log costs nothing — no `mesa-utils`, no network:
 
@@ -817,6 +842,13 @@ work" fails on both halves.
 **Boot freezes land at 16-23 s of uptime**, three of three. The one sample
 captured at the edge read 77 °C and `busy=90%` at `up=23`, on a SoC that had been
 running 70 °C six minutes earlier and never cooled.
+
+These are still open, and the screensaver result says nothing about them either
+way: the machine has not rebooted since, so nothing has re-run the window they
+occur in. Worth knowing before reading a clean report as a clean bill of health.
+The power columns cannot help here — `bat=?`, `chg=?`, `ilim=?` on every one of
+those lines, because `axp288_charger` has not probed yet at 16 seconds. If a boot
+freeze needs pinning down, that gap is the thing to close first.
 
 `pkill -f xscreensaver` does **not** stick — the LXQt session respawns it, and
 `ps` shows it back a minute later. Suppress the autostart entry instead:
