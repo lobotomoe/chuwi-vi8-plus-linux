@@ -1014,6 +1014,57 @@ expected state on a fresh install of this tablet. Fix it with the file copy in
 [01-hardware.md](01-hardware.md#wi-fi--bluetooth--ampak-ap6212-broadcom-bcm43430),
 and reboot rather than reloading the module.
 
+## `apt update` says the Release file "is not valid yet"
+
+```
+Error: Release file for http://archive.ubuntu.com/ubuntu/dists/resolute-updates/InRelease
+is not valid yet (invalid for another 21d 16h 18min 1s).
+```
+
+Nothing is wrong with the repository or the signature. The tablet's clock is in
+the past, so a correctly signed file that became valid three weeks ago looks like
+one from the future. **The hardware clock on this unit does not survive a power
+cut** — it reads a fixed factory date:
+
+```
+               Local time: 2026-08-01 01:05:11 +04
+                 RTC time: 2015-12-05 01:15:37
+System clock synchronized: no
+              NTP service: inactive
+```
+
+— **verified on the unit**. Whether the RTC backup cell is dead or the board
+never had one, the practical result is the same: every cold boot starts from
+2015.
+
+**What makes this hard to notice is that the system clock is not obviously
+wrong.** It read 2026-08-01, not 2015 — systemd refuses to let the clock go
+backwards past a stored epoch timestamp, so the machine comes up at roughly
+whenever it was last known to be running. That is plausible enough to pass a
+glance and wrong enough to break signature validity windows. It also silently
+ruins any cross-log correlation by wall clock: this drift is why the freeze log
+on the reference unit runs `2026-08-18` and then `2026-07-28` a few blocks later.
+
+The reason it never self-corrected is on the last line above — Ubuntu's NTP client
+was not running at all, and `systemd-timesyncd` is not even installed on this
+image. Turn it on, which is persistent, then push the corrected time back into the
+RTC:
+
+```sh
+sudo timedatectl set-ntp true
+sudo hwclock --systohc
+timedatectl                       # expect: System clock synchronized: yes
+```
+
+`set-ntp true` enables and starts whatever NTP unit the system provides, so it
+survives reboots. `hwclock --systohc` is still worth doing: the RTC keeps running
+while the tablet holds charge, so it carries the right time across an ordinary
+reboot even if it loses it on a full drain.
+
+`watch-freeze.sh` is unaffected by any of this — it identifies sessions by boot
+id, not by timestamp, which is why the freeze report stayed readable through the
+drift.
+
 ## Everything is just slow
 
 It is a 2016 Atom with 2 GB of RAM and eMMC. Realistic expectations: a text
