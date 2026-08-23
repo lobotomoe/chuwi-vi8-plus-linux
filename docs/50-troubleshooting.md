@@ -569,7 +569,14 @@ unit too.
 > `xscreensaver` autostart — the recipe is further down this section — took it
 > from freezing within ~19 minutes of being left alone to **3 days 8 hours of
 > continuous uptime** — `up=287263` — through deliberate CPU, memory and GPU load
-> tests in between. The desktop freezes stopped and have not returned.
+> tests in between.
+>
+> Then the screensaver came back on the first reboot, and the unit froze on it
+> within the hour — photographed mid-`GLMatrix`. That is the third leg of the
+> same correlation and the one that makes it hard to argue with: off, and it
+> survives days of deliberate abuse; on, and it dies at idle. **Suppress it in a
+> way that survives a reboot, and verify that it did** — the runtime fix held for
+> three days only because nothing rebooted in those three days.
 >
 > **It was not the charger**, which was the other live theory. The last sample
 > before the final desktop freeze reads `chg=1 ilim=2000mA bat=99% bst=Charging`:
@@ -850,8 +857,23 @@ The power columns cannot help here — `bat=?`, `chg=?`, `ilim=?` on every one o
 those lines, because `axp288_charger` has not probed yet at 16 seconds. If a boot
 freeze needs pinning down, that gap is the thing to close first.
 
+**Remove the package.** Nothing on a wall-mounted tablet needs an animated
+OpenGL screen hack, and every softer measure here has a way of coming back:
+
+```sh
+sudo apt purge xscreensaver
+```
+
+Read what `apt` proposes to remove before agreeing. If it wants to take `lxqt` or
+`lxqt-session` with it, decline and use the autostart override below instead.
+
 `pkill -f xscreensaver` does **not** stick — the LXQt session respawns it, and
-`ps` shows it back a minute later. Suppress the autostart entry instead:
+`ps` shows it back a minute later. `xscreensaver-command -exit` does stick for the
+session, and that is the trap: it held for three days on the reference unit and
+then came back on the first reboot, because nothing had rebooted in between to
+test it. If the package has to stay, suppress the autostart entry, then **reboot
+and confirm `pgrep xscreensaver` finds nothing** — an untested suppression is
+indistinguishable from a working one until the machine restarts:
 
 ```sh
 xscreensaver-command -exit
