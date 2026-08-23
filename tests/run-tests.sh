@@ -354,6 +354,26 @@ expect_contains "the charger and gauge are read straight through" \
 expect_contains "a GPU with no frequency file reports unknown, not zero" \
   "gpu=?MHz" "$sample_out"
 
+# The frequency file is resolved lazily on purpose. systemd starts the recorder at
+# boot so it can catch the freezes that happen at boot, which is before i915 has
+# registered its card -- and resolving once at load time silently decided whole
+# sessions on that race, losing the column that identified the screensaver.
+late_gpu=$(
+  PSY="$fake/psy" CPUIDLE="$fake/cpuidle" THERMAL="$fake/thermal" DRM="$fake/drm-late" \
+    CPUFREQ="$fake/cpufreq" PROC_STAT="$fake/stat" \
+    bash -c '
+      mkdir -p "$DRM"
+      source "$1"
+      sample_line
+      mkdir -p "$DRM/card1"
+      printf "400" >"$DRM/card1/gt_cur_freq_mhz"
+      sample_line
+    ' _ "$SCRIPTS/lib-freeze-sample.sh"
+)
+expect_contains "a GPU that has not probed yet reports unknown" "gpu=?MHz" "$late_gpu"
+expect_contains "and is picked up when it appears, not written off for the session" \
+  "gpu=400MHz" "$late_gpu"
+
 # The load test's ceiling names the zone it tripped on, because the first abort
 # in the field read an implausible 100 C and the message did not say from where.
 hot_out=$(

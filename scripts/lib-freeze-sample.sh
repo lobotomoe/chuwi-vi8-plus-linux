@@ -97,8 +97,8 @@ hottest_zone() {
 }
 
 # The GT frequency file has moved around and the card number is not fixed -- it
-# is card1 on the reference unit, because card0 is taken. Resolve it once rather
-# than hard-coding a path that silently reports "?" forever.
+# is card1 on the reference unit, because card0 is taken. Hence a search rather
+# than a hard-coded path that would silently report "?" forever.
 find_gpu_freq_file() {
   local candidate
   for candidate in \
@@ -112,7 +112,20 @@ find_gpu_freq_file() {
   return 0
 }
 
-gpu_freq_file=$(find_gpu_freq_file)
+# Resolved lazily, not here.
+#
+# Resolving once at load time is a race this recorder always loses half the time:
+# systemd starts it at boot so it can catch the freezes that happen at boot, which
+# is before i915 has probed and registered card1. Whichever side of that race the
+# service lands on then decides the whole session -- the reference unit logged
+# gpu=200MHz for one three-day session and gpu=? for the two after it, with
+# nothing changed but timing.
+#
+# Worth more than a missing column: gpu= is the most sensitive indicator the
+# recorder has. 200 MHz idle against 400 MHz under the screensaver is what
+# identified the screensaver as the thing hanging the machine, and on the boots
+# where this raced it would not have been there to find.
+gpu_freq_file=
 
 idle_state_names() {
   local state name names=
@@ -227,6 +240,13 @@ sample_line() {
   voltage=$(milli "$(read_or_empty "$PSY/axp288_fuel_gauge/voltage_now")")
   online=$(read_or_empty "$PSY/axp288_charger/online")
   ilim=$(milli "$(read_or_empty "$PSY/axp288_charger/input_current_limit")")
+  # Re-resolved until it is found, and again if it goes away -- a module reload
+  # takes the card with it. Cheap: three globs against a directory the kernel
+  # keeps in memory. Deliberately not inside a command substitution, which would
+  # run in a subshell and throw the resolved path away every time.
+  if [ -z "$gpu_freq_file" ] || [ ! -r "$gpu_freq_file" ]; then
+    gpu_freq_file=$(find_gpu_freq_file)
+  fi
   gpu=$(read_or_empty "${gpu_freq_file:-/nonexistent}")
   khz=$(read_or_empty "$CPUFREQ/scaling_cur_freq")
   loadavg=$(read_or_empty /proc/loadavg)
