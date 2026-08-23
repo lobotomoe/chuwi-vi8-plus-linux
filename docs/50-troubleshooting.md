@@ -436,6 +436,34 @@ sudo mount /dev/mmcblk0p1 /mnt2 && ls /mnt2/EFI/BOOT/
   system. That is what `scripts/postinstall-grub-ia32.sh` installs; if you are
   doing it by hand, `apt install grub-efi-ia32-bin` inside the chroot.
 
+## Never run `apt autoremove` here without reading the list
+
+On the reference unit, after a routine `apt full-upgrade`:
+
+```
+The following packages were automatically installed and are no longer required:
+  grub-efi-ia32-bin  grub-efi-ia32-unsigned  grub-pc-bin
+Use 'sudo apt autoremove' to remove them.
+```
+
+Those are the 32-bit EFI GRUB binaries — the entire reason this tablet boots at
+all. `apt` marks them auto-installed because the installer pulled them in as
+dependencies, and nothing declares a lasting dependency on them afterwards.
+Accepting that suggestion does not un-boot the machine immediately, since the
+image already sitting on the ESP is untouched, but it removes the ability to
+regenerate it — and on a machine whose firmware cannot load a 64-bit loader,
+`grub-install --target=i386-efi` failing is not a recoverable position from a
+running system.
+
+Mark them so the question stops being asked:
+
+```sh
+sudo apt-mark manual grub-efi-ia32-bin grub-efi-ia32-unsigned
+```
+
+`grub-pc-bin` is the legacy-BIOS build and this machine has no BIOS path, so it
+genuinely is not needed — but it costs a megabyte and leaving it changes nothing.
+
 ## No sound, only "Dummy Output"
 
 Check the machine driver bound at all:
@@ -871,8 +899,15 @@ Read what `apt` proposes to remove before agreeing. If it wants to take `lxqt` o
 `ps` shows it back a minute later. `xscreensaver-command -exit` does stick for the
 session, and that is the trap: it held for three days on the reference unit and
 then came back on the first reboot, because nothing had rebooted in between to
-test it. If the package has to stay, suppress the autostart entry, then **reboot
-and confirm `pgrep xscreensaver` finds nothing** — an untested suppression is
+test it.
+
+**And the autostart override did not save it either.** The `Hidden=true` entry was
+in place — timestamped 13 minutes before the clean three-day session began, and
+still there when the screensaver came back and hung the machine at `up=707`. So
+the quiet three days are explained by the runtime kill alone; the override has
+never been observed to do anything on this system. Which is the whole argument for
+purging instead. If the package has to stay, write the override, then **reboot and
+confirm `pgrep xscreensaver` finds nothing** — an untested suppression is
 indistinguishable from a working one until the machine restarts:
 
 ```sh
