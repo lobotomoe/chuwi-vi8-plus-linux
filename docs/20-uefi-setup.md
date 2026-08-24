@@ -249,14 +249,38 @@ Boot Option #4   [Hard Disk: Windows Boot Manager]
 `Fast Boot` is `Disabled` out of the box too, which is what you want — USB gets
 enumerated fully at power-on.
 
-**3. Optional: CPU C-states.** Setting C-States to `C1` is a long-standing
-workaround for random freezes on Chuwi's Atom tablets. It costs battery life, so
-leave it alone unless you actually see freezes — and if you do, see
-[50-troubleshooting.md](50-troubleshooting.md#random-freezes). There is no
-`Power` tab on this firmware — with `SHOW ALL ITEM` on, look under
-**`Advanced` -> `PPM Configuration`** (Processor Power Management), which is where
-AMI puts C-state options on this platform. The submenu exists on this unit; its
-contents have not been photographed, so the exact item name is not recorded.
+**3. CPU C-states — do not bother, on Linux.** Setting C-States to `C1` is a
+long-standing workaround for random freezes on Chuwi's Atom tablets, and it is
+worth understanding why that advice does not carry over.
+
+Linux drives idle on this CPU with `intel_idle`, which
+[the kernel documentation describes](https://docs.kernel.org/admin-guide/pm/intel_idle.html)
+as using its own per-model knowledge "without input from system firmware" —
+it consults ACPI `_CST` only for processors it does not recognise, and Airmont is
+not one of those. The firmware item changes what ACPI advertises; nothing reads
+it. The reference unit's own logs show which table is live: the idle states are
+named `C6N`/`C6S`/`C7S`, which are `intel_idle` names, where ACPI would report a
+flat `C1`/`C2`/`C3`.
+
+The forum advice is not wrong, it is about a different operating system — Windows
+*does* take its idle states from ACPI, so the toggle is real there. On Linux the
+lever is `intel_idle.max_cstate=`, and
+[50-troubleshooting.md](50-troubleshooting.md#random-freezes) has the reversible
+recipe.
+
+Confirm before believing any of this on a given unit:
+
+```sh
+cat /sys/devices/system/cpu/cpuidle/current_driver   # expect: intel_idle
+```
+
+If that reads `acpi_idle` instead, the firmware has masked `MWAIT` and the BIOS
+item is back in play — that is the one way it can still matter.
+
+The menu, for completeness: there is no `Power` tab on this firmware. With
+`SHOW ALL ITEM` on, look under **`Advanced` -> `PPM Configuration`** (Processor
+Power Management), which is where AMI puts C-state options on this platform. The
+submenu exists on this unit; its contents have not been photographed.
 
 Save with **F4** and let it reboot.
 

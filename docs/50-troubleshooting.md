@@ -1034,12 +1034,45 @@ Things to try, in order:
    available with `intel_idle.max_cstate=1`, which needs a reboot to apply and
    another to undo.
 
-   The firmware route — `C-States: C1` — is the worst of the three. The Aptio
-   build here has no `Power` tab; with `SHOW ALL ITEM` on it is under
-   **`Advanced` -> `PPM Configuration`** ([20-uefi-setup.md](20-uefi-setup.md#what-to-change)).
-   But `/sys/devices/system/cpu/cpuidle/current_driver` says `intel_idle` on this
-   unit, and `intel_idle` carries its own per-model tables instead of reading the
-   firmware's ACPI `_CST`, so the setting may do nothing at all.
+   **The firmware route does nothing here, and it is worth knowing why before
+   spending a trip on it.** `/sys/devices/system/cpu/cpuidle/current_driver` reads
+   `intel_idle` on this unit, and
+   [the kernel documentation](https://docs.kernel.org/admin-guide/pm/intel_idle.html)
+   is explicit that `intel_idle` drives idle from its own per-model tables "without
+   input from system firmware", falling back to ACPI `_CST` only for processors it
+   does not recognise. Airmont it recognises. The logged state names settle it from
+   this machine's own data: `C6N`, `C6S`, `C7S` are `intel_idle` names, where ACPI
+   would report a flat `C1`/`C2`/`C3`. The firmware item changes what ACPI
+   advertises and nothing reads it.
+
+   That also explains why the workaround circulates at all — Windows *does* take
+   its idle states from ACPI, so `C-States: C1` is a real setting over there. The
+   menu is under **`Advanced` -> `PPM Configuration`**
+   ([20-uefi-setup.md](20-uefi-setup.md#what-to-change)) if you want to look. The
+   one case where it comes back into play is a firmware that masks `MWAIT`
+   outright, which would show up as `current_driver` reading `acpi_idle` instead.
+
+   **Why C-states are worth suspecting again despite all of the above.** They were
+   written off here earlier on the grounds that the boot freezes land in the
+   busiest moment of boot, not in idle. That reasoning was about the wrong
+   mechanism. Intel's MMC maintainer describes a different one:
+
+   > *"Intel Baytrail has been observed sometimes to hang if host controllers are
+   > using DMA while deep C-states are used"*
+   > — [mmc: sdhci-acpi: Fix device hang on Intel BayTrail](https://lkml.iu.edu/hypermail/linux/kernel/1503.3/00272.html)
+
+   The kernel's workaround is a PM QoS request (`dma_latency = 20`) that keeps the
+   CPU out of deep states while a transfer is in flight — and it is gated on the
+   CPU model, because "host controller ACPI HIDs are not unique to Baytrail". The
+   model it matches is **0x37, Bay Trail**. This tablet is `0x6:4c:3` — **model
+   0x4C, Airmont**, outside that guard.
+
+   Which lines up with where the boot freezes actually stop: two seconds after
+   `brcmfmac` finishes pushing firmware to the radio over SDIO, the heaviest SDIO
+   DMA of the entire boot. The gaps between those bursts are idle, whatever the
+   `busy=` average says. Not established — but it is a mechanism, it names this
+   exact SoC as unprotected, and `intel_idle.max_cstate=1` tests it for the cost of
+   a reboot.
 
    Expect little either way, and see the VLP52 caveat above: the erratum behind
    the popular advice is Bay Trail, and this is Airmont. **The boot freezes argue
