@@ -614,10 +614,70 @@ unit too.
 > doing on a unit that reads 500 mA (item 1 below, and it was measured at 500 mA
 > here earlier), but it is not what was hanging this one.
 >
-> **The boot freezes are a separate, still-open question.** Three of three landed
-> at 16-23 s of uptime, and none has recurred — but the machine has not rebooted
-> since, so there has been no opportunity for one. Untested, not fixed. The next
-> reboot is the test, and the recorder is still installed to catch it.
+> **The boot freezes are a separate fault and they are not fixed.** They kept
+> happening after the screensaver was gone, at 16-23 s of uptime every time. The
+> leading explanation is now a named silicon erratum — **CHT45**, quoted in full
+> below — for which the only OS-level workaround is to take C6 and C7 away.
+
+### Erratum CHT45: the processor may not wake from C6 or deeper
+
+This SoC has a documented, unfixed silicon bug whose symptom is exactly what this
+tablet does. From Intel's own specification update for the Atom Z8000 series
+(document **332067**), verbatim:
+
+```
+CHT45          Processor May Not Wake From C6 or Deeper Sleep State
+
+Problem:       The processor may not wake after a sleep state entered with MWAIT Target C-state of
+               C6 and Sub C-state of 2 or a target C-state deeper than C6 is requested.
+
+Implication:   When this erratum occurs, the system may hang.
+
+Workaround:    It is possible for the firmware to contain a workaround for this erratum.
+
+Status:        For the steppings affected, see the Summary Tables of Changes.
+```
+
+The summary table marks CHT45 for every stepping listed and its status as
+**No Fix**. The document covers the Z8300 as S-Spec `SR29Z`, stepping `C-0` — and
+this tablet reports CPUID `0x6:4c:3`, which is `0x406C3`, Cherry Trail C0. Same
+part, same stepping, erratum applies.
+
+Read the symptom back against the photographs. A processor that entered a sleep
+state and never woke leaves the display controller scanning out the last frame it
+was given: a lit screen holding a still image, with nothing in the journal because
+nothing ran to write it. That is the frozen boot log, and it is the frozen
+screensaver.
+
+**The only OS workaround is to disallow C6 and C7.** Intel's own "workaround" line
+offers nothing to an operating system — it says the *firmware* may contain one,
+which is not something a user can switch on. On Linux that means:
+
+```sh
+printf 'GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT intel_idle.max_cstate=1 processor.max_cstate=1"\n' |
+  sudo tee /etc/default/grub.d/99-cstate.cfg
+sudo update-grub
+```
+
+A drop-in rather than an edit to `GRUB_CMDLINE_LINUX_DEFAULT` itself, so undoing it
+is `rm` plus `update-grub` rather than a careful re-edit. Ubuntu's `grub-mkconfig`
+sources `/etc/default/grub.d/*.cfg` after the main file. Confirm it took with
+`cat /proc/cmdline` after the reboot — the config having the flag and the kernel
+having been booted with it are different claims.
+
+It costs battery and runs warmer. On a tablet living on a wall charger that is not
+a cost at all.
+
+**Note what this does not explain.** The desktop freezes were the screensaver, and
+they stopped when the package went, which is a result with three legs of evidence
+under it. CHT45 is the leading explanation for the *boot* freezes and it is not yet
+confirmed on this unit — the test is whether they stop with C6/C7 disabled, against
+the historical rate rather than against one lucky boot.
+
+**One cheap prediction that would corroborate it.** If a hang is CHT45, the
+processor is asleep and the kernel is not running, so the Caps Lock LED test below
+should show a *dead* LED. A LED that still toggles would mean the kernel is alive
+and something else is wedged — which would point away from this erratum entirely.
 
 **Start by recording, not by guessing.** A hard hang gives the kernel no chance
 to flush anything, so the journal simply stops and every theory below looks
@@ -755,14 +815,19 @@ twice. That is a current peak, not an idle moment, and it is why the charger is
 item 1 below. Read that alongside
 [what the recorder caught](#what-the-recorder-actually-caught), which weakens it.
 
-The reading to be careful with is the popular one. Every search for this points
-at deep C-states and `intel_idle.max_cstate=1`, and the erratum behind that is
-**VLP52, which is Bay Trail only**: the patch written for it matches a single
-model, `case 0x37: /* BYT */`, and was never merged. This tablet reports
-`family:model:stepping 0x6:4c:3`, and `0x4c` is Airmont — the Cherry Trail core,
-a different generation. So the famous fix rests on an erratum this CPU does not
-have. Cheap to try, but not the thing to try first. — **verified** by reading the
-patch and the CPU model off the unit
+Every search for this points at deep C-states and `intel_idle.max_cstate=1`, and
+the erratum usually named alongside it is **VLP52, which is Bay Trail only**: the
+patch written for it matches a single model, `case 0x37: /* BYT */`, and was never
+merged. This tablet reports `family:model:stepping 0x6:4c:3`, and `0x4c` is
+Airmont — the Cherry Trail core, a different generation.
+
+**That is true and it was used here to reach a wrong conclusion.** Checking the
+Bay Trail erratum, finding it did not apply, and writing C-states off was the
+mistake: Cherry Trail has its own, [CHT45](#erratum-cht45-the-processor-may-not-wake-from-c6-or-deeper),
+status **No Fix**, and it applies to this exact part and stepping. The popular
+advice happens to be right here for a reason its sources never state. Worth
+remembering as a method: an erratum not applying is not the same as the mechanism
+not applying, and the second question has to be asked separately.
 
 What the timing does rule out is screen blanking, which cannot explain a freeze
 22 seconds in with the boot log still lit on the panel.
@@ -1074,11 +1139,17 @@ Things to try, in order:
    exact SoC as unprotected, and `intel_idle.max_cstate=1` tests it for the cost of
    a reboot.
 
-   Expect little either way, and see the VLP52 caveat above: the erratum behind
-   the popular advice is Bay Trail, and this is Airmont. **The boot freezes argue
-   against C-states on their own** — they land 16-23 s in, while services are
-   still starting. That is the busiest the machine ever is, and a deep-idle bug
-   needs a machine that has gone to sleep.
+   And the second mechanism is the one with Intel's name on it:
+   [CHT45](#erratum-cht45-the-processor-may-not-wake-from-c6-or-deeper) — the
+   processor may not wake from C6 sub-state 2 or deeper, status **No Fix**, this
+   exact part and stepping. Between the two, this item stops being a long shot and
+   becomes the first thing to try.
+
+   The argument once made here against it — that boot freezes land 16-23 s in,
+   while services are still starting, which is the busiest the machine ever is —
+   does not hold. `busy=` is an average over five seconds. A core that is idle
+   between two bursts of SDIO DMA still enters C6, and CHT45 needs one entry, not
+   a sustained idle.
 4. Kernel parameters another Vi8 Plus owner reports as their freeze fix:
 
    ```
