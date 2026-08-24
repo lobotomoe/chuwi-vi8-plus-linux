@@ -878,12 +878,62 @@ work" fails on both halves.
 captured at the edge read 77 °C and `busy=90%` at `up=23`, on a SoC that had been
 running 70 °C six minutes earlier and never cooled.
 
-These are still open, and the screensaver result says nothing about them either
-way: the machine has not rebooted since, so nothing has re-run the window they
-occur in. Worth knowing before reading a clean report as a clean bill of health.
-The power columns cannot help here — `bat=?`, `chg=?`, `ilim=?` on every one of
-those lines, because `axp288_charger` has not probed yet at 16 seconds. If a boot
-freeze needs pinning down, that gap is the thing to close first.
+These are still open, and the screensaver result says nothing about them: it was a
+desktop-idle fault and this is not. The power columns cannot help either —
+`bat=?`, `chg=?`, `ilim=?` on every one of those lines, because `axp288_charger`
+has not probed yet at 16 seconds.
+
+**A console photographed mid-hang says where it stops.** Booting without a splash
+so the log is visible, the last lines on a frozen screen were:
+
+```
+[   19.756358] brcmfmac: brcmf_fw_alloc_request: using brcm/brcmfmac43430a0-sdio for chip BCM43430/0
+[   20.426338] brcmfmac: brcmf_c_process_clm_blob: no clm_blob available (err=-2)
+[   20.430110] brcmfmac: brcmf_c_process_txcap_blob: no txcap_blob available (err=-2)
+[   20.435638] brcmfmac: brcmf_c_preinit_dcmds: Firmware: BCM43430/0 wl0: May 29 2017 ... FWID 01-130000
+[  OK  ] Started bluetooth.service
+         Starting NetworkManager.service - Network Manager...
+         Starting wpa_supplicant.service - WPA supplicant...
+[  OK  ] Started polkit.service
+         Starting ModemManager.service - Modem Manager...
+[  OK  ] Started iio-sensor-proxy.service
+[  OK  ] Started wpa_supplicant.service - WPA supplicant.
+```
+
+— **photographed on the unit**. Nothing after that. The radio firmware finishes
+loading at 20.4 s and the machine dies within about two seconds of the supplicant
+coming up on top of it. That is the same window every earlier boot freeze landed
+in, now with the kernel's own timestamps against it rather than a `up=` reading
+from the sampler.
+
+The `clm_blob` and `txcap_blob` lines are **not** the fault — they are normal for
+this chip on Linux, which ships no regulatory blob for it, and they appear on
+boots that succeed too. What matters is the sequence: cold module, firmware, then
+`NetworkManager` and `wpa_supplicant` starting on it. That is precisely what
+`stress-freeze.sh --phase wifi-reload` reproduces on demand.
+
+**On a tablet you cannot reach, fix the recoverability before the fault.** A boot
+hang here needs a human to hold the power button, which on a machine in another
+city is the expensive part — not the hang itself. Cherry Trail has an iTCO
+watchdog; wiring systemd to it turns "somebody has to travel" into "it resets
+itself in a minute and the next boot probably succeeds".
+
+```sh
+ls -l /dev/watchdog*        # is there one at all
+printf '[Manager]\nRuntimeWatchdogSec=60\nRebootWatchdogSec=2min\n' |
+  sudo tee /etc/systemd/system.conf.d/watchdog.conf
+sudo systemctl daemon-reexec
+systemctl show -p RuntimeWatchdogUSec       # expect 1min, not 0
+```
+
+`RuntimeWatchdogSec` has systemd pet `/dev/watchdog` while it is alive, so the
+hardware resets the machine when it stops. Note what that does and does not cover:
+a hang that takes the kernel with it gets reset, and a hang that leaves the kernel
+scheduling does not, because systemd keeps petting. Which of the two this fault is
+has not been established — the Caps Lock test below is what would settle it.
+
+This does not fix anything, and that is the point: it makes an unfixed fault
+survivable while the fix is still being looked for.
 
 **Remove the package.** Nothing on a wall-mounted tablet needs an animated
 OpenGL screen hack, and every softer measure here has a way of coming back:
