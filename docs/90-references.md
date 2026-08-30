@@ -246,7 +246,7 @@ and reachable by paging to `&st=` in multiples of 20.
 - **The CHUWI splash sits for 5-10 minutes after you select a USB device, and
   that is normal.** Post #2719 gives the full working procedure for booting a
   Windows installer this way. Corroborated by owners who mistook it for a hang
-  (#2609, #3345, #3741). This is the single most useful thing in the thread.
+  (#2609, #3345, #3741).
 - **Ubuntu 20.04 was installed successfully on this tablet in May 2020**, post
   #3875: `bootia32.efi` alone in `\EFI\BOOT\` with everything else deleted, stick
   written with Rufus, and a working network connection required or the install

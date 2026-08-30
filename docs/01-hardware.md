@@ -682,8 +682,6 @@ driver is running on its built-in default. And yet `speaker-test -c 2 -t wav -l 
 announces both "Front Left" and "Front Right" audibly through the single physical
 speaker, with nothing lost — **verified on the unit**. Something below the machine
 driver already combines the two channels; the quirk was never what made that work.
-An earlier revision of this file predicted half the audio would disappear, which
-was wrong.
 
 The components string does reach userspace, though, and there is direct evidence of
 it: `wpctl status` names the capture device **"Built-in Audio Internal Microphone on

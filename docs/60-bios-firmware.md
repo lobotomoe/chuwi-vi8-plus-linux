@@ -175,7 +175,7 @@ byte-identical. Extracting it needs a RAR5-capable unpacker; `bsdtar` on macOS
 handles it, while p7zip reports *"Unsupported Method"* and silently writes
 zero-byte files.
 
-Two useful things fell out of this:
+From that:
 
 - The folder labelled *"Vi8 plus Latest BIOS"* and the one labelled
   *"BIOS 20160225 (to solve issue with no read TF card)"* contain **byte-identical
@@ -198,7 +198,7 @@ byte for byte:
 
 — **verified**
 
-Two things follow. The Intel TXE firmware is **not** touched by this update, so
+The Intel TXE firmware is **not** touched by this update, so
 `.109` carries no ME/TXE change whatever else it does. And the BIOS region is not
 patched but rebuilt — 68 thousand scattered differences is a recompile, so a byte
 diff cannot isolate the microSD fix. What the update did *not* change is the more

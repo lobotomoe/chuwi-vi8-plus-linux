@@ -294,7 +294,7 @@ the file first — it is the faster way to learn whether the rest of the touchsc
 stack is healthy, and it makes a good bisection point if the patched kernel still
 does not work.
 
-That route is no longer theoretical: on the reference unit
+On the reference unit
 `extract-touchscreen-fw.sh --download --install` plus a `modprobe -r` / `modprobe`
 brought the touchscreen up on a stock Ubuntu kernel with the DMI still unfilled —
 tracking the finger, though with both axes rotated 180°, which a libinput

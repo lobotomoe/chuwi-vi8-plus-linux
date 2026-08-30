@@ -406,8 +406,6 @@ loader is running. Give it **a full 10 minutes** before concluding anything.
 Turning `Quiet Boot` off (`Boot` tab) replaces the logo with POST text and makes
 this far less nerve-wracking — it does not make the stick boot any sooner.
 
-Only after 10 minutes of no change is it worth treating as a real hang.
-
 What should happen next: a GRUB menu with the distribution's usual entries.
 That means `bootia32.efi` started, found `/boot/grub/grub.cfg` on the stick and
 handed over. From here the 32-bit part of the job is done — everything after

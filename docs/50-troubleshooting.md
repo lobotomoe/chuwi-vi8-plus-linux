@@ -251,9 +251,8 @@ nomodeset                  # sledgehammer: a picture, but no acceleration
 ```
 
 **Do not reach for safe graphics first, and do not conclude you have a display
-problem from a black screen alone.** This page previously said the plain "Try or
-Install" entry black-screens this tablet and that safe graphics was the fix. That
-was wrong, and the mistake is worth describing because it is easy to repeat.
+problem from a black screen alone.** A storage fault mimics a graphics fault here
+convincingly enough that the wrong conclusion is easy to reach and easy to repeat.
 
 The plain entry did black-screen, repeatedly, while safe graphics reached a
 desktop — which looks like conclusive evidence about the display driver. It was

@@ -306,8 +306,7 @@ xwininfo -id "$id" | grep 'Map State'     # touch a field, run it again
 
 ### An application that started before accessibility was on never appears
 
-This is the failure that wastes the evening. Every setting above can be
-correct, onboard can be running, and the keyboard still never shows — because
+Every setting above can be correct, onboard can be running, and the keyboard still never shows — because
 onboard learns about focus only from applications registered on the AT-SPI bus,
 and a program checks that bus **once, at startup**. Anything launched before
 `toolkit-accessibility` was turned on stays invisible to it for the rest of its

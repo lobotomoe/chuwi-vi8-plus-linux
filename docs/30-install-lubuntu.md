@@ -38,10 +38,9 @@ Both paths, so the install survives firmware that ignores NVRAM boot entries. GR
 own menu carries `Memory test (mt86+ia32)`, which is the giveaway that the 32-bit
 build is the one installed. `postinstall-grub-ia32.sh` was not needed.
 
-That settles the doubt this section used to carry about whether `apt-cdrom` can find
-a FAT32 copy of the ISO the way it finds a `dd`-written one. It can, or the step
-found what it needed some other way; either way the outcome is a booting 32-bit
-GRUB. Connecting Wi-Fi first remains the safer habit, and if you do end up with an
+So `apt-cdrom` found what it needed on a FAT32 copy of the ISO, or the installer
+reached the package some other way — either way the result was a booting 32-bit
+GRUB with no network. Connecting Wi-Fi first remains the safer habit, and if you do end up with an
 unbootable install, [postinstall-grub-ia32.sh](../scripts/postinstall-grub-ia32.sh)
 with `--offline-debs` is the recovery.
 
