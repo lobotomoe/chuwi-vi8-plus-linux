@@ -283,8 +283,9 @@ and reachable by paging to `&st=` in multiples of 20.
   and were told no — "sd карточки не получается, нада флешка" (#2191), with the
   suggested workaround being to run the installer's `Setup.exe` from the already
   running system rather than booting the card (#2410); asked again in #3411. No
-  post in the thread reports booting from the slot. Strong, but still second-hand:
-  **not tried on the unit behind this guide.**
+  post in the thread reports booting from the slot, and this has since been
+  [confirmed on the unit](01-hardware.md#storage) — a card in the same layout that
+  boots this tablet from USB does not appear under `Boot Override` at all.
 - **Cards dropping out is a recurring complaint on this model**, independent of
   booting: undetected cards of any size (#894), a card that needs re-seating after
   every boot (#2572), 32 and 64 GB cards that kept falling off (#3046). Fixes

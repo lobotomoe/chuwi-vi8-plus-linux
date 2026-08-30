@@ -432,6 +432,20 @@ cost of SD-card speed. Do it deliberately, with a real `/etc/fstab` entry and
 The AXP288 fuel gauge is calibrated by the firmware, so the reported capacity of
 a nine-year-old battery will be optimistic; trust the trend, not the number.
 
+**Check the charger's input current limit.** The `axp288_charger` driver can leave
+it at 500 mA, which is less than this tablet draws — so it runs the battery down
+while plugged in and reporting `online`:
+
+```sh
+cat /sys/class/power_supply/axp288_charger/input_current_limit   # 500000 is too low
+echo 2000000 | sudo tee /sys/class/power_supply/axp288_charger/input_current_limit
+```
+
+The limit is permission, not delivery: if the supply cannot source 2 A it throttles
+straight back, and `status` stays `Discharging`. Use a plain USB-A 2 A charger on an
+A-to-C cable, no hub. Mechanism in
+[01-hardware.md](01-hardware.md#ports-otg-and-charging-while-a-hub-is-attached).
+
 Expect noticeably worse idle drain than Windows. Cherry Trail's deep idle states
 depend on firmware cooperation that Linux does not always get, and the platform
 is long past anyone tuning it. `powertop --auto-tune` is worth a try; measure

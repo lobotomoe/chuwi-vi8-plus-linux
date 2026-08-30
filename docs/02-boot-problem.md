@@ -93,8 +93,11 @@ So instead the stick is built the other way around: format it FAT32 yourself, co
 "ISO image mode".
 
 The alternative is [Ventoy](https://www.ventoy.net/), which keeps ISOs as files and
-carries its own IA32 UEFI support. It is a good option on Windows and Linux, and it is
-covered in those two guides. There is no macOS build of Ventoy.
+carries its own IA32 UEFI support. It is **not known to work on this tablet and not
+known to fail** — the one attempt here never got far enough to tell, because the
+firmware did not enumerate the stick at all. Covered in the
+[Linux](11-usb-linux.md#option-b-ventoy--unproven-on-this-tablet) and
+[Windows](12-usb-windows.md#option-b-ventoy) guides. There is no macOS build.
 
 ## Secure Boot
 

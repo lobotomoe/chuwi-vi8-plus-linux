@@ -831,8 +831,7 @@ FAT32, carrying `\EFI\BOOT\BOOTIA32.EFI`, the same layout that boots this tablet
 from a USB stick — was put in the slot and **does not appear under `Boot Override`
 at all**. — **verified on the unit**
 
-That matches what owners have said for years (4PDA #2191, #2410, #3411) and closes
-a question this document previously answered on their word alone.
+That matches what owners have said for years (4PDA #2191, #2410, #3411).
 
 You can put `/home` on the SD card afterwards if you want.
 
