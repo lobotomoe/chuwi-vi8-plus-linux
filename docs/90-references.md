@@ -1,8 +1,12 @@
 # References
 
-Sources for the claims made in this repository. Everything marked **verified**
-was checked directly — against the kernel or distribution source, or by
-inspecting the actual ISO — rather than taken from a forum post.
+Sources for the claims made in this repository.
+
+Two markers appear throughout. **verified** means the claim was checked against
+the thing itself rather than against someone's account of it — kernel or
+distribution source, an ISO, a firmware image, a driver package, a photograph of
+the setup menu. **verified on the unit** means it was observed on the reference
+tablet. Anything with neither marker is a report, and is attributed.
 
 ## The 32-bit UEFI problem
 
@@ -91,8 +95,9 @@ file of per-tablet notes including his own Fedora install procedure for it:
 
 <https://github.com/jwrdegoede/sunxi-fedora-scripts/blob/master/x86-tablet-info>
 
-What it establishes, all of it matching this repository's own findings where the two
-overlap:
+What it establishes — matching this repository's findings except on the
+touchscreen firmware, where his unit and this one disagree (see
+[60-bios-firmware.md](60-bios-firmware.md#what-could-not-be-determined)):
 
 - `Cherry Trail x5-Z8300, 2G RAM`, `8" 800x1280 LCD`. The 800x1280 confirms the
   panel scans out **portrait**. — **verified on the unit** (Windows "About" reports
@@ -475,7 +480,7 @@ copies obtained from the sources listed.
 
 ### Verified by parsing the images
 
-Three 8 MB SPI images were extracted with
+The firmware images below were extracted with
 [`uefi-firmware-parser`](https://github.com/theopolis/uefi-firmware-parser) and
 their SMBIOS defaults, ACPI tables and Intel flash descriptors read directly.
 
@@ -500,9 +505,10 @@ their SMBIOS defaults, ACPI tables and Intel flash descriptors read directly.
   contains four Bay Trail Vi8 images and no Vi8 Plus BIOS at all.
 - Flash descriptors differ between the single-OS and dual-boot images (BIOS region
   4096 KiB at `0x400000` vs 6144 KiB at `0x200000`). — **verified**
-- The ICN8505 touchscreen firmware was **not** found in either Cherry Trail image,
-  searched by the kernel's `prefix`/`length` descriptor across all decompressed
-  sections. — **verified absent** from what could be decompressed
+- The ICN8505 touchscreen firmware was **not** found in `.108`, `.109` or the
+  dual-boot image, searched by the kernel's `prefix`/`length` descriptor across all
+  decompressed sections — nor in the reference unit's own dumped chip.
+  — **verified absent** from what could be decompressed
 
 ### Kernel precedent for generic DMI
 
@@ -655,11 +661,3 @@ controller generation (38580 bytes, prefix `30 05 00 00 64 05 00 00`).
 The 128-byte gap against the kernel's pinned 35012 is **not** padding: appending or
 prepending 128 zero or `0xff` bytes to the 34884-byte file produces none of the
 kernel's SHA-256. It is a different build, not a trimmed one.
-
-## Distributions
-
-- Lubuntu 26.04 LTS release notes. <https://lubuntu.me/lubuntu-26-04-lts-released/>
-- Debian installer images. <https://www.debian.org/CD/>
-- Arch Linux downloads. <https://archlinux.org/download/>
-- Ventoy. <https://www.ventoy.net/>
-- Rufus. <https://rufus.ie/>

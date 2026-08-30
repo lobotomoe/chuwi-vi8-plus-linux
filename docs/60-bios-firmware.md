@@ -8,8 +8,11 @@ not fix any of the Linux problems, and one of the images circulating under the
 name "Vi8 Plus BIOS" is for a completely different tablet and would brick this
 one. The rest of this page is the evidence for that, and what does help instead.
 
-Everything below marked **verified** was established by parsing the actual
-firmware images — SHA-256 in the table further down — not from forum claims.
+Everything below marked **verified** was established by inspecting the thing
+itself rather than a forum account of it: mostly the firmware images whose
+SHA-256 are in the table further down, and where the text says so, Chuwi's driver
+package, the EFI binaries inside it, kernel or flashrom source. **verified on the
+unit** means it was read off the reference tablet.
 
 You do not have to take any of it on trust.
 [`scripts/inspect-bios-image.py`](../scripts/inspect-bios-image.py) re-derives
@@ -471,9 +474,10 @@ Three methods exist, all three Chuwi's own. Both EFI ones are host-independent �
 copy the directory onto a FAT32 stick from Linux, macOS or anything else, boot
 it, and `startup.nsh` runs itself.
 
-**From an EFI shell, the stock `.108` package**: copy `dos/` and boot it. This is
-the one to prefer — it writes only the BIOS region and leaves the descriptor and
-TXE alone:
+**From an EFI shell, the stock `.108` package**: copy **the contents of** `dos/`
+to the root of a FAT32 stick — not the `dos/` directory itself, or the firmware
+will not find `\EFI\BOOT\BOOTIA32.EFI` — and boot it. This is the one to prefer:
+it writes only the BIOS region and leaves the descriptor and TXE alone:
 
 ```
 afuefi.efi bios.bin /p /b /n /x /reboot /r
