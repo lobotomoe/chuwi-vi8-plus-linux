@@ -165,8 +165,144 @@ dmesg | grep -i icn8505
 xinput list            # or: libinput list-devices
 ```
 
-An on-screen keyboard is worth having if you ever use it without the hub:
-`onboard` (X11) or `squeekboard`/`maliit` (Wayland).
+## On-screen keyboard
+
+Not optional. There is no built-in keyboard, so without one the tablet cannot
+type its own Wi-Fi passphrase, let alone a login form. On X11 — which is what
+Lubuntu/LXQt gives you here — that is `onboard`; on Wayland, `squeekboard` or
+`maliit`.
+
+```sh
+sudo apt install onboard
+```
+
+Installing it is not enough, and the defaults are wrong for a touch-only
+machine. Four settings matter:
+
+```sh
+gsettings set org.gnome.desktop.interface toolkit-accessibility true
+gsettings set org.onboard.auto-show enabled true
+gsettings set org.onboard.auto-show tablet-mode-detection-enabled false
+gsettings set org.onboard start-minimized true
+gsettings set org.onboard.icon-palette in-use true
+gsettings set org.onboard.window force-to-top true
+gsettings set org.onboard.window docking-enabled false
+```
+
+- **`toolkit-accessibility`** is what makes auto-show possible at all: onboard
+  learns that a text field has focus over AT-SPI, and without it the keyboard
+  never appears by itself. Onboard will otherwise pop a dialog asking to enable
+  it — set it here instead, so it is configuration rather than a click someone
+  has to remember. Applications started *before* this was turned on will not be
+  introspectable until they restart.
+- **`tablet-mode-detection-enabled false`** — onboard can gate auto-show on the
+  machine being in tablet mode, and this hardware has no tablet-mode switch at
+  all (`/proc/bus/input/devices` lists a `Lid Switch` and nothing else of the
+  kind). Leave the gate on and auto-show waits for a signal that never arrives.
+- **`start-minimized` + `icon-palette`** give the behaviour you want: nothing
+  covering the screen until you touch a text field, and a small floating icon to
+  summon the keyboard by hand when an application does not report focus.
+- **`force-to-top` + `docking-enabled false`** so it floats above a fullscreen
+  application instead of trying to shrink its work area.
+
+Autostart it per-user:
+
+```sh
+cat > ~/.config/autostart/onboard.desktop <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Onboard on-screen keyboard
+Exec=onboard
+Terminal=false
+EOF
+```
+
+Verify by touching a text field rather than by checking that the process
+exists — `pgrep onboard` succeeding tells you nothing about whether auto-show
+works. The keyboard's window should be unmapped with nothing focused and
+mapped once a field has focus:
+
+```sh
+id=$(xwininfo -root -children | grep '"Onboard":' | awk '{print $1}')
+xwininfo -id "$id" | grep 'Map State'     # touch a field, run it again
+```
+
+### An application that started before accessibility was on never appears
+
+This is the failure that wastes the evening. Every setting above can be
+correct, onboard can be running, and the keyboard still never shows — because
+onboard learns about focus only from applications registered on the AT-SPI bus,
+and a program checks that bus **once, at startup**. Anything launched before
+`toolkit-accessibility` was turned on stays invisible to it for the rest of its
+life. List what is actually registered:
+
+```sh
+python3 - <<'EOF'
+import gi
+gi.require_version("Atspi", "2.0")
+from gi.repository import Atspi
+Atspi.init()
+d = Atspi.get_desktop(0)
+for i in range(d.get_child_count()):
+    print(d.get_child_at_index(i).get_name())
+EOF
+```
+
+If the application you care about is missing from that list, restarting it is
+usually enough. Firefox needs more than that when it is started from a script
+or a session file, because it reads an environment variable rather than asking
+the bus again:
+
+```sh
+export GNOME_ACCESSIBILITY=1
+```
+
+Set it in whatever launches the browser, not in your interactive shell.
+
+### Size and appearance
+
+The defaults are a small yellowish keyboard in the top-left corner, which on a
+[portrait-native panel](#if-everything-starts-sideways) is both too small to
+type on and in the way. Onboard keeps separate geometry per orientation, in
+pixels:
+
+```sh
+gsettings set org.onboard.window.portrait x 0
+gsettings set org.onboard.window.portrait y 840        # 1280 - 440
+gsettings set org.onboard.window.portrait width 800
+gsettings set org.onboard.window.portrait height 440
+```
+
+Theming has a trap in it. Onboard rewrites `org.onboard.theme-settings` from
+its theme file every time it starts, so colours and fonts set with `gsettings`
+survive until the next restart and no further — and with
+`system-theme-tracking-enabled` left at its default it picks the theme from the
+desktop's GTK theme, overriding the choice entirely. The durable way is a theme
+file of your own:
+
+```sh
+gsettings set org.onboard system-theme-tracking-enabled false
+mkdir -p ~/.local/share/onboard/themes
+cat > ~/.local/share/onboard/themes/Custom.theme <<'EOF'
+<?xml version="1.0"?>
+<theme format="1.3" name="Custom">
+  <color_scheme>Charcoal</color_scheme>
+  <key_style>flat</key_style>
+  <roundrect_radius>20.0</roundrect_radius>
+  <key_size>92.0</key_size>
+  <key_fill_gradient>0.0</key_fill_gradient>
+  <key_stroke_gradient>0.0</key_stroke_gradient>
+  <key_label_font>Ubuntu</key_label_font>
+  <key_label_overrides/>
+  <key_shadow_strength>0.0</key_shadow_strength>
+  <key_shadow_size>0.0</key_shadow_size>
+</theme>
+EOF
+gsettings set org.onboard theme ~/.local/share/onboard/themes/Custom.theme
+```
+
+`<color_scheme>` names a `.colors` file from `/usr/share/onboard/themes/`;
+`Charcoal` is neutral grey, `DarkRoom` is olive despite the name.
 
 ## Wi-Fi and Bluetooth
 
