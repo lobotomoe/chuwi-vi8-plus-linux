@@ -358,6 +358,11 @@ gsettings set org.onboard.window.portrait width 800
 gsettings set org.onboard.window.portrait height 440
 ```
 
+Those numbers assume an 800x1280 portrait scanout, which is what the section
+above says this panel *probably* is rather than what anyone has confirmed. Check
+with `cat /sys/class/graphics/fb0/virtual_size` and substitute your own — the
+`y` is simply panel height minus keyboard height.
+
 Theming has a trap in it. Onboard rewrites `org.onboard.theme-settings` from
 its theme file every time it starts, so colours and fonts set with `gsettings`
 survive until the next restart and no further — and with
