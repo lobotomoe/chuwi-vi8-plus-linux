@@ -35,6 +35,24 @@ zramctl                      # should show a 1 GB zram0 in use as swap
 A 1 GB zram device typically holds 2.5-3 GB of real pages at zstd ratios, which
 is the difference between "slow" and "unusable" when a browser is open.
 
+Adding zram is only half of it. **Lubuntu's installer creates a 512 MB
+`/swapfile` on the eMMC**, and that file keeps being used no matter what zram
+does — on the reference tablet it was holding 339 MB, with `/proc/pressure/io`
+reporting the machine stalled on IO 4-6% of the time. Take it out once zram is
+running, so pages have somewhere to go while it is removed:
+
+```sh
+swapon --show                       # zram0 should be listed, priority 100
+sudo swapoff /swapfile
+sudo sed -i '/^\/swapfile/s/^/#/' /etc/fstab
+sudo rm /swapfile
+```
+
+Expect `kswapd0` to become visible in `top` afterwards: the cost of memory
+pressure moves from flash IO to CPU spent compressing. That is the trade you
+want on this machine, but it is not free, and the real fix is asking less of
+2 GB.
+
 ## Screen rotation
 
 The accelerometer is a Bosch BOSC0200 on the `bmc150_accel` driver, and unlike
@@ -163,6 +181,25 @@ case you are in:
 ```sh
 dmesg | grep -i icn8505
 xinput list            # or: libinput list-devices
+```
+
+### Dragging a finger does not scroll Firefox
+
+The digitiser works, taps land, and pages still refuse to scroll. Firefox on
+X11 treats touches as touches only when it is told to read XInput2; otherwise
+every touch arrives as an emulated mouse button, and a drag selects text
+instead of panning:
+
+```sh
+export MOZ_USE_XINPUT2=1
+```
+
+It has to be set in whatever launches the browser — a `.desktop` entry, a
+session script — not in a shell you happened to type it into. Before blaming
+the browser, confirm the kernel and udev agree it is a touchscreen at all:
+
+```sh
+udevadm info /dev/input/eventN | grep ID_INPUT     # ID_INPUT_TOUCHSCREEN=1
 ```
 
 ## On-screen keyboard
@@ -377,6 +414,36 @@ evening on it.
 - Terminal, editor, file manager: whatever your desktop shipped.
 - Avoid Snap and Flatpak here. Both trade disk and RAM for convenience, and this
   machine has neither to spare. Prefer distribution packages.
+
+## When it feels slow, check these before blaming the GPU
+
+The graphics are not the problem, and it is worth proving that before spending
+an evening on driver theories. The GPU is driven properly by `i915` and Mesa:
+
+```sh
+glxinfo -B | grep -E 'renderer|Accelerated|direct rendering'
+```
+
+That should name `Mesa Intel(R) HD Graphics (CHV)` with `Accelerated: yes`. If
+it says `llvmpipe` instead, rendering really is on the CPU. Note the GPU tops
+out at 500 MHz (`/sys/class/drm/card1/gt_RP0_freq_mhz`) — that is the chip, not
+a misconfiguration, and it is also why anything that makes it draw twice hurts.
+
+Which is the first real culprit: **LXQt runs `picom`, a compositor.** On the
+reference tablet it burned around 12% of the CPU redrawing a fullscreen window
+that needed no compositing. Turn it off for good:
+
+```sh
+echo 'Hidden=true' | sudo tee -a /etc/xdg/autostart/picom.desktop
+```
+
+Killing it mid-session is pointless — `lxqt-session` supervises it and starts a
+replacement within seconds. The change takes effect at the next login.
+
+The second is memory, covered above: no swap on eMMC, zram instead. The third
+is the browser itself, which on 2 GB is the whole budget. Measure rather than
+guess — `top -o %CPU`, `cat /proc/pressure/io`, and `free -m` tell you within a
+minute which of the three you are actually looking at.
 
 ## Verify the result
 
