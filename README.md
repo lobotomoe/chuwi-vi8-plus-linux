@@ -109,10 +109,11 @@ Confirm which one you have before doing anything else — see
    The freezes get [a file of their own](docs/51-freezes.md), because they are the
    one problem here that took an experiment rather than a recipe to settle.
 
-Not part of the install, but read it before you flash anything:
-[docs/60-bios-firmware.md](docs/60-bios-firmware.md) — the tablet's BIOS releases,
-what the circulating firmware archives actually contain, and why updating does not
-fix the Linux problems.
+Not part of the install: [docs/60-bios-firmware.md](docs/60-bios-firmware.md) —
+the tablet's BIOS releases, what the circulating firmware archives actually
+contain, and why updating does not fix any of the Linux problems. If you intend
+to flash regardless, [docs/61-flashing.md](docs/61-flashing.md) has the routes,
+the SPI lockdown that closes most of them, and DnX recovery.
 
 Sources for every technical claim in this repo are collected in
 [docs/90-references.md](docs/90-references.md).
