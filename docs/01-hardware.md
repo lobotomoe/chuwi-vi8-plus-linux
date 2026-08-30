@@ -506,13 +506,24 @@ diverge in a way no amount of configuration fixes:
 
 | Revision | File `btbcm` looks for | Packaged? |
 |---|---|---|
-| a1 | `brcm/BCM43430A1.hcd` | yes — `bluez-firmware` on both Debian and Ubuntu |
-| a0 | `brcm/BCM4343A0.hcd` | **no — no Debian or Ubuntu package ships it** |
+| a1 | `brcm/BCM43430A1.hcd` | yes — `bluez-firmware`, **Ubuntu multiverse** |
+| a0 | `brcm/BCM4343A0.hcd` | **no — and not upstream either** |
 
-So on an a1 unit `sudo apt install bluez-firmware` is the whole fix. On an a0 unit
-there is nothing to install: the vendor file (`BCM4343A0-26M.hcd` in Broadcom's
-naming) is not redistributed, and a GitHub-wide search for it returns two hits, both
-of them somebody's notes rather than the file.
+So on an a1 unit `sudo apt install bluez-firmware` is the whole fix, provided
+multiverse is enabled; the package is not in `main`, so a default install will
+report it as unavailable rather than as missing a component.
+
+On an a0 unit there is nothing to install, and the reason is worth knowing before
+you go looking. `bluez-firmware` repackages the Cypress-licensed set that the
+Raspberry Pi project maintains, and that set is `BCM43430A1`, `BCM43430B0`,
+`BCM4343A2`, `BCM4345C0`, `BCM4345C5` — **verified** by unpacking
+`bluez-firmware_1.2-11ubuntu2_all.deb`, whose `brcm/` directory holds exactly those
+five. A0 is not a packaging omission somebody could file a bug about; it is absent
+from the licensed release the package is built from. `linux-firmware` has it no
+better: its `WHENCE` lists one Broadcom `.hcd` in total, `BCM-0bb4-0306.hcd`. The
+vendor file (`BCM4343A0-26M.hcd` in Broadcom's naming) is not redistributed, and a
+GitHub-wide search for it returns two hits, both of them somebody's notes rather
+than the file.
 
 This matches how the driver's maintainer scores the tablet — his own status table
 marks Bluetooth `FIR`, defined there as *"needs firmware which is not in

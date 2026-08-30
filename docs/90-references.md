@@ -74,6 +74,14 @@ that corroborate rather than establish. If you are chasing one claim:
 - Calamares' bootloader module, which maps 32-bit firmware to the `i386-efi`
   GRUB target.
   <https://github.com/calamares/calamares/blob/calamares/src/modules/bootloader/main.py> — **verified**
+- casper, the Ubuntu live-boot scripts. `scripts/casper` sets `mountpoint=/cdrom`
+  on line 7 and mounts the boot medium there whatever it physically is, and parses
+  `live-media=` into `LIVEMEDIA` — the two facts
+  [13-split-media.md](13-split-media.md#check-it-worked) depends on. Debian's
+  `live-boot` uses `/run/live/medium` for the same job, which is why a path copied
+  from a Debian guide finds nothing here. — **verified** against the
+  `casper_26.04.2` source tarball.
+  <http://archive.ubuntu.com/ubuntu/pool/main/c/casper/>
 - curtin's `install_grub.py`, which selects `grub-efi-ia32` from the *target
   architecture* and never consults `fw_platform_size` — the reason Ubuntu's and
   Xubuntu's installers leave this tablet unbootable.
@@ -195,6 +203,25 @@ country code needs `ALL->X2`. The a0 tablets in the same list (Onda V80 Plus,
 Jumper ezPad mini 3, Chuwi Hi8) take `BCM4343A0-26M.hcd` instead. This is the
 clearest outside evidence that the a0/a1 split in this model is real and that the
 two revisions want different files on both radios.
+
+### Why no distribution ships the a0 patch file
+
+- Ubuntu `bluez-firmware`, **multiverse**, `1.2-11ubuntu2`. Its `brcm/` directory
+  holds `BCM43430A1`, `BCM43430B0`, `BCM4343A2`, `BCM4345C0`, `BCM4345C5` and
+  nothing else — **verified** by downloading the `.deb` from the archive and
+  listing it, not from a package-search page.
+  <http://archive.ubuntu.com/ubuntu/pool/multiverse/b/bluez-firmware/>
+
+- Upstream of that package: the Cypress-licensed blobs the Raspberry Pi project
+  carries, same five files, same absence.
+  <https://github.com/RPi-Distro/bluez-firmware/tree/master/debian/firmware/broadcom>
+
+- `linux-firmware` is not an alternative. Its `WHENCE` declares exactly one
+  Broadcom `.hcd`, `BCM-0bb4-0306.hcd`, plus a symlink to it.
+  <https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/WHENCE>
+
+So the a0 gap is upstream of packaging: the file is missing from the licensed
+release itself, which is why there is no bug to file and no PPA to add.
 
 ## The firmware setup menu
 

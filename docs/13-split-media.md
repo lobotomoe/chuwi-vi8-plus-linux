@@ -118,12 +118,17 @@ starts after.
 Once you have a desktop:
 
 ```sh
-findmnt -no SOURCE /run/live/medium 2>/dev/null || mount | grep -i medium
+findmnt -no SOURCE /cdrom
 ```
 
 An `mmcblk` device means the live filesystem is coming from the card and USB is out of
 the picture. An `sd` device means it found the stick instead — which should not be
 possible with a stick built by `--boot-only`, and means something else is plugged in.
+
+`/cdrom` is not a typo and there is no optical drive involved: casper hardcodes
+`mountpoint=/cdrom` and mounts whatever it booted from there, USB stick or SD card
+alike. Debian's `live-boot` uses `/run/live/medium` for the same job, so a guide
+written for Debian will name that path instead — on an Ubuntu stick it is empty.
 
 `lsblk` is worth a look too. The eMMC is `mmcblk0`; the card is usually `mmcblk2`,
 because `mmcblk1` is taken by the eMMC's boot hardware partitions.
