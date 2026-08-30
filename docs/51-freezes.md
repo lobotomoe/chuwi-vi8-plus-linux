@@ -1,63 +1,32 @@
 # Random freezes
 
-The one piece of work in this repository that is an experiment rather than a
-recipe, which is why it has a file of its own. There turned out to be **two
-unrelated faults** wearing the same symptom — the tablet hanging at idle, and
-the tablet hanging twenty seconds into boot — and a third explanation that had
-the most evidence behind it and was wrong.
+Two faults were found here wearing the same symptom — the tablet hanging at
+idle, and the tablet hanging twenty seconds into boot — plus a third explanation
+that had the most evidence behind it and was wrong. Whether the first two were
+ever really separate is
+[an open question](#open-question-were-these-ever-really-two-faults); both fixes
+are kept, because neither costs anything.
 
-If you only want the fix for the boot hangs, it is
-[`intel_idle.states_off=56`](#erratum-cht45-the-processor-may-not-wake-from-c6-or-deeper).
-The idle hangs on this unit were the screensaver, which nobody guesses first.
+**Which one is yours:**
 
-The reasoning is kept here in full, including the two statistical mistakes made
-along the way, because on a machine that fails intermittently the method is the
-part that transfers to your unit — the conclusions may not.
+| | boot hang | idle hang |
+|---|---|---|
+| when | 16-27 s of uptime, every time | ~19 minutes after being left alone |
+| on screen | the boot log, backlight on | the screensaver, mid-animation |
+| power data | none — `axp288` has not probed yet | `gpu=400MHz`, 70 °C at `busy=14%` |
+| fix | [`intel_idle.states_off=56`](#erratum-cht45-the-processor-may-not-wake-from-c6-or-deeper) | [suppress the screensaver](#the-idle-hangs-were-the-screensaver) |
 
-A long-standing complaint on Chuwi's Atom tablets. It happens on the reference
-unit too.
+The reasoning is kept in full because on a machine that fails intermittently the
+method is the part that transfers to your unit — the conclusions may not.
 
-> **Outcome on the reference unit: it was the screensaver.** Suppressing the
-> `xscreensaver` autostart — the recipe is further down this page — took it
-> from freezing within ~19 minutes of being left alone to **3 days 8 hours of
-> continuous uptime** — `up=287263` — through deliberate CPU, memory and GPU load
-> tests in between.
->
-> Then the screensaver came back on the first reboot, and the unit froze on it
-> within the hour — photographed mid-`GLMatrix`. That is the third leg of the
-> same correlation and the one that makes it hard to argue with: off, and it
-> survives days of deliberate abuse; on, and it dies at idle. **Suppress it in a
-> way that survives a reboot, and verify that it did** — the runtime fix held for
-> three days only because nothing rebooted in those three days.
->
-> **It was not the charger**, which was the other live theory. The last sample
-> before the final desktop freeze reads `chg=1 ilim=2000mA bat=99% bst=Charging`:
-> the supply was already at the full 2 A budget and the battery full. What that
-> same line also shows is `gpu=400MHz` and 70 °C at `busy=14%` — the screensaver
-> animating on an idle machine. Raising the input current limit is still worth
-> doing on a unit that reads 500 mA (item 1 below, and it was measured at 500 mA
-> here earlier), but it is not what was hanging this one.
->
-> **The boot freezes were a separate fault, and they are fixed too.** They kept
-> happening after the screensaver was gone, at 16-27 s of uptime every time. The
-> cause is a named, unfixed silicon erratum — **CHT45**, quoted in full below —
-> and the cure is one kernel parameter that takes away the three idle states the
-> erratum names:
->
-> ```
-> intel_idle.states_off=56
-> ```
->
-> Measured on the reference unit by rebooting it into the ground, counting boots
-> out of `journalctl --list-boots` — a boot that ends after 20 s is a hang:
->
-> | | boots | hung |
-> |---|---|---|
-> | before | 17 | **10** |
-> | after `states_off=56` | 15 | **0** |
->
-> Fisher's exact test on that table gives **p ≈ 0.0006**. The freezes did not
-> become rarer; across fifteen consecutive boots they stopped.
+**Both are fixed on the reference unit.** The boot hangs stopped dead with
+`intel_idle.states_off=56`: 10 hangs in 17 boots before, 0 in 15 after. The idle
+hangs stopped when `xscreensaver` went away — from hanging within ~19 minutes of
+being left alone to 3 days 8 hours unbroken, then back within the hour when the
+screensaver returned on a reboot. The charger, which had the most evidence behind
+it, was **not** the cause: the last sample before the final desktop freeze reads
+`chg=1 ilim=2000mA bat=99% bst=Charging` — the full 2 A budget, battery full.
+Every number here is derived below, with what it rests on.
 
 ## Erratum CHT45: the processor may not wake from C6 or deeper
 
@@ -410,9 +379,9 @@ is common to them. A sixth died 19 minutes in while idle, and the owner reports
 it freezing on the screensaver. — **observed on the unit**
 
 **Three of those five are the moment a radio powers up** — Bluetooth once, Wi-Fi
-twice. That is a current peak, not an idle moment, and it is why the charger is
-item 1 below. Read that alongside
-[what the recorder caught](#what-the-recorder-actually-caught), which weakens it.
+twice. That was read at the time as a current peak, and it is what kept the
+charger theory alive. It is also, as it turned out, the heaviest SDIO DMA of the
+boot, which fits CHT45 just as well and does not need the supply to be at fault.
 
 Every search for this points at deep C-states and `intel_idle.max_cstate=1`, and
 the erratum usually named alongside it is **VLP52, which is Bay Trail only**: the
@@ -491,7 +460,7 @@ soc_dts1  passive 0 C, 0 C      (unprogrammed)
 Two of `STR0`'s passive trips read `-274000`, which is below absolute zero and
 means unset, as do the SoC sensors' zeroes. What is set is a throttling trip at
 61 °C and a critical one at 85 °C on the skin sensor. The hottest reading ever
-recorded here is 70-71 °C on `PNIT`, whose own trip is at 85 °C, so nothing has
+recorded here is 77 °C on `PNIT`, whose own trip is at 85 °C, so nothing has
 come close to a critical trip.
 
 That matters more than the margin, because of what a critical trip *does*: the
@@ -577,27 +546,20 @@ boots that succeed too. What matters is the sequence: cold module, firmware, the
 `stress-freeze.sh --phase wifi-reload` reproduces on demand.
 
 **On a tablet you cannot reach, fix the recoverability before the fault.** A boot
-hang here needs a human to hold the power button, which on a machine in another
-city is the expensive part — not the hang itself. Cherry Trail has an iTCO
-watchdog; wiring systemd to it turns "somebody has to travel" into "it resets
-itself in a minute and the next boot probably succeeds".
+hang needs a human to hold the power button, which on a machine in another city
+is the expensive part — not the hang itself. The watchdog is the answer, with the
+caveats recorded in
+[its own section](#the-hardware-watchdog-real-usable-and-only-half-a-safety-net):
+it recovered one hang out of two attempts here, so wire it up and do not build a
+test plan that assumes it works.
 
-```sh
-ls -l /dev/watchdog*        # is there one at all
-printf '[Manager]\nRuntimeWatchdogSec=60\nRebootWatchdogSec=2min\n' |
-  sudo tee /etc/systemd/system.conf.d/watchdog.conf
-sudo systemctl daemon-reexec
-systemctl show -p RuntimeWatchdogUSec       # expect 1min, not 0
-```
+## The idle hangs were the screensaver
 
-`RuntimeWatchdogSec` has systemd pet `/dev/watchdog` while it is alive, so the
-hardware resets the machine when it stops. Note what that does and does not cover:
-a hang that takes the kernel with it gets reset, and a hang that leaves the kernel
-scheduling does not, because systemd keeps petting. Which of the two this fault is
-has not been established — the Caps Lock test below is what would settle it.
-
-This does not fix anything, and that is the point: it makes an unfixed fault
-survivable while the fix is still being looked for.
+The evidence is [above](#what-the-recorder-actually-caught): 15-20 °C and a
+pinned 400 MHz GPU while it animates, repeated hangs within ~19 minutes of the
+machine being left alone, then `up=287263` — 3 days 8 hours unbroken — with one
+variable changed. Then it came back on the first reboot and hung the machine
+within the hour, which is the leg that makes the correlation hard to argue with.
 
 **Remove the package.** Nothing on a wall-mounted tablet needs an animated
 OpenGL screen hack, and every softer measure here has a way of coming back:
@@ -637,10 +599,41 @@ LED is driven by the kernel's HID layer, so if it still toggles the kernel is
 alive and only userspace is wedged; if it is dead, so is the kernel, and no
 amount of userspace tuning will help.
 
-Things to try, in order:
+## Things to try, in order
 
-1. **Raise the charger's input current limit.** On the reference unit the numbers
-   leave no room for interpretation:
+The two fixes this page established come first, because a reader who scrolled
+straight here should not have to go back up for them.
+
+1. **Put `intel_idle.states_off=56` on the kernel command line** — the boot
+   hangs, [erratum CHT45](#erratum-cht45-the-processor-may-not-wake-from-c6-or-deeper).
+   To try it without rebooting, every idle state has a writable `disable`:
+
+   ```sh
+   # what the states are and in what order -- do not assume the numbering
+   head -v /sys/devices/system/cpu/cpu0/cpuidle/state*/name
+
+   # C6S, C7 and C7S off, now -- the three the erratum names
+   for s in /sys/devices/system/cpu/cpu*/cpuidle/state[3-9]; do
+     echo 1 | sudo tee "$s/disable" >/dev/null
+   done
+   ```
+
+   The recorder's `idle=` column then shows those counters going flat, which is
+   how you know the change took rather than assuming it. Undo it by writing `0`
+   back. **Do not extend this to `state2`** — that is `C6N`, which the erratum
+   does not name and which is worth 19 °C of idle temperature.
+
+2. **Suppress the screensaver** — the idle hangs,
+   [as established above](#the-idle-hangs-were-the-screensaver).
+
+3. **Confirm you are not swapping to eMMC.** `swapon --show` should list a zram
+   device and nothing else.
+
+4. **Raise the charger's input current limit.** This was the leading theory here
+   and it was **wrong** — the unit froze at `ilim=2000mA` with the battery full.
+   It is still worth doing on a unit that reads 500 mA, because a machine that
+   draws about an ampere while permitted half of one takes the rest out of a
+   ten-year-old battery while plugged in and reporting `online`:
 
    ```
    axp288_charger/input_current_limit:  500000   (500 mA)
@@ -649,15 +642,8 @@ Things to try, in order:
    axp288_fuel_gauge/current_now:      -496000   (496 mA out of the battery)
    ```
 
-   The deficit equals the cap. The tablet draws about an ampere, is permitted
-   half of it from the wall, and takes the rest out of a ten-year-old battery —
-   while plugged in and reporting `online`. Capacity fell from 95 % to 86 %
-   across an idle session on the charger. — **verified on the unit**
-
-   That is the whole freeze story: at a consumption peak — a radio coming up, the
-   CPU stepping — the machine needs one and a half to two amps, may take 0.5 A,
-   and the battery has to cover the difference. Which is exactly what its own
-   maintainer describes it failing to do.
+   Capacity fell from 95 % to 86 % across an idle session on the charger.
+   — **verified on the unit**
 
    ```sh
    echo 2000000 | sudo tee /sys/class/power_supply/axp288_charger/input_current_limit
@@ -667,89 +653,11 @@ Things to try, in order:
    cannot actually source 2 A, VBUS sags, and since the driver pins `Vhold` at
    4.4 V the charger throttles straight back. Still `Discharging` after raising it
    means the problem is the supply — use a plain USB-A 2 A charger on an A-to-C
-   cable, direct, no hub.
+   cable, direct, no hub. See
+   [01-hardware.md](01-hardware.md#ports-otg-and-charging-while-a-hub-is-attached)
+   for what the driver does with `Vhold`.
 
-   ```sh
-   cat /sys/class/power_supply/axp288_charger/input_current_limit
-   echo 2000000 | sudo tee /sys/class/power_supply/axp288_charger/input_current_limit
-   ```
-
-   See [01-hardware.md](01-hardware.md#ports-otg-and-charging-while-a-hub-is-attached)
-   for why this is needed and what the driver does with `Vhold`.
-2. Confirm you are not swapping to eMMC. `swapon --show` should list a zram
-   device and nothing else.
-3. Take the deep C-states away — but do it at runtime, not in the firmware and
-   not on the kernel command line. Every idle state has a writable `disable`
-   attribute, so the experiment needs no reboot and is undone by writing `0`
-   back:
-
-   ```sh
-   # what the states are and in what order -- do not assume the numbering
-   head -v /sys/devices/system/cpu/cpu0/cpuidle/state*/name
-
-   # everything deeper than C1 off, now
-   for s in /sys/devices/system/cpu/cpu*/cpuidle/state[2-9]; do
-     echo 1 | sudo tee "$s/disable" >/dev/null
-   done
-   ```
-
-   The recorder's `idle=` column then shows the deep counters going flat, which
-   is how you know the change took rather than assuming it. That check is not
-   available with `intel_idle.max_cstate=1`, which needs a reboot to apply and
-   another to undo.
-
-   **The firmware route does nothing here, and it is worth knowing why before
-   spending a trip on it.** `/sys/devices/system/cpu/cpuidle/current_driver` reads
-   `intel_idle` on this unit, and
-   [the kernel documentation](https://docs.kernel.org/admin-guide/pm/intel_idle.html)
-   is explicit that `intel_idle` drives idle from its own per-model tables "without
-   input from system firmware", falling back to ACPI `_CST` only for processors it
-   does not recognise. Airmont it recognises. The logged state names settle it from
-   this machine's own data: `C6N`, `C6S`, `C7S` are `intel_idle` names, where ACPI
-   would report a flat `C1`/`C2`/`C3`. The firmware item changes what ACPI
-   advertises and nothing reads it.
-
-   That also explains why the workaround circulates at all — Windows *does* take
-   its idle states from ACPI, so `C-States: C1` is a real setting over there. The
-   menu is under **`Advanced` -> `PPM Configuration`**
-   ([20-uefi-setup.md](20-uefi-setup.md#what-to-change)) if you want to look. The
-   one case where it comes back into play is a firmware that masks `MWAIT`
-   outright, which would show up as `current_driver` reading `acpi_idle` instead.
-
-   **Why C-states are worth suspecting again despite all of the above.** They were
-   written off here earlier on the grounds that the boot freezes land in the
-   busiest moment of boot, not in idle. That reasoning was about the wrong
-   mechanism. Intel's MMC maintainer describes a different one:
-
-   > *"Intel Baytrail has been observed sometimes to hang if host controllers are
-   > using DMA while deep C-states are used"*
-   > — [mmc: sdhci-acpi: Fix device hang on Intel BayTrail](https://lkml.iu.edu/hypermail/linux/kernel/1503.3/00272.html)
-
-   The kernel's workaround is a PM QoS request (`dma_latency = 20`) that keeps the
-   CPU out of deep states while a transfer is in flight — and it is gated on the
-   CPU model, because "host controller ACPI HIDs are not unique to Baytrail". The
-   model it matches is **0x37, Bay Trail**. This tablet is `0x6:4c:3` — **model
-   0x4C, Airmont**, outside that guard.
-
-   Which lines up with where the boot freezes actually stop: two seconds after
-   `brcmfmac` finishes pushing firmware to the radio over SDIO, the heaviest SDIO
-   DMA of the entire boot. The gaps between those bursts are idle, whatever the
-   `busy=` average says. Not established — but it is a mechanism, it names this
-   exact SoC as unprotected, and `intel_idle.max_cstate=1` tests it for the cost of
-   a reboot.
-
-   And the second mechanism is the one with Intel's name on it:
-   [CHT45](#erratum-cht45-the-processor-may-not-wake-from-c6-or-deeper) — the
-   processor may not wake from C6 sub-state 2 or deeper, status **No Fix**, this
-   exact part and stepping. Between the two, this item stops being a long shot and
-   becomes the first thing to try.
-
-   The argument once made here against it — that boot freezes land 16-23 s in,
-   while services are still starting, which is the busiest the machine ever is —
-   does not hold. `busy=` is an average over five seconds. A core that is idle
-   between two bursts of SDIO DMA still enters C6, and CHT45 needs one entry, not
-   a sustained idle.
-4. Kernel parameters another Vi8 Plus owner reports as their freeze fix:
+5. Kernel parameters another Vi8 Plus owner reports as their freeze fix:
 
    ```
    usbcore.autosuspend=-1 pcie_aspm=off intel_idle.max_cstate=1
@@ -771,3 +679,48 @@ printf '[connection]\nwifi.powersave = 2\n' |
 sudo systemctl restart NetworkManager
 ```
 
+
+### Two things not to bother with, and why
+
+**The firmware's `C-States` item does nothing under Linux.**
+`/sys/devices/system/cpu/cpuidle/current_driver` reads `intel_idle` on this unit,
+and [the kernel documentation](https://docs.kernel.org/admin-guide/pm/intel_idle.html)
+is explicit that `intel_idle` drives idle from its own per-model tables "without
+input from system firmware", falling back to ACPI `_CST` only for processors it
+does not recognise. Airmont it recognises. The logged state names settle it from
+this machine's own data: `C6N`, `C6S`, `C7S` are `intel_idle` names, where ACPI
+would report a flat `C1`/`C2`/`C3`. The firmware item changes what ACPI
+advertises and nothing reads it. That is why the workaround circulates at all —
+Windows *does* take its idle states from ACPI, so `C-States: C1` is a real
+setting over there. The one case where it comes back into play is a firmware that
+masks `MWAIT` outright, which would show up as `current_driver` reading
+`acpi_idle` instead.
+
+**`intel_idle.max_cstate=1` costs 19 °C for no benefit over `states_off=56`.**
+See [why not `max_cstate=1`](#erratum-cht45-the-processor-may-not-wake-from-c6-or-deeper)
+above. It also needs a reboot to apply and another to undo, where the `disable`
+attributes in item 1 need neither.
+
+### The other mechanism that fits, and is not needed to explain this
+
+Before CHT45 was found, C-states were written off here because the boot freezes
+land in the busiest moment of boot rather than in idle. That reasoning was about
+the wrong mechanism — `busy=` is an average over five seconds, and a core idle
+between two bursts of SDIO DMA still enters C6. Intel's MMC maintainer describes
+a fault that fits the timing exactly:
+
+> *"Intel Baytrail has been observed sometimes to hang if host controllers are
+> using DMA while deep C-states are used"*
+> — [mmc: sdhci-acpi: Fix device hang on Intel BayTrail](https://lkml.iu.edu/hypermail/linux/kernel/1503.3/00272.html)
+
+The kernel's workaround is a PM QoS request (`dma_latency = 20`) holding the CPU
+out of deep states while a transfer is in flight, gated on the CPU model because
+"host controller ACPI HIDs are not unique to Baytrail". The model it matches is
+**0x37, Bay Trail**. This tablet is `0x6:4c:3` — **model 0x4C, Airmont**, outside
+that guard. Which lines up with where the boot freezes actually stopped: two
+seconds after `brcmfmac` finishes pushing firmware to the radio over SDIO, the
+heaviest SDIO DMA of the whole boot.
+
+Recorded because it is a second, independent reason to take the deep states away
+on this SoC, and because it would explain the same evidence. It is not needed:
+`states_off=56` already fixed the fault, and CHT45 names this exact part.
