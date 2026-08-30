@@ -212,6 +212,30 @@ CHT45, the processor is asleep and the kernel is not running, so the Caps Lock L
 test below should show a *dead* LED. A LED that still toggles would mean the kernel
 is alive and something else is wedged — which would point away from this erratum.
 
+### Open question: were these ever really two faults?
+
+This page treats the idle hangs and the boot hangs as separate, because that is
+how they were found and fixed — the screensaver first, months before CHT45 was
+identified. But the tidier explanation has not been ruled out: **that both were
+CHT45, and the screensaver was a way of provoking it rather than a cause.**
+
+A screensaver animating on an otherwise unattended machine is not a busy
+machine. It is a machine going idle and waking again, several times a second,
+for hours — which is precisely the pattern an erratum about waking from a deep
+C-state punishes, and it explains why the freezes came at idle rather than
+under the deliberate CPU, memory and GPU load tests that the tablet survived
+for three days.
+
+Against that: the correlation with `xscreensaver` was three-legged and strong,
+and it held before any C-state parameter existed.
+
+**It is testable, and it has not been tested.** Put `xscreensaver` back with
+`intel_idle.states_off=56` in place and leave the tablet alone for a few days.
+If it survives, one fault explains everything and the screensaver was innocent.
+If it hangs, they really are two. Until somebody runs that, this page keeps both
+fixes, because keeping a fix that turns out to be unnecessary costs a screensaver
+and dropping one that was necessary costs the machine.
+
 ## The hardware watchdog: real, usable, and only half a safety net
 
 The firmware describes a watchdog in the ACPI `WDAT` table, and Linux can drive it

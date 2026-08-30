@@ -416,6 +416,27 @@ because a claim repeated by one community is not the same as a verified one.
   <https://sturmflut.github.io/linux/ubuntu/2015/02/04/installing-ubuntu-on-baytrail-tablets-version-2/>
   <https://github.com/hakuna-m/wubiuefi/issues/27>
 
+## The freezes: Intel's own erratum
+
+- **Intel® Atom™ Z8000 Processor Series Specification Update**, document
+  **332067**. The source of erratum **CHT45**, *"Processor May Not Wake From C6
+  or Deeper Sleep State"*, quoted verbatim in
+  [51-freezes.md](51-freezes.md#erratum-cht45-the-processor-may-not-wake-from-c6-or-deeper)
+  along with its `No Fix` status and the S-Spec / stepping table that ties it to
+  the Z8300 in this tablet.
+  <https://www.intel.com/content/dam/www/public/us/en/documents/specification-updates/atom-z8000-spec-update.pdf>
+
+  Intel reissues this document under the same number, so the revision you
+  download will not be the one that was read — errata keep their identifiers
+  across revisions, but page numbers and the summary table do not. Distributors
+  mirror older revisions if the current one has dropped something:
+  <https://www.mouser.com/pdfdocs/atom-z8000-spec-update.pdf>
+
+- The identification of *which* idle states the erratum names is not from Intel;
+  it is the MWAIT hints the kernel prints for this CPU, decoded and tabulated in
+  the same section — **verified on the unit**, and the reason the fix disables
+  three states rather than all of them.
+
 ## The device itself
 
 - Notebookcheck review of the Chuwi Vi8 Plus (CWI519) — ports, the single USB-C
