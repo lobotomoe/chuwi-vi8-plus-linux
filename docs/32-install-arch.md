@@ -105,7 +105,7 @@ cat > /boot/loader/entries/arch.conf <<'EOF'
 title   Arch Linux
 linux   /vmlinuz-linux
 initrd  /initramfs-linux.img
-options root=PARTUUID=REPLACE_ME rw
+options root=PARTUUID=REPLACE_ME rw intel_idle.states_off=56
 EOF
 
 blkid -s PARTUUID -o value /dev/mmcblk0p2    # paste this into the file above
@@ -113,6 +113,10 @@ blkid -s PARTUUID -o value /dev/mmcblk0p2    # paste this into the file above
 
 `bootctl install` also writes `\EFI\BOOT\BOOTIA32.EFI` as the removable-media
 fallback, which on this firmware is often the entry that actually gets used.
+
+`intel_idle.states_off=56` is not optional on this hardware — without it the
+reference unit hung on ten of seventeen boots. See
+[40-post-install.md](40-post-install.md#stop-the-freezes-first).
 
 ## Bootloader — GRUB, if you prefer it
 

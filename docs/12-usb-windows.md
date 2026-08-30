@@ -5,6 +5,23 @@ you have a reason not to.
 
 ---
 
+## Pick a USB 2.0 stick, and a USB 2.0 hub
+
+Do this before you build anything, because no amount of getting the stick's
+contents right will help if the tablet cannot read it.
+
+The Type-C port is wired for USB 2.0, but the SoC still exposes a SuperSpeed bus.
+A USB 3.0 stick behind a USB 3.0 hub — which is what most Type-C hubs are —
+negotiates SuperSpeed, fails to hold the link, and resets in a loop without ever
+appearing as a disk. It is intermittent, so it will work once and convince you the
+hardware is fine. A **USB 2.0 A-to-A extension cable** between hub and stick also
+does it: no SuperSpeed conductors, so the link is forced down to a mode that works.
+
+Symptoms and the full diagnosis are in
+[50-troubleshooting.md](50-troubleshooting.md#a-usb-30-stick-cannot-hold-a-link-here).
+
+---
+
 ## Option A: Rufus (recommended)
 
 1. Get [Rufus](https://rufus.ie/) and your ISO.
@@ -39,6 +56,13 @@ to the stick, then copy ISO files onto the resulting `Ventoy` partition. No
 
 Upstream still labels the IA32 support experimental and develops it without real
 IA32 hardware, so if an image misbehaves, fall back to Option A for that image.
+
+**Not known to work on this tablet, and not known to fail.** The one attempt here
+never got as far as testing Ventoy: the firmware did not enumerate the stick as a
+USB device at all, which is a hub problem rather than a Ventoy one. Nobody has
+since retried it on a stick this firmware does see. Prefer Option A unless you
+specifically want to carry several ISOs —
+[why it is still open](90-references.md#ventoy-ia32-on-this-tablet-still-unknown-and-here-is-why).
 
 ---
 

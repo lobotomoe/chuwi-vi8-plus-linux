@@ -4,6 +4,23 @@ macOS has no Ventoy build and cannot even mount a hybrid Linux ISO any more
 (`hdiutil` answers "no mountable file systems"). The scripted route below works
 around both.
 
+## Pick a USB 2.0 stick, and a USB 2.0 hub
+
+Do this before you build anything, because no amount of getting the stick's
+contents right will help if the tablet cannot read it.
+
+The Type-C port is wired for USB 2.0, but the SoC still exposes a SuperSpeed bus.
+A USB 3.0 stick behind a USB 3.0 hub — which is what most Type-C hubs are —
+negotiates SuperSpeed, fails to hold the link, and resets in a loop without ever
+appearing as a disk. It is intermittent, so it will work once and convince you the
+hardware is fine. A **USB 2.0 A-to-A extension cable** between hub and stick also
+does it: no SuperSpeed conductors, so the link is forced down to a mode that works.
+
+Symptoms and the full diagnosis are in
+[50-troubleshooting.md](50-troubleshooting.md#a-usb-30-stick-cannot-hold-a-link-here).
+
+---
+
 ## What the script does
 
 1. Repartitions the stick: GPT, one FAT32 partition covering the whole device.
@@ -60,7 +77,7 @@ Scratch space: unpacking needs as much free disk as the ISO is big, in
 `$TMPDIR`. If your boot volume is tight, point it elsewhere:
 
 ```sh
-sudo ./scripts/make-media.sh --iso ... --device ... --scratch /Volumes/Big
+sudo ./scripts/make-media.sh --iso <iso> --device /dev/diskN --scratch /Volumes/Big
 ```
 
 **5. Optional, Ubuntu flavours only — carry the 32-bit GRUB package along.**
