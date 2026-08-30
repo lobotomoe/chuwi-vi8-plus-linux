@@ -397,6 +397,21 @@ because a claim repeated by one community is not the same as a verified one.
   the same section — **verified on the unit**, and the reason the fix disables
   three states rather than all of them.
 
+- The same table upstream, in the driver's own source: `cht_cstates` in
+  `drivers/idle/intel_idle.c`, which offers `C1` `0x00`, `C6N` `0x58`, `C6S`
+  `0x52`, `C7` `0x60`, `C7S` `0x64`, in that order.
+  <https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/drivers/idle/intel_idle.c>
+
+  This settles two things the sysfs read on its own could not. **`POLL` really is
+  bit 0**: `intel_idle_cpuidle_driver_init()` calls `cpuidle_poll_state_init()`,
+  tests `disabled_states_mask & BIT(0)` against that state, and only then sets
+  `drv->state_count = 1` before appending the per-CPU table — so `C1` lands at
+  index 1 and `C6N` at index 2, and `states_off=56` takes `C6S`, `C7`, `C7S` and
+  nothing else. And **a kernel upgrade will not renumber them**: the block is
+  byte-identical from `v5.15` through mainline except for `&intel_idle` losing
+  its `&`. — **verified** by fetching the file at `v5.15`, `v6.6`, `v6.12` and
+  mainline and diffing the block.
+
 ## The device itself
 
 - Notebookcheck review of the Chuwi Vi8 Plus (CWI519) — ports, the single USB-C
@@ -490,6 +505,33 @@ read-only.
   Switch names for the system manufacturer and product fields could **not** be
   confirmed from a primary AMI source; both the datasheet mirror and the
   secondary wiki returned 403.
+
+### flashrom: the chip's voltage, and the one release that must not write
+
+Both read from the flashrom tree itself rather than from a release announcement
+or a forum summary. Background for
+[61-flashing.md](61-flashing.md#flashing-from-linux-the-flasher-the-descriptor-and-the-lockdown).
+
+- `flashchips/winbond.c`, the `W25Q64.W` entry: `.voltage = {1700, 1950}`. The
+  whole case for a 1.8 V programmer rests on this line — it is the chip
+  database's own figure, not an inference from the `.W` in the part name.
+  <https://github.com/flashrom/flashrom/blob/main/flashchips/winbond.c>
+
+- Release notes, v1.5.1: *"Users with older Intel-based platforms
+  (Broadwell/Braswell and earlier) flashing using the internal programmer option
+  might encounter an 'Invalid OPCODE' error when erasing/writing which would lead
+  to an incomplete flash and potentially a bricked device. External flashing was
+  not affected at all."*
+  <https://github.com/flashrom/flashrom/blob/main/doc/release_notes/v_1_5.rst>
+
+  The upstream ticket and the fix:
+  <https://ticket.coreboot.org/issues/573>
+  <https://review.coreboot.org/c/flashrom/+/85612>
+
+  The notes name Braswell, not Cherry Trail. The two are the same 14 nm Airmont
+  generation under different branding, so this tablet sits inside that window —
+  **inferred** from the generation, and the reason 61-flashing.md states a
+  version floor rather than a tested result.
 
 ### The stock ROM, and the only copy of `P03_C806.108`
 

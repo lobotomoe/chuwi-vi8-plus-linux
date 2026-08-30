@@ -163,14 +163,17 @@ mapped at physical address 0x00000000ff800000
 
 This settles the programmer-voltage question, which until now rested on one
 owner's report. The `.W` suffix is not decoration: flashrom's own chip table
-gives `W25Q64.W` a `.voltage` of `{1700, 1950}`, i.e. **1.7–1.95 V**. A 3.3 V
-CH341A on this chip is out of spec by a factor that destroys it. — **verified**
-against flashrom's `flashchips/winbond.c`.
+gives `W25Q64.W` a `.voltage` of `{1700, 1950}`, i.e. **1.7–1.95 V**. A stock
+CH341A drives 3.3 V — **1.7× the chip's maximum**. Use a 1.8 V programmer, or a
+level shifter in front of a 3.3 V one. — **verified** against
+[flashrom's own chip table](90-references.md#flashrom-the-chips-voltage-and-the-one-release-that-must-not-write).
 
-One hard version requirement if you ever do write: **flashrom 1.5.0 issues an
-invalid opcode when erasing or writing on Braswell and earlier**, leaving an
-incomplete flash and a possibly bricked device. Fixed in 1.5.1. Reading is
-unaffected.
+One hard version requirement if you ever do write: **flashrom 1.5.0 raises
+`Invalid OPCODE` when erasing or writing through the `internal` programmer on
+Broadwell/Braswell and earlier**, leaving an incomplete flash and a possibly
+bricked device. Fixed in 1.5.1. External programmers were never affected, so the
+CH341A route is safe on any version — it is the `internal` route, from the
+tablet's own Linux, that has the version floor.
 
 
 ## There is no macOS path, and it is worth knowing why
