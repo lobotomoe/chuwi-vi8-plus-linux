@@ -128,8 +128,9 @@ Both of the components that matter can be fixed without DMI, because in each cas
 driver's *second* attempt uses a name that does not depend on it —
 [Wi-Fi](#wi-fi--bluetooth--ampak-ap6212-broadcom-bcm43430) and
 [touchscreen](#touchscreen--chipone-icn8505) below. The accelerometer never
-needed one, as explained above. **Audio is the only one genuinely stuck**: its
-quirk keys on the system fields with no second path, so it needs a kernel patch.
+needed one, as explained above. **Audio is the only one with no automatic second
+path**: its quirk keys on the system fields and nothing else supplies the routing,
+so it has to be [forced by hand](#forcing-the-quirk-by-hand), or patched properly.
 
 **A BIOS update does not fix this.** The placeholder is baked into the firmware
 image: the newest BIOS Chuwi published (`P03_C806.109`, 2016-02-25) hard-codes
@@ -250,8 +251,10 @@ it, so there is no package to install; every route to the file goes through
 Chuwi. It lives inside the tablet's own
 UEFI image, and the kernel extracts it at boot through the EFI embedded-firmware
 mechanism (`CONFIG_EFI_EMBEDDED_FIRMWARE=y`) that Hans de Goede added specifically for
-this class of tablet. Nothing to download; it just works, but it does mean the
-touchscreen depends on booting via EFI and on that config option being enabled.
+this class of tablet. Where that works there is nothing to download, though it does
+mean the touchscreen depends on booting via EFI and on that config option being
+enabled. On the reference unit it does not work, for two independent reasons — the
+DMI quirk does not match, and the blob is not in this BIOS build to begin with.
 
 Check it landed:
 
@@ -308,16 +311,25 @@ firmware and nothing else.
 That makes the touchscreen the one broken component you can fix today without
 building a kernel.
 
-There are two ways to get the file. `linux-firmware` does not carry it, but Chuwi's
-own Windows driver does — that is the easy route, below. The other is to pull the
-copy out of your own flash, which is the only way to get the exact blob the kernel
-pins: **35012 bytes**, starting with `b0 07 00 00 e4 07 00 00`, SHA-256
-`93e549e0b6a2b4b3889634975ea81378729b8b829eb5ca7f125134f4307cfc7c`.
+There are two ways to get the file, and on this BIOS build only one of them works.
+`linux-firmware` does not carry it, but Chuwi's own Windows driver does — that is
+the route that produced a working touchscreen here, below.
 
-`sudo ./scripts/dump-bios.sh` does that job: it reads the flash twice, refuses a
-dump the two reads disagree on, searches it for that prefix and installs the result
-only if the hash matches. It needs `flashrom`, which no distribution installs by
-default — `sudo apt install flashrom` first.
+The other would be to pull the copy out of your own flash, which is the only way to
+get the exact blob the kernel pins: **35012 bytes**, starting with
+`b0 07 00 00 e4 07 00 00`, SHA-256
+`93e549e0b6a2b4b3889634975ea81378729b8b829eb5ca7f125134f4307cfc7c`.
+`sudo ./scripts/dump-bios.sh` reads the flash twice, refuses a dump the two reads
+disagree on, searches it for that prefix and installs the result only if the hash
+matches.
+
+**On this unit it finds nothing.** The dump was taken — two passes, identical,
+8388608 bytes — and reported *"Not found as a contiguous blob"*, matching the same
+negative result against all three published images. — **verified on the unit**, see
+[60-bios-firmware.md](60-bios-firmware.md#what-could-not-be-determined). So on this
+build the EFI extraction has nothing to extract whether the DMI quirk matches or
+not, and installing `flashrom` to go looking is time spent confirming an answer
+this repository already has. Use the driver package.
 
 #### Chuwi ships the firmware itself, in its own driver
 
@@ -981,7 +993,9 @@ already at the firmware menu. If the port flips to device mode *after* Linux has
 started, a running live session loses its root filesystem — see
 [50-troubleshooting.md](50-troubleshooting.md#the-live-session-boots-then-slowly-falls-apart).
 
-Micro-HDMI 1.4 output works, up to 1080p, with audio.
+Micro-HDMI 1.4 is wired for output up to 1080p with audio, and the kernel drives
+it through the same `i915` pipeline as the panel. **Not exercised here** — nothing
+has been plugged into that port on the reference unit.
 
 ## Verifying all of this on your own device
 

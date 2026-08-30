@@ -1,19 +1,22 @@
 # Kernel patches for a Vi8 Plus with unfilled DMI
 
 Three patches that make the kernel recognise a Chuwi Vi8 Plus whose firmware
-left `sys_vendor` and `product_name` at `To be filled by O.E.M.`. Between them
-they fix the touchscreen, Wi-Fi and audio on such a unit.
+left `sys_vendor` and `product_name` at `To be filled by O.E.M.`.
 
-**Status: prepared, not submitted, not yet tested on hardware.** They apply
-cleanly and are modelled on entries already upstream, but nobody has booted a
-kernel built with them. Do not send them anywhere until the checklist below is
-done.
+**Status: prepared, never compiled, never booted.** They apply cleanly to
+mainline and are modelled on entries already upstream, but no kernel has been
+built with them. The values they carry are a separate question and a better one —
+the DMI capture, the BIOS date and the audio quirk value have each been read off
+the running hardware, and are marked where they appear below.
 
-| Patch | Subsystem | Fixes |
+| Patch | Subsystem | Intended effect |
 |---|---|---|
-| `0001-…touchscreen_dmi…` | `platform/x86` | ICN8505 firmware extraction from UEFI |
+| `0001-…touchscreen_dmi…` | `platform/x86` | ICN8505 firmware extraction from UEFI — **probably a no-op on the reference unit**, whose BIOS carries no such blob to extract; say so when sending |
 | `0002-…brcmfmac…` | `wifi` | NVRAM lookup for the BCM43430 |
 | `0003-…bytcr_rt5651…` | `ASoC/Intel` | mono speaker, swapped headphones, IN2 mic |
+
+Before sending: confirm the BIOS date matches yours, and build and boot a kernel
+with them. Both are covered below.
 
 The accelerometer needs nothing at all — see [below](#the-accelerometer-needs-no-patch-at-all).
 

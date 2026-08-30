@@ -173,7 +173,8 @@ from one placeholder string.
 
 Wi-Fi and the touchscreen have DMI-independent workarounds — in both cases the
 driver's second attempt uses a name that comes from ACPI or from the chip itself.
-Audio has no such escape hatch and needs a kernel patch. The accelerometer looks
+Audio has no automatic escape hatch — its routing has to be forced by hand with a
+`modprobe.d` line, or patched properly. The accelerometer looks
 like a fourth victim and is not one: its mount matrix is supposed to come from an
 ACPI `ROTM` method rather than from DMI. Check yours before you conclude anything:
 
