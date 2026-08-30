@@ -265,7 +265,7 @@ flat `C1`/`C2`/`C3`.
 The forum advice is not wrong, it is about a different operating system — Windows
 *does* take its idle states from ACPI, so the toggle is real there. On Linux the
 lever is `intel_idle.max_cstate=`, and
-[50-troubleshooting.md](50-troubleshooting.md#random-freezes) has the reversible
+[51-freezes.md](51-freezes.md) has the reversible
 recipe.
 
 Confirm before believing any of this on a given unit:

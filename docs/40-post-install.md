@@ -361,8 +361,11 @@ bluetoothctl list
 dmesg | grep -iE 'bluetooth|btbcm|hci_uart'
 ```
 
-If `hci0` never appears, see
-[50-troubleshooting.md](50-troubleshooting.md#bluetooth-does-not-appear).
+`bluetoothctl list` printing an adapter is not enough — check the address it
+reports. On the reference unit `hci0` comes up `UP RUNNING` with the placeholder
+`AA:AA:AA:AA:AA:AA`, which means the controller never received its firmware
+patch. That, and the case where the adapter does not appear at all, are in
+[50-troubleshooting.md](50-troubleshooting.md#bluetooth-appears-but-has-no-address).
 
 ## eMMC longevity
 
@@ -397,9 +400,23 @@ before and after rather than assuming.
 
 ## Suspend
 
-`s2idle` is the only mode available. It works, but the tablet will be warmer and
-emptier after a night asleep than Windows would leave it. Shutting down is a
-legitimate strategy on a machine that boots in under a minute.
+`s2idle` is the only mode available — `cat /sys/power/mem_sleep` says so, and
+there is no S3 to enable. **Not exercised on the reference unit**, so treat what
+follows as the platform's reputation rather than as a measurement: the
+`bmc150`/Cherry Trail maintainer's own status table scores this class of tablet
+as suspending but not reaching S0i3, which means a warmer and emptier tablet
+after a night asleep than Windows would leave it.
+
+Test it yourself before relying on it, and do it while you can still reach a
+power button:
+
+```sh
+systemctl suspend        # then wake it, and check nothing came back broken
+journalctl -b -p warning --since "-5 min"
+```
+
+Shutting down is a legitimate strategy on a machine that boots in well under a
+minute, and it is the strategy this repo can vouch for.
 
 ## What is not going to work
 

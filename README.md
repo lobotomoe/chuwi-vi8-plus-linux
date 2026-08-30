@@ -76,6 +76,8 @@ Confirm which one you have before doing anything else — see
 6. [docs/40-post-install.md](docs/40-post-install.md) — rotation, audio, zram, eMMC
    wear, battery.
 7. When something misbehaves: [docs/50-troubleshooting.md](docs/50-troubleshooting.md).
+   The freezes get [a file of their own](docs/51-freezes.md), because they are the
+   one problem here that took an experiment rather than a recipe to settle.
 
 Not part of the install, but read it before you flash anything:
 [docs/60-bios-firmware.md](docs/60-bios-firmware.md) — the tablet's BIOS releases,
@@ -128,10 +130,10 @@ kernel symbols.
 | Touchscreen (Chipone ICN8505) | Yes | **Dead out of the box, works after installing the firmware by hand** — the DMI quirk does not match, so nothing is extracted from UEFI. No kernel patch needed: the filename comes from ACPI, and Chuwi's own driver package carries the blob. Done on this unit; the axes then come out rotated 180°, corrected with a libinput matrix |
 | Audio (RT5651) | Yes | Untested; the quirk does not match, so expect wrong channel mapping |
 | Accelerometer / auto-rotation | Partly | **The sensor binds** — `BOSC0200` appears as `iio:device0` — but `iio-sensor-proxy` cannot read it: *"Could not find trigger name"*, then *"Buffer did not have data within 0.5s"*. So orientation is exposed by ACPI `ROTM` as designed, and userspace still does not rotate |
-| Battery, charging (AXP288) | Yes | **Reports correctly, charges badly** — `axp288_fuel_gauge` reports capacity, voltage and current. But the supply can read `online` while the battery *discharges*: the driver's input current limit is left too low, and it must be raised by hand. No PD; 2 A only from a USB-A charger via an A-to-C cable, 500 mA from C-to-C. Suspected cause of the freezes |
+| Battery, charging (AXP288) | Yes | **Reports correctly, charges badly** — `axp288_fuel_gauge` reports capacity, voltage and current. But the supply can read `online` while the battery *discharges*: the driver's input current limit is left too low, and it must be raised by hand. No PD; 2 A only from a USB-A charger via an A-to-C cable, 500 mA from C-to-C. Was the leading theory for the freezes and turned out not to be the cause |
 | Backlight | Yes | **Works** — `intel_backlight` present and readable |
 | micro-HDMI | Yes | Untested |
-| Bluetooth (BCM43430 over UART) | Yes | Untested. Needs an `.hcd` from `bluez-firmware`, **not** `linux-firmware` — and no distribution ships one for an a0 chip |
+| Bluetooth (BCM43430 over UART) | Yes | **Half-works, and the half that is missing matters** — `hci0` appears and comes up `UP RUNNING`, but with the placeholder address `AA:AA:AA:AA:AA:AA`, because the controller never got its `.hcd` patch. That file comes from `bluez-firmware`, **not** `linux-firmware`, and no distribution ships one for an a0 chip. Not paired with anything |
 | Suspend | Partly | Untested here. The maintainer's table scores it as suspending but **not** reaching S0i3, so expect idle drain |
 | Cameras | **No** | Cherry Trail ISP has no usable mainline driver. Treat them as absent |
 
@@ -230,6 +232,16 @@ touches a real device.
 - **Secure Boot must stay off.** No distribution publishes a Microsoft-signed 32-bit
   x86 shim, so there is nothing to start a signed chain from —
   [details](docs/02-boot-problem.md#secure-boot).
+- **It will freeze until you turn off three idle states.** Not occasionally — the
+  reference unit hung on ten of its first seventeen boots. The cause is a silicon
+  erratum Intel marks **No Fix** (CHT45), and the cure is one kernel parameter,
+  `intel_idle.states_off=56`. Fifteen consecutive clean boots after applying it.
+  Do this before you conclude anything else about this machine —
+  [details and the measurement](docs/51-freezes.md#erratum-cht45-the-processor-may-not-wake-from-c6-or-deeper).
+- **Nothing types until you install an on-screen keyboard.** There is no built-in
+  keyboard, and no desktop here ships one configured. Until it is set up the tablet
+  cannot enter its own Wi-Fi passphrase without a USB keyboard attached —
+  [how](docs/40-post-install.md#on-screen-keyboard).
 - **This tablet is from 2016.** Cherry Trail is slow and its Linux support, while
   complete, is maintained by very few people. Expect a usable browsing/media/terminal
   machine, not a fast one.
@@ -254,6 +266,13 @@ Wi-Fi sections are copied out of that unit's own `dmesg`.
 the SPI lock state and the region-by-region comparison against the published
 `.108` are all read off the hardware rather than off a downloaded image.
 
+**The freezes were reproduced, diagnosed and fixed on that unit**, which is the
+one piece of work here that is an experiment rather than a recipe: 32 boots
+counted out of `journalctl --list-boots` either side of a one-parameter change,
+plus the idle-state counters and thermals behind it. The on-screen keyboard was
+set up and confirmed by watching the keyboard appear and disappear as a text
+field gained and lost focus, across a cold boot.
+
 **Derived from sources, never executed here.**
 
 | Thing | What it rests on |
@@ -262,7 +281,8 @@ the SPI lock state and the region-by-region comparison against the published
 | [`make-media.ps1`](scripts/make-media.ps1) | Never run — no Windows machine was involved |
 | `restore-emmc.sh`, `postinstall-*.sh` | Argument handling is unit-tested; neither has run on the tablet |
 | The three [`patches/`](patches/) | Apply cleanly to mainline. Never compiled, never booted |
-| Suspend, HDMI, Bluetooth, audio, cameras | Not exercised on the installed system |
+| Suspend, HDMI, audio, cameras | Not exercised on the installed system |
+| Bluetooth | Only far enough to see `hci0` come up without its address. Nothing was paired |
 
 **The date all three patches depend on.** They hard-code BIOS date
 `12/11/2015`. That was a photograph of the setup screen, then the `P03_C806.108`

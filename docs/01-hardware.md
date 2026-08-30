@@ -506,7 +506,9 @@ This matches how the driver's maintainer scores the tablet — his own status ta
 marks Bluetooth `FIR`, defined there as *"needs firmware which is not in
 linux-firmware"*, and his unit is an a1. Read the exact name your kernel asked for
 out of `dmesg` rather than assuming; see
-[50-troubleshooting.md](50-troubleshooting.md#bluetooth-does-not-appear).
+[50-troubleshooting.md](50-troubleshooting.md#bluetooth-appears-but-has-no-address).
+On this a0 unit it asked for `brcm/BCM4343A0.hcd`, did not get it, and brought
+the adapter up anyway with a placeholder address.
 
 #### Two chip revisions ship in this model, and they want different NVRAM
 
@@ -961,7 +963,7 @@ Two things in `axp288_charger` cause that, and one is fixable from userspace:
 This is not a footnote on this tablet. The same notes record its battery as
 *"dead (browns out on consumption peaks)"*, needing *"always have a charger
 connected"* — and starving the charger is what forces the battery to carry the
-peaks. See [50-troubleshooting.md](50-troubleshooting.md#random-freezes).
+peaks. See [51-freezes.md](51-freezes.md).
 
 A data-only hub leaves the tablet on battery, so charge to 100 % before you start and
 do not let the live session idle for an hour before you begin the install. But that is
