@@ -32,9 +32,34 @@ Confirm which one you have before doing anything else — see
 
 ---
 
+## Reality check before you start
+
+- **This wipes Windows.** 32 GB is not enough for a sane dual boot; Windows 10 alone
+  leaves under 18 GB free. Back it up first if you might want it back.
+- **You cannot charge during the install.** One USB-C port, and it is occupied by the
+  OTG hub. Start at 100 %; the install takes 20-40 minutes.
+- **Secure Boot must stay off.** No distribution publishes a Microsoft-signed 32-bit
+  x86 shim, so there is nothing to start a signed chain from —
+  [details](docs/02-boot-problem.md#secure-boot).
+- **It will freeze until you turn off three idle states.** Not occasionally — the
+  reference unit hung on ten of seventeen boots. The cause is a silicon
+  erratum Intel marks **No Fix** (CHT45), and the cure is one kernel parameter,
+  `intel_idle.states_off=56`. Fifteen consecutive clean boots after applying it.
+  Do this before you conclude anything else about this machine —
+  [details and the measurement](docs/51-freezes.md#erratum-cht45-the-processor-may-not-wake-from-c6-or-deeper).
+- **Nothing types until you install an on-screen keyboard.** There is no built-in
+  keyboard, and no desktop here ships one configured. Until it is set up the tablet
+  cannot enter its own Wi-Fi passphrase without a USB keyboard attached —
+  [how](docs/40-post-install.md#on-screen-keyboard).
+- **This tablet is from 2016.** Cherry Trail is slow and its Linux support, while
+  complete, is maintained by very few people. Expect a usable browsing/media/terminal
+  machine, not a fast one.
+
+---
+
 ## What you need
 
-- The tablet, **charged to 100 %** (you cannot charge it during the install).
+- The tablet, **charged to 100 %**.
 - A **USB-C OTG hub** with at least two USB-A ports.
 - A **USB keyboard**. The firmware setup menu does respond to touch on some units, but
   do not bet the install on it.
@@ -220,31 +245,6 @@ The end-to-end test builds a synthetic ISO, attaches a **virtual** disk (a disk 
 on macOS, a loop device on Linux), runs `make-media.sh` against it and checks the
 resulting stick really carries `EFI/BOOT/bootia32.efi` and the ISO's tree. It never
 touches a real device.
-
----
-
-## Reality check before you start
-
-- **This wipes Windows.** 32 GB is not enough for a sane dual boot; Windows 10 alone
-  leaves under 18 GB free. Back it up first if you might want it back.
-- **You cannot charge during the install.** One USB-C port, and it is occupied by the
-  OTG hub. Start at 100 %; the install takes 20-40 minutes.
-- **Secure Boot must stay off.** No distribution publishes a Microsoft-signed 32-bit
-  x86 shim, so there is nothing to start a signed chain from —
-  [details](docs/02-boot-problem.md#secure-boot).
-- **It will freeze until you turn off three idle states.** Not occasionally — the
-  reference unit hung on ten of its first seventeen boots. The cause is a silicon
-  erratum Intel marks **No Fix** (CHT45), and the cure is one kernel parameter,
-  `intel_idle.states_off=56`. Fifteen consecutive clean boots after applying it.
-  Do this before you conclude anything else about this machine —
-  [details and the measurement](docs/51-freezes.md#erratum-cht45-the-processor-may-not-wake-from-c6-or-deeper).
-- **Nothing types until you install an on-screen keyboard.** There is no built-in
-  keyboard, and no desktop here ships one configured. Until it is set up the tablet
-  cannot enter its own Wi-Fi passphrase without a USB keyboard attached —
-  [how](docs/40-post-install.md#on-screen-keyboard).
-- **This tablet is from 2016.** Cherry Trail is slow and its Linux support, while
-  complete, is maintained by very few people. Expect a usable browsing/media/terminal
-  machine, not a fast one.
 
 ---
 
