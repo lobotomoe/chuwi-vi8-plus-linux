@@ -30,7 +30,74 @@ orientation.
 `scripts/collect-hw-report.sh`, run from a live session, dumps all of this plus the
 driver state in one file.
 
-### Some units ship with the DMI fields unfilled, and it breaks three things at once
+### If your tablet reports something else entirely
+
+The rest of this repo still mostly applies — any Cherry Trail tablet with 32-bit UEFI
+boots the same way — but the per-device quirks in the table below will not.
+
+### Not every Vi8 Plus has 32-bit firmware
+
+This matters more than anything else in this document, because the whole premise of
+this repository rests on it.
+
+Chuwi shipped this model in several revisions, and owners on the 4PDA thread report
+firmware that is **not** 32-bit:
+
+- The common Windows-only units are 32-bit UEFI running 32-bit Windows 10. That is
+  what this guide targets.
+- **Dual-boot (Android + Windows) units behave differently.** One owner reports BIOS
+  `D2D3_Vi8A1.232` presenting as 32-bit when booting Windows and **64-bit when
+  booting Android**, with `x64` appended to the version string in the menu
+  (post #2861). Those units expose a **`Boot architecture`** setting the 32-bit
+  units do not have (posts #2613, #2655).
+- BIOS revision **1608** is reported as 64-bit when booting Windows (post #2940).
+
+So "the Vi8 Plus has 32-bit UEFI" is true of this model in general and **not
+guaranteed of your unit**. Check before you build anything:
+
+```sh
+cat /sys/firmware/efi/fw_platform_size      # 32 -> this guide applies
+```
+
+That needs a booted Linux, which is the thing you cannot do yet. **From Windows,
+while you still have it**, this answers the same question:
+
+```powershell
+$env:PROCESSOR_ARCHITECTURE                 # x86 -> 32-bit Windows
+Confirm-SecureBootUEFI                      # errors if not booted via UEFI
+```
+
+UEFI requires the firmware and the operating system to share a bitness, so a
+**32-bit Windows booted in UEFI mode means 32-bit firmware** — which is the case
+this repository is written for, and what the stock Vi8 Plus ships with. If that
+reports `AMD64`, stop and re-read this section before building a stick.
+
+If it reports `64`, you do not have this repository's problem at all — install
+normally with the distribution's own 64-bit media and ignore everything here about
+`bootia32.efi`. If your firmware has a `Boot architecture` item, leave it alone
+unless you know exactly which way your unit boots; owners who tried to move a
+32-bit unit to 64-bit firmware bricked it, and there is no software path back
+(post #2626).
+
+## Base specification
+
+| | |
+|---|---|
+| Model | Chuwi Vi8 Plus, CWI519 (2016) |
+| SoC | Intel Atom x5-Z8300, Cherry Trail, 4 cores, x86-64 (some later retail listings quote the x5-Z8350 — check `lscpu`; both are Cherry Trail and behave identically here) |
+| GPU | Intel HD Graphics (Gen8 / Cherry Trail) |
+| RAM | 2 GB DDR3L, soldered |
+| Storage | 32 GB eMMC + microSD slot |
+| Display | 8.0" IPS, 1280x800, 10-point capacitive touch. Scanout orientation is probably **portrait** (800x1280) — the firmware setup renders upright with the tablet held portrait — and the kernel has no orientation quirk for this model, so expect to rotate it yourself. See [40-post-install.md](40-post-install.md#if-everything-starts-sideways) |
+| Firmware | **32-bit (IA32) UEFI**, no CSM/legacy boot — but see the revision note below; confirm with `fw_platform_size` before trusting it. The unit this guide was written against reports AMI Aptio `2.17.1249`, **BIOS version `1ATFG007`, dated 12/11/2015** |
+| Ports | 1x USB Type-C (USB 2.0, power + data, OTG), micro-HDMI 1.4, microSD, 3.5 mm |
+| Battery | Li-Po. **Sources disagree:** Notebookcheck's review says 5000 mAh, the 4PDA thread's specification header says Chuwi claims 4000 mAh with owners measuring 3900-4050 mAh. Read your own with `cat /sys/class/power_supply/*/energy_full_design` rather than trusting either |
+| Cameras | 2 MP front, 2 MP rear |
+
+The 64-bit CPU with 32-bit-only firmware is the single most important fact about this
+device. [docs/02-boot-problem.md](02-boot-problem.md) covers what follows from it.
+
+## Some units ship with the DMI fields unfilled, and it breaks three things at once
 
 Check this early. It is invisible, it is not a fault in your tablet, and it is the
 single explanation for a whole cluster of "nothing works out of the box".
@@ -163,73 +230,6 @@ lists what has to be confirmed first.
 The other route is to write the two system strings back into the firmware with
 AMI's DMI editor, which would make all three quirks match at once. Untested here;
 the risks are in [60-bios-firmware.md](60-bios-firmware.md#what-would-actually-fix-it).
-
-### If your tablet reports something else entirely
-
-The rest of this repo still mostly applies — any Cherry Trail tablet with 32-bit UEFI
-boots the same way — but the per-device quirks in the table below will not.
-
-### Not every Vi8 Plus has 32-bit firmware
-
-This matters more than anything else in this document, because the whole premise of
-this repository rests on it.
-
-Chuwi shipped this model in several revisions, and owners on the 4PDA thread report
-firmware that is **not** 32-bit:
-
-- The common Windows-only units are 32-bit UEFI running 32-bit Windows 10. That is
-  what this guide targets.
-- **Dual-boot (Android + Windows) units behave differently.** One owner reports BIOS
-  `D2D3_Vi8A1.232` presenting as 32-bit when booting Windows and **64-bit when
-  booting Android**, with `x64` appended to the version string in the menu
-  (post #2861). Those units expose a **`Boot architecture`** setting the 32-bit
-  units do not have (posts #2613, #2655).
-- BIOS revision **1608** is reported as 64-bit when booting Windows (post #2940).
-
-So "the Vi8 Plus has 32-bit UEFI" is true of this model in general and **not
-guaranteed of your unit**. Check before you build anything:
-
-```sh
-cat /sys/firmware/efi/fw_platform_size      # 32 -> this guide applies
-```
-
-That needs a booted Linux, which is the thing you cannot do yet. **From Windows,
-while you still have it**, this answers the same question:
-
-```powershell
-$env:PROCESSOR_ARCHITECTURE                 # x86 -> 32-bit Windows
-Confirm-SecureBootUEFI                      # errors if not booted via UEFI
-```
-
-UEFI requires the firmware and the operating system to share a bitness, so a
-**32-bit Windows booted in UEFI mode means 32-bit firmware** — which is the case
-this repository is written for, and what the stock Vi8 Plus ships with. If that
-reports `AMD64`, stop and re-read this section before building a stick.
-
-If it reports `64`, you do not have this repository's problem at all — install
-normally with the distribution's own 64-bit media and ignore everything here about
-`bootia32.efi`. If your firmware has a `Boot architecture` item, leave it alone
-unless you know exactly which way your unit boots; owners who tried to move a
-32-bit unit to 64-bit firmware bricked it, and there is no software path back
-(post #2626).
-
-## Base specification
-
-| | |
-|---|---|
-| Model | Chuwi Vi8 Plus, CWI519 (2016) |
-| SoC | Intel Atom x5-Z8300, Cherry Trail, 4 cores, x86-64 (some later retail listings quote the x5-Z8350 — check `lscpu`; both are Cherry Trail and behave identically here) |
-| GPU | Intel HD Graphics (Gen8 / Cherry Trail) |
-| RAM | 2 GB DDR3L, soldered |
-| Storage | 32 GB eMMC + microSD slot |
-| Display | 8.0" IPS, 1280x800, 10-point capacitive touch. Scanout orientation is probably **portrait** (800x1280) — the firmware setup renders upright with the tablet held portrait — and the kernel has no orientation quirk for this model, so expect to rotate it yourself. See [40-post-install.md](40-post-install.md#if-everything-starts-sideways) |
-| Firmware | **32-bit (IA32) UEFI**, no CSM/legacy boot — but see the revision note below; confirm with `fw_platform_size` before trusting it. The unit this guide was written against reports AMI Aptio `2.17.1249`, **BIOS version `1ATFG007`, dated 12/11/2015** |
-| Ports | 1x USB Type-C (USB 2.0, power + data, OTG), micro-HDMI 1.4, microSD, 3.5 mm |
-| Battery | Li-Po. **Sources disagree:** Notebookcheck's review says 5000 mAh, the 4PDA thread's specification header says Chuwi claims 4000 mAh with owners measuring 3900-4050 mAh. Read your own with `cat /sys/class/power_supply/*/energy_full_design` rather than trusting either |
-| Cameras | 2 MP front, 2 MP rear |
-
-The 64-bit CPU with 32-bit-only firmware is the single most important fact about this
-device. [docs/02-boot-problem.md](02-boot-problem.md) covers what follows from it.
 
 ## Component-by-component
 
@@ -536,7 +536,7 @@ brcmfmac: brcmf_fw_alloc_request: using brcm/brcmfmac43430a0-sdio for chip BCM43
 
 — **verified on the unit**: revision **a0**.
 
-##### What `a0` and `a1` actually are
+**What `a0` and `a1` actually are.**
 
 Not tablet revisions. They are **silicon steppings of the Broadcom BCM43430 die** —
 mask revisions of the chip inside the AmPak module, changed by the module vendor
@@ -561,16 +561,13 @@ inconsistently: `BCM4343A0` against `BCM43430A1`, one digit apart.
 B0 is a later part — it is the one in the Raspberry Pi Zero W — and is not expected in
 a 2015-2016 tablet.
 
-##### How to tell which one you have
+**Telling them apart is software-only.** The module is soldered under an unmarked
+shield, so there is no part number to read even with the case open, and the DMI serial
+is no help either: this BIOS ships `product_serial` as a single space. The `dmesg` line
+above is the answer — `BCM43430/0` is a0, `BCM43430/1` is a1.
 
-From software only. The module is soldered to the board under an unmarked shield, so
-there is no part number to read even with the case open, and the DMI serial is no help
-either: this BIOS ships `product_serial` as a single space. The `dmesg` line above is
-the answer — `BCM43430/0` is a0, `BCM43430/1` is a1.
-
-##### When the switch happened
-
-Suggestive rather than settled. Chuwi serial numbers appear to encode the build month
+**When the switch happened** — suggestive rather than settled, and useful only as a
+prior when buying second-hand. Chuwi serial numbers appear to encode the build month
 as `YYMM` after the `Q32G22` prefix, and the driver maintainer's collection notes both
 serials and chip revisions for the sibling Hi8:
 
@@ -585,9 +582,6 @@ Seven serials across his Chuwi tablets all carry a valid month in those position
 which is what makes the reading credible; none of it is documented by Chuwi. On that
 evidence the changeover falls around mid-2016, and this tablet's BIOS date of
 2015-12-11 sits comfortably on the a0 side — which is what it turned out to be.
-
-Useful as a prior when buying a second-hand unit. Not a substitute for the `dmesg`
-check.
 
 That matters because the NVRAM `linux-firmware` ships for this tablet is
 `brcmfmac43430**-sdio.Hampoo-D2D3_Vi8A1.txt` — no `a0`, so it came from a unit with the
@@ -808,14 +802,6 @@ hypothesis**, and worth confirming with `ls /sys/bus/iio/devices/` and
 `cat /sys/bus/iio/devices/iio:device0/in_accel_*_raw` before anyone chases it.
 If the raw reads work while buffered reads do not, that diagnosis is right.
 
-### Power — X-Powers AXP288 PMIC
-
-- `axp288_charger`, `axp288_fuel_gauge`, `CONFIG_INTEL_SOC_PMIC=y`
-- Backlight is driven through the Cherry Trail LPSS PWM (`CONFIG_PWM_LPSS=y`).
-
-Battery percentage, charge state and brightness all work. Reported capacity can be a
-little optimistic; the fuel gauge is calibrated by the firmware, not by Linux.
-
 ### Storage
 
 - eMMC via `sdhci-acpi`, appears as `/dev/mmcblk0` (occasionally `mmcblk1` — always
@@ -870,6 +856,18 @@ USB problems described in
 Cherry Trail routes the cameras through the Intel ISP2400 ("atomisp"). The mainline
 driver is in `drivers/staging/` and does not produce a usable camera on this hardware.
 Treat both cameras as non-functional. This is not going to change.
+
+### Power — X-Powers AXP288 PMIC
+
+Battery and charging behaviour is in
+[Ports, OTG, and charging](#ports-otg-and-charging-while-a-hub-is-attached) below,
+because on this tablet the two cannot be discussed apart.
+
+- `axp288_charger`, `axp288_fuel_gauge`, `CONFIG_INTEL_SOC_PMIC=y`
+- Backlight is driven through the Cherry Trail LPSS PWM (`CONFIG_PWM_LPSS=y`).
+
+Battery percentage, charge state and brightness all work. Reported capacity can be a
+little optimistic; the fuel gauge is calibrated by the firmware, not by Linux.
 
 ### Ports, OTG, and charging while a hub is attached
 
