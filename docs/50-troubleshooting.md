@@ -1,7 +1,40 @@
 # Troubleshooting
 
-Ordered roughly by when you hit them.
+Ordered by when you hit them: everything down to
+[`grub-install`](#grub-install-says-cannot-find-efi-directory-or-i386-efi-not-found)
+happens while you are still installing, everything after it on the machine you
+installed.
 
+**Before the install is finished**
+
+| Symptom | |
+|---|---|
+| Sits on the CHUWI logo after you pick the stick | [go](#it-sits-on-the-chuwi-logo-after-you-pick-the-stick) |
+| Stuck on the logo after you changed a firmware setting | [go](#a-setting-you-changed-left-it-stuck-on-the-chuwi-logo) |
+| The stick is not in the boot menu | [go](#the-tablet-does-not-list-the-usb-stick-at-all) |
+| The firmware does not see the stick at all | [go](#the-stick-is-not-enumerated-at-all) |
+| A `grub>` prompt instead of a menu | [go](#the-stick-boots-to-a-grub-prompt-instead-of-a-menu) |
+| Black or garbled screen in the installer | [go](#the-installer-boots-but-the-screen-is-black-or-garbled) |
+| The live session degrades after a few minutes | [go](#the-live-session-boots-then-slowly-falls-apart) |
+| `Unable to find a medium containing a live file system` | [go](#unable-to-find-a-medium-containing-a-live-file-system) |
+| Installed, and now nothing boots | [go](#the-install-finished-and-now-nothing-boots) |
+
+**On the installed system**
+
+| Symptom | |
+|---|---|
+| Random freezes, at boot or at idle | [go](#random-freezes) |
+| No sound, only "Dummy Output" | [go](#no-sound-only-dummy-output) |
+| No network icon; no `wlan0` | [go](#there-is-no-network-icon-in-the-tray) |
+| Wi-Fi does not see the network | [go](#wi-fi-does-not-see-the-network) |
+| Bluetooth has address `AA:AA:AA:AA:AA:AA` | [go](#bluetooth-appears-but-has-no-address) |
+| The touchscreen does not respond | [go](#the-touchscreen-does-not-respond) |
+| Auto-rotation does nothing | [go](#monitor-sensor-says-not-authorized-sensor-claim-not-allowed) |
+| `apt update`: Release file "is not valid yet" | [go](#apt-update-says-the-release-file-is-not-valid-yet) |
+| Everything is just slow | [go](#everything-is-just-slow) |
+| You want Windows back | [go](#getting-back-to-windows) |
+
+---
 ## It sits on the CHUWI logo after you pick the stick
 
 **Wait ten minutes before doing anything.** This is the single most common false
@@ -91,8 +124,7 @@ tells you to change Secure Boot and nothing else.
 
 ### Never disable USB in the firmware setup
 
-Worth its own warning, because it is a one-way door and `SHOW ALL ITEM` puts the
-switch in plain sight. A Vi8 Plus owner did exactly this in January 2016:
+It is a one-way door, and `SHOW ALL ITEM` puts the switch in plain sight. A Vi8 Plus owner did exactly this in January 2016:
 
 > *"I DEACTIVATED the USB in the bios hence i couldn't plug anything on the
 > tablet or it would crash, i couldn't reset the bios either because i couldn't
@@ -435,6 +467,25 @@ sudo mount /dev/mmcblk0p1 /mnt2 && ls /mnt2/EFI/BOOT/
   system. That is what `scripts/postinstall-grub-ia32.sh` installs; if you are
   doing it by hand, `apt install grub-efi-ia32-bin` inside the chroot.
 
+## Random freezes
+
+Long enough, and enough of an investigation rather than a recipe, that it has a
+file of its own: **[51-freezes.md](51-freezes.md)**.
+
+The short version:
+
+- **Freezing 16-27 seconds into boot** is a silicon erratum Intel marks *No Fix*,
+  and one kernel parameter takes away the idle states it names —
+  `intel_idle.states_off=56`. Ten hangs in seventeen boots before, none in
+  fifteen after:
+  [the erratum and the measurement](51-freezes.md#erratum-cht45-the-processor-may-not-wake-from-c6-or-deeper).
+- **Freezing while sitting idle on the desktop** was, on the reference unit, the
+  screensaver — a conclusion nobody expects, which is why it took three separate
+  observations before it was believed:
+  [how that was established](51-freezes.md#the-idle-hangs-were-the-screensaver).
+- **It was not the charger**, which was the other live theory and had evidence
+  behind it. Worth reading before you spend an evening on power delivery.
+
 ## Never run `apt autoremove` here without reading the list
 
 On the reference unit, after a routine `apt full-upgrade`:
@@ -605,25 +656,6 @@ before hunting for a file that is not there.
 
 Wi-Fi and Bluetooth share the antenna path on this module, so heavy Bluetooth
 use degrades 2.4 GHz Wi-Fi throughput. That is the hardware.
-
-## Random freezes
-
-Long enough, and enough of an investigation rather than a recipe, that it has a
-file of its own: **[51-freezes.md](51-freezes.md)**.
-
-The short version, because you are probably reading this immediately after one:
-
-- **Freezing 16-27 seconds into boot** is a silicon erratum Intel marks *No Fix*,
-  and one kernel parameter takes away the idle states it names —
-  `intel_idle.states_off=56`. Ten hangs in seventeen boots before, none in
-  fifteen after:
-  [the erratum and the measurement](51-freezes.md#erratum-cht45-the-processor-may-not-wake-from-c6-or-deeper).
-- **Freezing while sitting idle on the desktop** was, on the reference unit, the
-  screensaver — a conclusion nobody expects, which is why it took three separate
-  observations before it was believed:
-  [how that was established](51-freezes.md).
-- **It was not the charger**, which was the other live theory and had evidence
-  behind it. Worth reading before you spend an evening on power delivery.
 
 ## The touchscreen does not respond
 
