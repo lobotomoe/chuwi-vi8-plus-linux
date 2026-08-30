@@ -15,8 +15,7 @@ done.
 | `0002-…brcmfmac…` | `wifi` | NVRAM lookup for the BCM43430 |
 | `0003-…bytcr_rt5651…` | `ASoC/Intel` | mono speaker, swapped headphones, IN2 mic |
 
-The accelerometer needs a systemd hwdb entry rather than a kernel patch; see
-below.
+The accelerometer needs nothing at all — see [below](#the-accelerometer-needs-no-patch-at-all).
 
 ## Why this shape
 

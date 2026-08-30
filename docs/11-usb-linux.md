@@ -70,7 +70,7 @@ Caveats worth knowing:
 - Ventoy's IA32 support is still labelled experimental by upstream, and its
   author develops it without real IA32 hardware.
 - Secure Boot must be off either way.
-- If a particular ISO refuses to boot under Ventoy, fall back to Option B for
+- If a particular ISO refuses to boot under Ventoy, fall back to Option A for
   that ISO rather than fighting it.
 
 ---

@@ -761,10 +761,13 @@ See [40-post-install.md](40-post-install.md#screen-rotation).
 
 The hwdb entry matches on `svnHampoo:pnD2D3_Vi8A1`, so on a unit with
 [unfilled DMI](#some-units-ship-with-the-dmi-fields-unfilled-and-it-breaks-three-things-at-once)
-the mount matrix is not applied and auto-rotation has no idea which way is up. The
-accelerometer itself still works — you can copy the matrix into a local hwdb rule
-matched on something your unit actually reports. This is the `modalias` to match
-against, read off the tablet:
+it never fires — **and on this tablet that does not matter**, because the driver
+asks ACPI first and `ROTM` answers, as the reading above shows. No local hwdb rule
+is needed. Note also that the two sources disagree: hwdb carries
+`0, 1, 0; 1, 0, 0; 0, 0, 1` while this unit's own firmware reports
+`0, -1, 0; -1, 0, 0; 0, 0, 1`. Which of the two is right for this panel has not
+been established here; the firmware's is the one in use. For the quirks that *do*
+key on DMI, this is the `modalias` to match against, read off the tablet:
 
 ```
 dmi:bvnAmericanMegatrendsInc.:bvrP03_C806.108:bd12/11/2015:br5.11:svnTobefilledbyO.E.M.:pnTobefilledbyO.E.M.:pvrTobefilledbyO.E.M.:rvnHampoo:rnCherryTrailCR:rvrTobefilledbyO.E.M.:cvnToBeFilledByO.E.M.:ct3:cvrToBeFilledByO.E.M.:skuMRD:pfaCherryTrailCR:

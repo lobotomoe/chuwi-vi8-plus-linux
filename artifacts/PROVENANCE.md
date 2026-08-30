@@ -45,9 +45,12 @@ directory.
 
 ## Verifying it yourself
 
+`SHA256SUMS` names the file without a directory, so run the check from inside
+`artifacts/`:
+
 ```sh
-shasum -a 256 -c artifacts/SHA256SUMS      # macOS
-sha256sum -c artifacts/SHA256SUMS          # Linux
+(cd artifacts && shasum -a 256 -c SHA256SUMS)      # macOS
+(cd artifacts && sha256sum -c SHA256SUMS)          # Linux
 ```
 
 To re-derive the file from Debian's archive instead of trusting this copy:

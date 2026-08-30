@@ -170,17 +170,16 @@ In order:
    on a USB 2.0 host is a combination old firmware can fail to enumerate, while
    low-speed HID devices on the same hub keep working — which makes it look like
    the stick is at fault when it is the negotiation.
-2. **Power the hub.** With a hub attached this tablet runs on battery, and a stick
+3. **Power the hub.** With a hub attached this tablet runs on battery, and a stick
    draws far more than a keyboard. If your hub has a Type-C Power Delivery input,
    put a charger in it.
-3. **Remove anything you do not need**, starting with the mouse. The volume keys
+4. **Remove anything you do not need**, starting with the mouse. The volume keys
    and a keyboard are enough for everything in this guide.
-4. **Try the hub's SD card reader** if it has one, with a microSD carrying the
+5. **Try the hub's SD card reader** if it has one, with a microSD carrying the
    install image. A card reader presents as USB mass storage, so unlike the
    tablet's own microSD slot — which the firmware is
    [not known to boot from](01-hardware.md#storage) — it is an ordinary bootable
    USB device as far as the firmware is concerned.
-5. **Try a different hub**, ideally a plain USB 2.0 one.
 
 Confirm each attempt in `USB Configuration` rather than by trying to boot: the
 device appearing on the `USB Devices:` line is the signal, and it takes seconds
@@ -227,7 +226,7 @@ was wrong, and the mistake is worth describing because it is easy to repeat.
 The plain entry did black-screen, repeatedly, while safe graphics reached a
 desktop — which looks like conclusive evidence about the display driver. It was
 not. The live USB was dropping off the bus and taking the root filesystem with
-it (see [above](#a-usb-30-stick-cannot-hold-a-link-here)); the two entries differ
+it (see [below](#a-usb-30-stick-cannot-hold-a-link-here)); the two entries differ
 in how long they take to get to the point of needing it, which is enough to make
 a storage fault look like a graphics fault. With the live filesystem moved to the
 microSD card, **the plain entry boots to a working LXQt desktop and runs the

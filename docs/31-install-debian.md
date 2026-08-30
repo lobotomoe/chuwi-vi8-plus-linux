@@ -13,7 +13,7 @@ step afterwards.
 
 The one thing Debian does not do for you is boot: its ISOs ship only
 `bootx64.efi`, so the stick still needs `artifacts/bootia32.efi` added. That is
-what [10](10-usb-macos.md)/[11](11-usb-linux.md)/[12-usb-windows.md](12-usb-windows.md)
+what [macOS](10-usb-macos.md) / [Linux](11-usb-linux.md) / [Windows](12-usb-windows.md)
 did.
 
 ## Which image

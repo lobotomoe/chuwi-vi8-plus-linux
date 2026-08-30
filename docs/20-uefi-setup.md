@@ -264,9 +264,10 @@ flat `C1`/`C2`/`C3`.
 
 The forum advice is not wrong, it is about a different operating system — Windows
 *does* take its idle states from ACPI, so the toggle is real there. On Linux the
-lever is `intel_idle.max_cstate=`, and
-[51-freezes.md](51-freezes.md) has the reversible
-recipe.
+lever is `intel_idle.states_off=56`, which takes away only the three states the
+erratum names — not `intel_idle.max_cstate=1`, which the forums recommend and
+which costs 19 °C here for nothing extra:
+[51-freezes.md](51-freezes.md#erratum-cht45-the-processor-may-not-wake-from-c6-or-deeper).
 
 Confirm before believing any of this on a given unit:
 
@@ -337,9 +338,9 @@ Two ways to get to it. Either way, the hub, keyboard and stick must be plugged i
 **before** you power on:
 
 **The short way** — power on and tap **F7** repeatedly from the moment the screen
-lights up. This opens the boot-device menu directly, skipping setup. Reported by
-owners of this model rather than verified here, so if nothing happens, use the
-other route.
+lights up. This opens the boot-device menu directly, skipping setup. It is not
+advertised on the POST screen, but it works on the reference unit. If nothing
+happens, use the other route.
 
 **Through setup** — power on, tap **Esc** repeatedly, then:
 
