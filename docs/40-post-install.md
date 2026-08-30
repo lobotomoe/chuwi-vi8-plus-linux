@@ -166,12 +166,16 @@ automatically. The HiBook entry matches on `Hampoo` + `Cherry Trail CR`, which
 this tablet also reports, but it is declared for a 1200x1920 panel and the lookup
 compares resolution before anything else, so it cannot misfire here.
 
-Settle it in the live session before installing:
+Two commands settle it:
 
 ```sh
 cat /sys/class/graphics/fb0/virtual_size        # 1280,800 or 800,1280
 xrandr --query | grep -w connected               # X11
 ```
+
+Worth running in the live session too, if you get there before reading this — the
+answer does not change after installing, but knowing it in advance saves meeting a
+sideways installer with no idea whether it is a fault.
 
 If it is portrait-native, the fixes are, in order of preference:
 

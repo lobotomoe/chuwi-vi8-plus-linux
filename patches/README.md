@@ -15,7 +15,8 @@ the running hardware, and are marked where they appear below.
 | `0002-…brcmfmac…` | `wifi` | NVRAM lookup for the BCM43430 |
 | `0003-…bytcr_rt5651…` | `ASoC/Intel` | mono speaker, swapped headphones, IN2 mic |
 
-Before sending: confirm the BIOS date matches yours, and build and boot a kernel
+Before sending: check the DMI values below against your own tablet — the BIOS
+date is part of every match and yours may differ — then build and boot a kernel
 with them. Both are covered below.
 
 The accelerometer needs nothing at all — see [below](#the-accelerometer-needs-no-patch-at-all).
@@ -114,7 +115,7 @@ byte-identical to `chuwi_hi8_pro_data`. Keeping the separate name documents
 which tablet the entry is for; be ready to be asked to reuse the existing
 struct instead.
 
-## Before submitting: confirm the BIOS date
+## Before submitting: read the DMI off your own unit
 
 All three patches hard-code `12/11/2015`. That is now **confirmed from the
 firmware image itself**, not only from a photograph: `P03_C806.108`, the build
@@ -254,7 +255,7 @@ speaker, the IN2 microphone mapping and the jack-detect source
 `HP_LR_SWAPPED` is the one flag not corroborated outside the kernel entry itself,
 and it is also the one you can hear: swapped left and right in headphones.
 
-### The rest
+### Touchscreen and Wi-Fi, which do need a built kernel
 
 There is no shortcut: build a kernel with the patches and boot it. On this
 hardware, build on another machine.
