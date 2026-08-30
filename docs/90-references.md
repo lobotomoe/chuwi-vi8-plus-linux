@@ -493,7 +493,13 @@ provenance:
 | `P03_C806.109` | `0d72b3ceac2c46c869c1337873238c63612a74759c907e9aa89ab824050742de` |
 | `bios.bin` (dual-boot) | `0068258628377e3ce2a6c2a04cb9a42da88696f72c23a3282effb08fe91d2800` |
 | `CHUWI.D86JLBNR03.bin` | `77a94ca41343a795784c13bba5c0f67aa587602d7d0211dcbc4620a7bc29416d` |
-| `P03_C806.rom.exe` (Windows flasher, not an SPI image) | `6434433c075c063e934ff05a76c5596c6c10845f6da165ffe98c8716d53e0e0f` |
+| `P03_C806.rom.exe` wrapping `.109` (Windows flasher, not an SPI image) | `6434433c075c063e934ff05a76c5596c6c10845f6da165ffe98c8716d53e0e0f` |
+| `P03_C806.rom.exe` wrapping `.108` — **same filename, same 6 497 280 bytes** | `28553f5142df505fe35192b48ace0c5701484533f467dbe39d3e108549d4d289` |
+
+The last two rows are the reason this table exists. Two different BIOS releases
+are distributed as a file with one name and one size, and the only thing that
+separates them is the hash — see
+[60-bios-firmware.md](60-bios-firmware.md#the-releases-that-are-known-to-exist).
 
 Re-derive any of it with
 [`scripts/inspect-bios-image.py`](../scripts/inspect-bios-image.py), which is

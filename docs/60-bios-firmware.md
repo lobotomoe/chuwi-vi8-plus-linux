@@ -118,8 +118,15 @@ downloaded and unpacked for this document — see
 to upgrade the Chuwi Vi8 Plus BIOS?"* says *"Current version: P03_C806.108"* and
 links a MEGA file. That file was downloaded: it is `Vi8 Plus BIOS.rar`, SHA-256
 `b03b953c…c2482`, byte-identical to the archive described below, which contains
-`.109` and no `.108` at all. — **verified**. The confusion is easy to make,
-because both releases ship under the same `P03_C806.rom.exe` filename.
+`.109` and no `.108` at all. — **verified**.
+
+The confusion is easy to make, and worse than a naming collision. Both releases
+ship a Windows flasher called `P03_C806.rom.exe`, and **the two files are the same
+length** — 6 497 280 bytes each. They are not the same file: the first 403 286
+bytes match, which is the Smart Install Maker stub, and 2 706 457 bytes differ
+after that. So the payload is genuinely a different BIOS while the name, the icon
+and the size on disk are identical. Nothing short of hashing tells them apart. —
+**verified** by extracting both wrappers and running `cmp -l`.
 
 ### Chuwi's own "BIOS download" thread does not contain a BIOS
 
@@ -165,6 +172,7 @@ assumptions that are easy to make:
 | `P03_C806.109` | `0d72b3ceac2c46c8` | AMI Aptio, Cherry Trail. Full 8 MB SPI image. **The genuine latest Vi8 Plus BIOS** |
 | `P03_C806.108` | `5ba88aad59a4bd36` | The previous build, and what the reference tablet shipped with. Full 8 MB SPI image |
 | `P03_C806.rom.exe` | `6434433c075c063e` | Windows flasher wrapping `.109` |
+| `P03_C806.rom.exe` | `28553f5142df505f` | Windows flasher wrapping `.108`. **Same name and same 6 497 280 bytes as the row above** |
 | `bios.bin` (dual-boot) | `0068258628377e3c` | AMI Aptio, Cherry Trail, dual-boot. Full 8 MB SPI image |
 | `CHUWI.D86JLBNR03.bin` | `77a94ca41343a795` | **InsydeH2O, ValleyView (Bay Trail). Not this tablet.** |
 
@@ -221,7 +229,11 @@ executable:
 | `startup.nsh` | — | walks `fs0:`..`fs4:` for itself, then flashes |
 
 — machine types **verified** by reading the PE COFF headers (`0x014c` = IA32,
-`0x8664` = x64), version from AFU's own banner string.
+`0x8664` = x64). The version is **verified** too, though not from the banner: the
+banner is the format string `AMI Firmware Update Utility  v%s`, and the number it
+takes is the standalone `5.08.00` in the same binary. Aptio 5 is the major version
+rather than anything the file announces — it carries *both* the *"Please use Aptio
+5 AFU"* and *"Please use Aptio 4 AFU"* error strings, so neither one identifies it.
 
 Note which binaries are which. The shell ships in both widths, but **both
 flashing tools are IA32 only** — on 64-bit firmware `bootx64.efi` would start and
