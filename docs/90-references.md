@@ -8,6 +8,20 @@ distribution source, an ISO, a firmware image, a driver package, a photograph of
 the setup menu. **verified on the unit** means it was observed on the reference
 tablet. Anything with neither marker is a report, and is attributed.
 
+Sections run roughly in the order the guide needs them — booting, installing,
+the hardware, the freezes, the firmware — and end with the community sources
+that corroborate rather than establish. If you are chasing one claim:
+
+| Looking for | Section |
+|---|---|
+| why the stick will not boot, `bootia32.efi` | [The 32-bit UEFI problem](#the-32-bit-uefi-problem) |
+| why Lubuntu and not Ubuntu | [Installer behaviour](#installer-behaviour) |
+| a driver, a quirk, a kernel symbol | [hardware in the kernel](#chuwi-vi8-plus-hardware-in-the-kernel), [de Goede's notes](#hans-de-goedes-notes-on-this-exact-tablet) |
+| the setup menu's contents | [The firmware setup menu](#the-firmware-setup-menu) |
+| CHT45, idle states | [The freezes](#the-freezes-intels-own-erratum) |
+| a BIOS image, a hash, the touchscreen blob | [BIOS / UEFI firmware](#bios--uefi-firmware) |
+| what other owners report | [4PDA](#the-4pda-owners-thread), [recovery](#recovery-and-corroboration-from-outside-4pda), [another owner's fixes](#another-owners-fixes-for-this-exact-tablet) |
+
 ## The 32-bit UEFI problem
 
 - Linux kernel, `arch/x86/Kconfig` — `CONFIG_EFI_MIXED` and
@@ -184,59 +198,13 @@ two revisions want different files on both radios.
 
 ## The firmware setup menu
 
-- The firmware on a CWI519 identifies itself as **`Aptio Setup Utility`,
-  `Version 2.17.1249`, "Copyright (C) 2015 American Megatrends, Inc."** Tabs are
-  `Main / Advanced / Chipset / Security / Boot / Save & Exit`. The `Security` tab
-  carries only `Administrator Password` and `User Password` (length 3–20) — no
-  Secure Boot entry. The on-screen key legend gives `F4: Save & Exit`,
-  `F3: Optimized Defaults`, `F2: Previous Values`, `+/-: Change Opt.`
-  — **verified from a photograph of the running setup menu, August 2026**
-- `Save & Exit` -> **`SHOW ALL ITEM`**, default `[Disabled]`, help text *"Enable
-  or Disable show all setup item"*. Chuwi suppresses most of the setup menu with
-  it, which is why Secure Boot is absent from both `Security` and `Boot` in the
-  default view. The `Boot` tab ships with `Bootup NumLock State [On]`,
-  `Quiet Boot [Enabled]`, `Fast Boot [Disabled]`, a fixed boot order of
-  `USB Lan / USB Key / USB Hard Disk / Hard Disk: Windows Boot Manager`, and only
-  `UEFI Hard Disk Drive BBS Priorities`. `Save & Exit` also carries `Boot
-  Override`, `Launch EFI Shell from filesystem device` and `Windows 10 - Push
-  Button Reset`. — **verified from photographs of the running setup menu,
-  August 2026**. Searching for documentation of `SHOW ALL ITEM` on Chuwi hardware
-  turns up nothing; the on-screen help is the source.
-- With `SHOW ALL ITEM` enabled, `Security` gains `▶ Secure Boot menu` and
-  `▶ Secure Flash update`. The latter is a read-only report (`Signed BIOS update
-  Enabled`, `Public Key store Sha256`, `Signature algorithm PKCS#1v1.5/PSS`,
-  `BIOS flash method Runtime,Capsule,Recovery`, `Flash write-protection
-  Disabled`) and is not where Secure Boot is configured. `Save & Exit` also gains
-  `Reset System with ME disable ModeMEUD000`. — **verified from photographs of
-  the running setup menu, August 2026**
-- With `SHOW ALL ITEM` enabled, the `Advanced` tab carries exactly these
-  submenus, in this order: `Trusted Computing`, `ACPI Settings`, `Serial Port
-  Console Redirection`, `CPU Configuration`, `PPM Configuration`, `Thermal`,
-  `Android`, `PCI Subsystem Settings`, `Network Stack Configuration`,
-  `USB Configuration`, `Platform Trust Technology`, `Security Configuration`,
-  `System Component`. — **verified from a photograph of the running setup menu,
-  August 2026.** Three of these matter here: `PPM Configuration` is where AMI
-  puts C-state options on this platform; `USB Configuration` is the one that
-  bricks the tablet if USB is turned off, and on this firmware it also lists
-  detected mass-storage devices, which separates "the firmware cannot see the
-  stick" from "it sees it but finds no loader" (4PDA #2831 describes exactly that
-  split); and `Android` is presumably the dual-boot machinery, unexplored here.
-- `Security` -> `Secure Boot menu` -> `Key Management` reports **every Secure Boot
-  key store empty** — `Platform Key(PK)`, `Key Exchange Keys`, `Authorized
-  Signatures`, `Forbidden Signatures` and `Authorized TimeStamps` all show
-  `Size 0 | Key# 0`, with `Provision Factory Default keys [Disabled]`. That is
-  direct confirmation, at the key-store level rather than inferred from
-  `System Mode: Setup`, that Secure Boot cannot engage on this tablet. The
-  `Secure Boot Mode` selector offers `Standard` and `Custom`, and sits on
-  `Custom`. — **verified from photographs of the running setup menu, August 2026**
-- `Advanced` -> `USB Configuration` reports `USB Module Version 11`, one `XHCI`
-  controller, `XHCI Hand-off [Enabled]`, `USB Mass Storage Driver Support
-  [Enabled]`, and the tunables `USB transfer time-out [20 sec]`, `Device reset
-  time-out [20 sec]`, `Device power-up delay [Auto]`. It also enumerates attached
-  devices under `USB Devices:`, which is what makes it a diagnostic — a stick
-  that does not appear there is not being seen by the firmware at all, so no
-  amount of rebuilding its filesystem or bootloader will help.
-  — **verified from a photograph of the running setup menu, August 2026**
+The setup menu was photographed on a running CWI519 in August 2026 and
+transcribed in [20-uefi-setup.md](20-uefi-setup.md), which is the single source
+for what it contains: Aptio Setup Utility 2.17.1249, the six tabs, the key
+legend, the `SHOW ALL ITEM` switch that reveals the Secure Boot and Key
+Management submenus, and `Advanced` -> `USB Configuration` as the enumeration
+diagnostic. — **verified from photographs of the running setup menu, August 2026**
+
 - AMI Aptio locks the Secure Boot setting until an Administrator (supervisor)
   password is set; setting one makes it selectable, and clearing it afterwards
   leaves the choice in place.
@@ -333,16 +301,10 @@ and reachable by paging to `&st=` in multiples of 20.
 
 ## Ventoy IA32 on this tablet: still unknown, and here is why
 
-An earlier revision of this file claimed Ventoy had been tested here and did not
-work. **That claim was wrong and is retracted.** What actually happened is worth
-recording, because it is a trap anyone debugging this hardware can fall into.
-
 A Ventoy stick carrying a Linux ISO, plugged in before power-on, did not appear
-under `Boot Override` on a Chuwi Vi8 Plus (BIOS `1ATFG007`) with Secure Boot off
-and `Fast Boot` disabled. The obvious reading — Ventoy's IA32 loader is not being
-found — is what got written down.
-
-Then `Advanced` -> `USB Configuration` showed:
+under `Boot Override` (BIOS `1ATFG007`, Secure Boot off, `Fast Boot` disabled).
+The obvious reading is that Ventoy's IA32 loader was not found. It is the wrong
+one — `Advanced` -> `USB Configuration` showed:
 
 ```
 USB Devices:  1 Keyboard, 1 Mouse, 2 Hubs
@@ -350,21 +312,13 @@ USB Devices:  1 Keyboard, 1 Mouse, 2 Hubs
 
 **No mass-storage device at all**, with `USB Mass Storage Driver Support
 [Enabled]`, across every port of the hub, while the keyboard hot-plugged and
-responded instantly. The firmware was never enumerating the stick as a USB
-device, so it never reached the point of looking at its partitions, filesystem or
-`\EFI\BOOT\`. Nothing about Ventoy's layout — exFAT data partition, loaders on a
-second partition — can influence whether a device enumerates, because enumeration
-happens below all of that.
+responded instantly. The firmware never enumerated the stick, so it never reached
+the point of looking at its partitions, filesystem or `\EFI\BOOT\`. Nothing
+about Ventoy's layout can influence whether a device enumerates.
 
-So this tells us nothing about Ventoy IA32 on a Vi8 Plus. The remaining
-candidates are the OTG power budget (this tablet runs on battery whenever a hub
-is attached, and a stick draws far more than a keyboard) and the stick itself.
+So this says nothing about Ventoy IA32 on a Vi8 Plus. The remaining candidates
+are the OTG power budget and the stick itself.
 — **verified from photographs of the setup menu, August 2026**
-
-The lesson generalises: **before concluding anything about a bootloader, confirm
-in `USB Configuration` that the firmware sees the device at all.** An absent
-entry under `Boot Override` has two very different causes and they need opposite
-fixes.
 
 ## Recovery, and corroboration from outside 4PDA
 
@@ -380,7 +334,7 @@ because a claim repeated by one community is not the same as a verified one.
   keyboard during the reboot or you get a menu with no input. The author is the
   kernel developer behind this tablet's touchscreen, audio and EFI
   embedded-firmware support, so this is as authoritative as this topic gets. The
-  original LiveJournal has since been deleted; read it at
+  original LiveJournal URL does not serve automated fetches; read it at
   <https://web.archive.org/web/20210507014353/https://hansdegoede.livejournal.com/25342.html>
   — **verified, and the binaries are still hosted** at
   <https://fedorapeople.org/~jwrdegoede/grub-efi-directly-enter-fwsetup/>
@@ -478,37 +432,29 @@ Background for [60-bios-firmware.md](60-bios-firmware.md). The firmware images
 themselves are not redistributed here; the findings below come from parsing
 copies obtained from the sources listed.
 
-### Verified by parsing the images
+### The firmware images, and their hashes
 
-The firmware images below were extracted with
+Extracted with
 [`uefi-firmware-parser`](https://github.com/theopolis/uefi-firmware-parser) and
-their SMBIOS defaults, ACPI tables and Intel flash descriptors read directly.
+their SMBIOS defaults, ACPI tables and Intel flash descriptors read directly. The
+findings drawn from them — the hard-coded `To be filled by O.E.M.`, the
+`HAMP0002`/`HAMP0005` split, `CHUWI.D86JLBNR03.bin` being a Bay Trail image, the
+differing flash-region layouts, and the touchscreen firmware being absent from
+all of them — are argued in
+[60-bios-firmware.md](60-bios-firmware.md), which owns them. This is the
+provenance:
 
 | Image | SHA-256 |
 |---|---|
+| `P03_C806.108` (`dos/bios.bin` = `windows/P03_C806.108`) | `5ba88aad…0c3900`, from the stock ROM below |
 | `P03_C806.109` | `0d72b3ceac2c46c869c1337873238c63612a74759c907e9aa89ab824050742de` |
 | `bios.bin` (dual-boot) | `0068258628377e3ce2a6c2a04cb9a42da88696f72c23a3282effb08fe91d2800` |
 | `CHUWI.D86JLBNR03.bin` | `77a94ca41343a795784c13bba5c0f67aa587602d7d0211dcbc4620a7bc29416d` |
-| `P03_C806.rom.exe` | `6434433c075c063e934ff05a76c5596c6c10845f6da165ffe98c8716d53e0e0f` |
+| `P03_C806.rom.exe` (Windows flasher, not an SPI image) | `6434433c075c063e934ff05a76c5596c6c10845f6da165ffe98c8716d53e0e0f` |
 
-- `P03_C806.109` SMBIOS type 1 hard-codes `To be filled by O.E.M.` for both
-  system manufacturer and product name; type 2 manufacturer is `Hampoo`, SKU is
-  `MRD`. **A BIOS update therefore cannot fix the unfilled DMI.** — **verified**
-- The single-OS image declares the touchscreen as ACPI `HAMP0002`; the dual-boot
-  image declares `HAMP0005`, which no kernel driver claims. — **verified**
-- `CHUWI.D86JLBNR03.bin` is an **InsydeH2O / ValleyView (Bay Trail)** image, not a
-  Vi8 Plus BIOS, despite being distributed as one. — **verified** three ways:
-  by BIOS-vendor and SoC strings in the image, by its flash-region layout, and by
-  `touchscreen_dmi.c`, which matches `DMI_BIOS_VERSION` "CHUWI.D86JLBNR" together
-  with `DMI_SYS_VENDOR` "Insyde" / `DMI_PRODUCT_NAME` "i86" for the Chuwi Vi8
-  **CWI506**. The archive folder these come from is labelled "CHUWI VI8 PLUS" and
-  contains four Bay Trail Vi8 images and no Vi8 Plus BIOS at all.
-- Flash descriptors differ between the single-OS and dual-boot images (BIOS region
-  4096 KiB at `0x400000` vs 6144 KiB at `0x200000`). — **verified**
-- The ICN8505 touchscreen firmware was **not** found in `.108`, `.109` or the
-  dual-boot image, searched by the kernel's `prefix`/`length` descriptor across all
-  decompressed sections — nor in the reference unit's own dumped chip.
-  — **verified absent** from what could be decompressed
+Re-derive any of it with
+[`scripts/inspect-bios-image.py`](../scripts/inspect-bios-image.py), which is
+read-only.
 
 ### Kernel precedent for generic DMI
 
@@ -544,17 +490,80 @@ their SMBIOS defaults, ACPI tables and Intel flash descriptors read directly.
   confirmed from a primary AMI source; both the datasheet mirror and the
   secondary wiki returned 403.
 
-### Recovery
+### The stock ROM, and the only copy of `P03_C806.108`
 
-- Hans de Goede, "Soft unbricking Bay- and Cherry-Trail tablets with broken BIOS
-  settings" — DnX mode via volume-up + volume-down, `fastboot flash osloader`.
-  Cherry Trail integrates the gadget PHY into the SoC, so DnX is available even
-  on Windows-only units. <https://hansdegoede.livejournal.com/25342.html>
-  (LiveJournal returns 404 to automated fetches; mirrored at
-  <http://news.tuxmachines.org/node/150888>)
-- "Teclast X98 Air 3G: unbricking a Bay Trail tablet".
-  <https://ao2.it/en/blog/2014/12/30/teclast-x98-air-3g-unbricking-bay-trail-tablet>
+`Chuwi-Vi8-Plus-5BS2R-C806.rar`, 4278459662 bytes, SHA-256
+`cd2f09bcde7caba61fafdfffeb9fa31b6ccfa908bb8232cd821ead2f0d4040e0`. Free
+registration required. — **verified** by downloading and unpacking it.
 
+<https://www.needrom.com/download/chuwi-vi8-plus/>
+
+Contains the full Windows 10 image (`VI8 PLUS WIN10.CHUWI.S.10.TH2.1212.V200`)
+and, in `BIOS/CHT-P03_C806_108_20151211/`, the `.108` BIOS twice — `dos/bios.bin`
+and `windows/P03_C806.108` are byte-identical, SHA-256 `5ba88aad…0c3900`. It is
+the only place this BIOS is published; see
+[60-bios-firmware.md](60-bios-firmware.md#what-changed-between-108-and-109).
+
+Unpack it with a RAR5-capable tool. `bsdtar -x -f ARCHIVE 'Chuwi-*/BIOS/*'`
+extracts just the BIOS directory; p7zip reports *"Unsupported Method"* and writes
+zero-byte files, and Homebrew's `unrar` is unsigned so macOS Gatekeeper blocks it
+without printing anything.
+
+### Chuwi's own driver package — the primary source for the touchscreen firmware
+
+`Hi8_Pro_drivers_C806_X64.zip`, 227034543 bytes, SHA-256
+`92a4163ec7d0388888a31666ef8340d2056e3ec866639d9cdd7275dac817561f`. Linked from
+Chuwi's own Vi8 Plus forum thread, mirrored on MediaFire and on Chuwi's Box
+account.
+
+- <https://www.mediafire.com/file/180vqqbk3rus2s1/Hi8_Pro_drivers_C806_X64.zip/file>
+- <https://chuwiinnovationtechnologyshenz.box.com/s/wwqnnrtpe0lsd90nrzlux47q04cvwp56>
+
+— **verified** by downloading and unpacking it.
+
+`drivers_C806_X64/TP_X64/chpntsc.inf` (DriverVer 04/21/2016, catalogue
+`Chpntsc.cat`) holds all seven ICN8505 firmware blobs as hex under
+`[Chpntsc_Device_Firmware.AddReg]`, keyed by ACPI `_SUB` name. This is where the
+copies floating around GitHub ultimately come from —
+[`scripts/extract-touchscreen-fw.sh`](../scripts/extract-touchscreen-fw.sh) reads
+them straight out of it.
+
+Also in the package, both worth knowing:
+
+- `Wifi_x64` is **Realtek** (`netrtwlans.inf`, *"Realtek Wireless 802.11b/g/n
+  SDIO"*, DriverVer 04/29/2016), not Broadcom.
+- `Bt_x64` contains **no Bluetooth driver**: it holds `prnms009.inf`,
+  `Class=Printer`, `Provider="Microsoft"` — Microsoft Print to PDF.
+
+### Where the second copy of the touchscreen firmware comes from
+
+<https://github.com/Dax89/chuwi-dev> — **inspected, not tested here**
+
+A Chipone reverse-engineering repository aimed at the Chuwi Hi10. It carries raw
+controller dumps named by ACPI `_SUB` string, `hi10/HAMP0001.bin` through
+`HAMP0005.bin`, plus an out-of-tree `chipone_ts` driver and a Vi10 Ultimate DSDT.
+
+`HAMP0002.bin` — the `_SUB` this tablet's touchscreen reports — is **byte-identical
+to the file in `sciboy12/vi8-plus-linux-fixes`**, confirmed with `cmp`: both 34884
+bytes, both SHA-256 `d9db81b9…c99327`.
+
+That is one source, not two. This copy was committed **2016-07-15**, the other
+**2025-07-30**, nine years later; the later one is most plausibly a copy of this one
+or of a shared vendor original. Do not read the match as independent corroboration.
+
+What it does establish is that this file is **contemporaneous with the hardware** and
+comes from someone who was writing a driver for the controller, which is better
+standing than an undated upload. Treat `Dax89/chuwi-dev` as the origin and
+`sciboy12` as a mirror.
+
+`HAMP0001` and `HAMP0005` share the same 34884-byte length and the same prefix but
+hash differently — they are sibling tablets' firmware for the same controller, and
+are not interchangeable. `HAMP0003`, `HAMP0004` and the Vi10 file are a different
+controller generation (38580 bytes, prefix `30 05 00 00 64 05 00 00`).
+
+The 128-byte gap against the kernel's pinned 35012 is **not** padding: appending or
+prepending 128 zero or `0xff` bytes to the 34884-byte file produces none of the
+kernel's SHA-256. It is a different build, not a trimmed one.
 ## Another owner's fixes for this exact tablet
 
 `sciboy12/vi8-plus-linux-fixes` — the only other repository found that targets the
@@ -587,77 +596,3 @@ What it offers, with what we could establish about each:
   Wi-Fi power save to stop firmware crashes.
 - Agrees with this repo that both cameras are unusable.
 
-## The stock ROM, and the only copy of `P03_C806.108`
-
-`Chuwi-Vi8-Plus-5BS2R-C806.rar`, 4278459662 bytes, SHA-256
-`cd2f09bcde7caba61fafdfffeb9fa31b6ccfa908bb8232cd821ead2f0d4040e0`. Free
-registration required. — **verified** by downloading and unpacking it.
-
-<https://www.needrom.com/download/chuwi-vi8-plus/>
-
-Contains the full Windows 10 image (`VI8 PLUS WIN10.CHUWI.S.10.TH2.1212.V200`)
-and, in `BIOS/CHT-P03_C806_108_20151211/`, the `.108` BIOS twice — `dos/bios.bin`
-and `windows/P03_C806.108` are byte-identical, SHA-256 `5ba88aad…0c3900`. It is
-the only place this BIOS is published; see
-[60-bios-firmware.md](60-bios-firmware.md#what-changed-between-108-and-109).
-
-Unpack it with a RAR5-capable tool. `bsdtar -x -f ARCHIVE 'Chuwi-*/BIOS/*'`
-extracts just the BIOS directory; p7zip reports *"Unsupported Method"* and writes
-zero-byte files, and Homebrew's `unrar` is unsigned so macOS Gatekeeper blocks it
-without printing anything.
-
-## Chuwi's own driver package — the primary source for the touchscreen firmware
-
-`Hi8_Pro_drivers_C806_X64.zip`, 227034543 bytes, SHA-256
-`92a4163ec7d0388888a31666ef8340d2056e3ec866639d9cdd7275dac817561f`. Linked from
-Chuwi's own Vi8 Plus forum thread, mirrored on MediaFire and on Chuwi's Box
-account.
-
-- <https://www.mediafire.com/file/180vqqbk3rus2s1/Hi8_Pro_drivers_C806_X64.zip/file>
-- <https://chuwiinnovationtechnologyshenz.box.com/s/wwqnnrtpe0lsd90nrzlux47q04cvwp56>
-
-— **verified** by downloading and unpacking it.
-
-`drivers_C806_X64/TP_X64/chpntsc.inf` (DriverVer 04/21/2016, catalogue
-`Chpntsc.cat`) holds all seven ICN8505 firmware blobs as hex under
-`[Chpntsc_Device_Firmware.AddReg]`, keyed by ACPI `_SUB` name. This is where the
-copies floating around GitHub ultimately come from —
-[`scripts/extract-touchscreen-fw.sh`](../scripts/extract-touchscreen-fw.sh) reads
-them straight out of it.
-
-Also in the package, both worth knowing:
-
-- `Wifi_x64` is **Realtek** (`netrtwlans.inf`, *"Realtek Wireless 802.11b/g/n
-  SDIO"*, DriverVer 04/29/2016), not Broadcom.
-- `Bt_x64` contains **no Bluetooth driver**: it holds `prnms009.inf`,
-  `Class=Printer`, `Provider="Microsoft"` — Microsoft Print to PDF.
-
-## Where the second copy of the touchscreen firmware comes from
-
-<https://github.com/Dax89/chuwi-dev> — **inspected, not tested here**
-
-A Chipone reverse-engineering repository aimed at the Chuwi Hi10. It carries raw
-controller dumps named by ACPI `_SUB` string, `hi10/HAMP0001.bin` through
-`HAMP0005.bin`, plus an out-of-tree `chipone_ts` driver and a Vi10 Ultimate DSDT.
-
-`HAMP0002.bin` — the `_SUB` this tablet's touchscreen reports — is **byte-identical
-to the file in `sciboy12/vi8-plus-linux-fixes`**, confirmed with `cmp`: both 34884
-bytes, both SHA-256 `d9db81b9…c99327`.
-
-That is one source, not two. This copy was committed **2016-07-15**, the other
-**2025-07-30**, nine years later; the later one is most plausibly a copy of this one
-or of a shared vendor original. Do not read the match as independent corroboration.
-
-What it does establish is that this file is **contemporaneous with the hardware** and
-comes from someone who was writing a driver for the controller, which is better
-standing than an undated upload. Treat `Dax89/chuwi-dev` as the origin and
-`sciboy12` as a mirror.
-
-`HAMP0001` and `HAMP0005` share the same 34884-byte length and the same prefix but
-hash differently — they are sibling tablets' firmware for the same controller, and
-are not interchangeable. `HAMP0003`, `HAMP0004` and the Vi10 file are a different
-controller generation (38580 bytes, prefix `30 05 00 00 64 05 00 00`).
-
-The 128-byte gap against the kernel's pinned 35012 is **not** padding: appending or
-prepending 128 zero or `0xff` bytes to the 34884-byte file produces none of the
-kernel's SHA-256. It is a different build, not a trimmed one.
