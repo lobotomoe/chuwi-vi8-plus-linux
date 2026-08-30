@@ -8,8 +8,38 @@ sudo ./scripts/postinstall-tune.sh --apply
 ```
 
 It sets up zram swap, enables weekly TRIM, installs `iio-sensor-proxy` and caps
-the journal. The rest of this page is the detail behind those, plus everything
-the script deliberately leaves to you.
+the journal, and warns if swap is still on the eMMC. The rest of this page is the
+detail behind those, plus everything the script deliberately leaves to you.
+
+## Stop the freezes first
+
+The script does not do this one, and nothing else on this page matters until it
+is done. Without it the reference unit hung on **10 of 17 boots** — a silicon
+erratum Intel marks *No Fix*, cured by taking away the three idle states it
+names:
+
+```sh
+printf 'GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT intel_idle.states_off=56"\n' |
+  sudo tee /etc/default/grub.d/99-cstate-cht45.cfg
+sudo update-grub
+```
+
+Reboot, then confirm it took — the bit numbering counts `POLL` as index 0, so an
+off-by-one silently disables the wrong three states:
+
+```sh
+for s in /sys/devices/system/cpu/cpu0/cpuidle/state*; do
+  printf '%s %-5s disable=%s usage=%s\n' "${s##*/}" "$(cat $s/name)" \
+    "$(cat $s/disable)" "$(cat $s/usage)"
+done
+```
+
+`C6S`, `C7` and `C7S` must read `disable=1` with `usage=0`; `POLL`, `C1` and
+`C6N` must be untouched. Do not disable `C6N` as well — the erratum does not name
+it, and losing it costs 19 °C of idle temperature.
+
+The erratum text, the measurement behind the 10-of-17, and the second fault that
+wears the same symptom are in [51-freezes.md](51-freezes.md).
 
 ## Memory: zram, not swap on eMMC
 
@@ -75,6 +105,14 @@ supplied nothing.
 sudo apt install iio-sensor-proxy       # or: pacman -S iio-sensor-proxy
 monitor-sensor                          # tilt the tablet, watch the output
 ```
+
+**On the reference unit this is where it stops.** The sensor binds and the matrix
+is right, but `iio-sensor-proxy` cannot get samples out of it — *"Could not find
+trigger name"*, then *"Buffer did not have data within 0.5s"*. If you see that,
+the rest of this section will not work either; rotate by hand
+[below](#rotating-it-once-by-hand-in-lubuntu). Details and the untested
+hypothesis in
+[01-hardware.md](01-hardware.md#accelerometer--auto-rotation--bosch-bosc0200).
 
 ### Rotating it once, by hand, in Lubuntu
 
@@ -214,7 +252,7 @@ sudo apt install onboard
 ```
 
 Installing it is not enough, and the defaults are wrong for a touch-only
-machine. Four settings matter:
+machine:
 
 ```sh
 gsettings set org.gnome.desktop.interface toolkit-accessibility true
@@ -230,8 +268,10 @@ gsettings set org.onboard.window docking-enabled false
   learns that a text field has focus over AT-SPI, and without it the keyboard
   never appears by itself. Onboard will otherwise pop a dialog asking to enable
   it — set it here instead, so it is configuration rather than a click someone
-  has to remember. Applications started *before* this was turned on will not be
-  introspectable until they restart.
+  has to remember. It has a startup-ordering trap of its own, [below](#an-application-that-started-before-accessibility-was-on-never-appears).
+- **`auto-show enabled`** is the switch for the behaviour everything else here
+  supports: the keyboard rising when a text field takes focus and going away
+  when it loses it. Off by default.
 - **`tablet-mode-detection-enabled false`** — onboard can gate auto-show on the
   machine being in tablet mode, and this hardware has no tablet-mode switch at
   all (`/proc/bus/input/devices` lists a `Lid Switch` and nothing else of the
@@ -434,8 +474,8 @@ evening on it.
 
 ## When it feels slow, check these before blaming the GPU
 
-The graphics are not the problem, and it is worth proving that before spending
-an evening on driver theories. The GPU is driven properly by `i915` and Mesa:
+The GPU is driven properly by `i915` and Mesa, and proving that first costs one
+command:
 
 ```sh
 glxinfo -B | grep -E 'renderer|Accelerated|direct rendering'
@@ -443,7 +483,7 @@ glxinfo -B | grep -E 'renderer|Accelerated|direct rendering'
 
 That should name `Mesa Intel(R) HD Graphics (CHV)` with `Accelerated: yes`. If
 it says `llvmpipe` instead, rendering really is on the CPU. Note the GPU tops
-out at 500 MHz (`/sys/class/drm/card1/gt_RP0_freq_mhz`) — that is the chip, not
+out at 500 MHz (`/sys/class/drm/card*/gt_RP0_freq_mhz`) — that is the chip, not
 a misconfiguration, and it is also why anything that makes it draw twice hurts.
 
 Which is the first real culprit: **LXQt runs `picom`, a compositor.** On the
