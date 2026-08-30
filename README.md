@@ -87,6 +87,11 @@ Confirm which one you have before doing anything else — see
    the stick — sometimes minutes into a working session. If it happens to you,
    [docs/13-split-media.md](docs/13-split-media.md) moves the live filesystem onto the
    microSD card and takes USB out of the picture entirely.
+   **Then copy this repository onto the stick**, after building it. Several later
+   steps run `./scripts/...` from the live session and from the installed system,
+   and the build script reformats the stick, so anything put there first is lost.
+   A second small partition, the microSD card, or `git clone` once the tablet is
+   online all work equally well.
 4. Get into the tablet's firmware setup, disable Secure Boot, boot the stick —
    [docs/20-uefi-setup.md](docs/20-uefi-setup.md). **Then wait ten minutes.** This
    tablet sits on the CHUWI logo for 5-10 minutes after you pick the stick, and
