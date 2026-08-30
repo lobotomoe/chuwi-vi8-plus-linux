@@ -47,7 +47,9 @@ wears the same symptom are in [51-freezes.md](51-freezes.md).
 more. A swap partition on eMMC turns memory pressure into a machine that stops
 responding for thirty seconds at a time, and wears the flash while doing it.
 
-Compressed swap in RAM is the right answer:
+Compressed swap in RAM is the right answer, and **the script has already done
+this half** — this is what it wrote, for checking against or for doing by hand if
+you skipped it:
 
 ```ini
 # /etc/systemd/zram-generator.conf
@@ -57,19 +59,19 @@ compression-algorithm = zstd
 ```
 
 ```sh
-sudo systemctl daemon-reload
-sudo systemctl start systemd-zram-setup@zram0.service
 zramctl                      # should show a 1 GB zram0 in use as swap
 ```
 
 A 1 GB zram device typically holds 2.5-3 GB of real pages at zstd ratios, which
 is the difference between "slow" and "unusable" when a browser is open.
 
-Adding zram is only half of it. **Lubuntu's installer creates a 512 MB
-`/swapfile` on the eMMC**, and that file keeps being used no matter what zram
-does — on the reference tablet it was holding 339 MB, with `/proc/pressure/io`
-reporting the machine stalled on IO 4-6% of the time. Take it out once zram is
-running, so pages have somewhere to go while it is removed:
+**The other half is yours, and the script says so rather than doing it** — it
+would mean editing `/etc/fstab`, which the script does not touch. **Lubuntu's
+installer creates a 512 MB `/swapfile` on the eMMC**, and that file keeps being
+used no matter what zram does — on the reference tablet it was holding 339 MB,
+with `/proc/pressure/io` reporting the machine stalled on IO 4-6% of the time.
+Take it out once zram is running, so pages have somewhere to go while it is
+removed:
 
 ```sh
 swapon --show                       # zram0 should be listed, priority 100
@@ -101,8 +103,11 @@ cat /sys/bus/iio/devices/iio:device0/in_accel_mount_matrix
 It should print `0, -1, 0; -1, 0, 0; 0, 0, 1`. An identity matrix means ACPI
 supplied nothing.
 
+The script has already installed `iio-sensor-proxy`; if you skipped it,
+`sudo apt install iio-sensor-proxy` (or `pacman -S iio-sensor-proxy`). Either way
+this is the test:
+
 ```sh
-sudo apt install iio-sensor-proxy       # or: pacman -S iio-sensor-proxy
 monitor-sensor                          # tilt the tablet, watch the output
 ```
 
@@ -413,14 +418,11 @@ patch. That, and the case where the adapter does not appear at all, are in
 ## eMMC longevity
 
 32 GB of cheap eMMC, roughly 20 GB usable after the OS. Two settings pay for
-themselves:
+themselves. The first, `fstrim.timer`, the script has already enabled — confirm
+with `systemctl is-enabled fstrim.timer`.
 
-```sh
-sudo systemctl enable --now fstrim.timer
-```
-
-and `noatime` on the root filesystem, which removes one write per file read.
-Edit `/etc/fstab` yourself — the tuning script deliberately does not:
+The second is `noatime` on the root filesystem, which removes one write per file
+read. Edit `/etc/fstab` yourself — the tuning script deliberately does not:
 
 ```
 UUID=...  /  ext4  defaults,noatime  0 1
