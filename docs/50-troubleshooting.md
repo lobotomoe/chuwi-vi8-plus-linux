@@ -614,10 +614,26 @@ unit too.
 > doing on a unit that reads 500 mA (item 1 below, and it was measured at 500 mA
 > here earlier), but it is not what was hanging this one.
 >
-> **The boot freezes are a separate fault and they are not fixed.** They kept
-> happening after the screensaver was gone, at 16-23 s of uptime every time. The
-> leading explanation is now a named silicon erratum — **CHT45**, quoted in full
-> below — for which the only OS-level workaround is to take C6 and C7 away.
+> **The boot freezes were a separate fault, and they are fixed too.** They kept
+> happening after the screensaver was gone, at 16-27 s of uptime every time. The
+> cause is a named, unfixed silicon erratum — **CHT45**, quoted in full below —
+> and the cure is one kernel parameter that takes away the three idle states the
+> erratum names:
+>
+> ```
+> intel_idle.states_off=56
+> ```
+>
+> Measured on the reference unit by rebooting it into the ground, counting boots
+> out of `journalctl --list-boots` — a boot that ends after 20 s is a hang:
+>
+> | | boots | hung |
+> |---|---|---|
+> | before | 17 | **10** |
+> | after `states_off=56` | 15 | **0** |
+>
+> Fisher's exact test on that table gives **p ≈ 0.0006**. The freezes did not
+> become rarer; across fifteen consecutive boots they stopped.
 
 ### Erratum CHT45: the processor may not wake from C6 or deeper
 
@@ -649,35 +665,170 @@ was given: a lit screen holding a still image, with nothing in the journal becau
 nothing ran to write it. That is the frozen boot log, and it is the frozen
 screensaver.
 
-**The only OS workaround is to disallow C6 and C7.** Intel's own "workaround" line
-offers nothing to an operating system — it says the *firmware* may contain one,
-which is not something a user can switch on. On Linux that means:
+**The erratum names two specific things, and both can be identified exactly.**
+Intel's "workaround" line offers nothing to an operating system — it says the
+*firmware* may contain one, which is not something a user can switch on. But the
+text is precise enough to point at individual entries in this machine's idle
+table rather than at C-states in general. An MWAIT hint encodes the target
+C-state in bits [7:4] — where 0 means C1 — and the sub-state in bits [3:0], and
+the kernel prints the hint for every state it offers:
 
 ```sh
-printf 'GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT intel_idle.max_cstate=1 processor.max_cstate=1"\n' |
-  sudo tee /etc/default/grub.d/99-cstate.cfg
+for s in /sys/devices/system/cpu/cpu0/cpuidle/state*; do
+  printf '%s %-5s %s\n' "${s##*/}" "$(cat $s/name)" "$(cat $s/desc)"
+done
+```
+
+On the reference unit that gives six states, and the erratum lands on three of
+them:
+
+| state | name | MWAIT | decodes to | named by CHT45? |
+|-------|------|-------|------------|-----------------|
+| state0 | POLL | — | busy loop | no |
+| state1 | C1 | `0x00` | C1, sub-state 0 | no |
+| state2 | C6N | `0x58` | C6, sub-state **8** | no |
+| state3 | C6S | `0x52` | C6, sub-state **2** | **yes, by name** |
+| state4 | C7 | `0x60` | C7, sub-state 0 | yes, deeper than C6 |
+| state5 | C7S | `0x64` | C7, sub-state 4 | yes, deeper than C6 |
+
+"C6 and Sub C-state of 2" is not a family of states here. It is one row, `C6S`,
+`MWAIT 0x52`. And "deeper than C6" is `C7` and `C7S`. `C6N` is C6 sub-state 8,
+which is neither — and the latency column agrees that it is the shallower of the
+two C6 entries: 80 µs against 200 µs, so the sub-state numbers are not ordered by
+depth on this part and the erratum's "2" has to be read literally.
+
+So the workaround is three states, not all of them. `intel_idle` takes a bitmask
+of state indices to disable at init, and bits 3, 4 and 5 are 8 + 16 + 32:
+
+```sh
+printf 'GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT intel_idle.states_off=56"\n' |
+  sudo tee /etc/default/grub.d/99-cstate-cht45.cfg
 sudo update-grub
 ```
 
 A drop-in rather than an edit to `GRUB_CMDLINE_LINUX_DEFAULT` itself, so undoing it
 is `rm` plus `update-grub` rather than a careful re-edit. Ubuntu's `grub-mkconfig`
-sources `/etc/default/grub.d/*.cfg` after the main file. Confirm it took with
-`cat /proc/cmdline` after the reboot — the config having the flag and the kernel
-having been booted with it are different claims.
+sources `/etc/default/grub.d/*.cfg` after the main file.
 
-It costs battery and runs warmer. On a tablet living on a wall charger that is not
-a cost at all.
+**Verify which states it actually took away**, rather than trusting the bit
+numbering — `states_off` counts `POLL` as index 0, so an off-by-one here silently
+disables the wrong three:
 
-**Note what this does not explain.** The desktop freezes were the screensaver, and
-they stopped when the package went, which is a result with three legs of evidence
-under it. CHT45 is the leading explanation for the *boot* freezes and it is not yet
-confirmed on this unit — the test is whether they stop with C6/C7 disabled, against
-the historical rate rather than against one lucky boot.
+```sh
+cat /proc/cmdline
+for s in /sys/devices/system/cpu/cpu0/cpuidle/state*; do
+  printf '%s %-5s disable=%s usage=%s\n' "${s##*/}" "$(cat $s/name)" \
+    "$(cat $s/disable)" "$(cat $s/usage)"
+done
+```
 
-**One cheap prediction that would corroborate it.** If a hang is CHT45, the
-processor is asleep and the kernel is not running, so the Caps Lock LED test below
-should show a *dead* LED. A LED that still toggles would mean the kernel is alive
-and something else is wedged — which would point away from this erratum entirely.
+`C6S`, `C7` and `C7S` must read `disable=1` with `usage=0`, and `POLL`, `C1`,
+`C6N` must be untouched. A `usage` that keeps climbing on a state marked disabled
+means the parameter did not apply.
+
+**Why not `max_cstate=1`, which is the advice you will find posted.** It leaves
+only `POLL` and `C1`, and the cost of going that far is measurable here. During
+one six-day session something in userspace held `/dev/cpu_dma_latency` at zero for
+the last four days, which pins the CPU to `POLL` — a natural experiment. Median
+idle temperature on `PNIT`, at `busy` under 8%, across 93 000 samples:
+
+| idle behaviour | median PNIT | samples |
+|---|---|---|
+| C-states in use | **54 °C** | 29 711 |
+| `POLL` only | **73 °C** | 63 613 |
+
+Nineteen degrees, on a fanless aluminium 8" tablet. Keeping `C6N` is what buys
+that back, and `C6N` is the one C6 entry the erratum does not name. Battery is a
+separate question and on the reference unit a moot one: across the same session
+it logged 73 118 samples at `Full` and 20 384 at `Charging` and never once
+`Discharging`. It lives on a charger.
+
+**If the hangs continue with C6N still enabled**, the next step is `states_off=60`
+— bits 2 through 5 — which takes `C6N` as well and leaves `POLL` and `C1`. That
+is the reading-of-the-text assumption failing, and it is worth knowing which way
+it fell before paying the nineteen degrees.
+
+**How this was confirmed, and how to confirm it on another unit.** One lucky boot
+proves nothing here: the failure is probabilistic, and the rate has to be measured
+on both sides of the change. Reboot the machine in a loop, let each boot live past
+the window where the hangs land — two minutes is plenty for a fault that fires at
+16-27 s — and count afterwards from `journalctl --list-boots`, where a boot that
+ended twenty seconds after it started is a hang:
+
+```sh
+journalctl --list-boots --no-pager
+```
+
+On the reference unit that gave 10 hangs in 17 boots before, and 0 in 15 after.
+Two things made the earlier estimate untrustworthy and are worth avoiding: the
+"before" figure was originally taken from twelve boots spread over five weeks,
+which is a confidence interval from 10% to 65% rather than a rate — and a batch of
+consecutive hangs was briefly blamed on an unrelated change made that evening,
+when the honest reading was that both numbers were too small to compare.
+
+**What the freezes look like in the journal**, if you want to identify the fault
+before fixing it. They stop at a *different* place every time — `dbus` on one
+boot, `avahi` on another, `ModemManager`, `i915`, `wpa_supplicant` — always inside
+the 21-27 s window where userspace brings everything up at once. A driver bug
+stops at the same line every time; this does not. And the last recorder sample
+before one of them reads
+
+```
+up=23 busy=90% idle=232/9329/170/51/109/31
+             POLL  C1  C6N C6S C7  C7S
+```
+
+which is 140 entries into states deeper than C6 in the final five seconds, on a
+machine that was 90% busy. That last part matters: "the boot is too busy for an
+idle bug" sounds reasonable and is wrong. `busy` is a five-second average, and
+CHT45 needs one bad entry, not a sustained sleep.
+
+**A cheap prediction that would corroborate it on another unit.** If a hang is
+CHT45, the processor is asleep and the kernel is not running, so the Caps Lock LED
+test below should show a *dead* LED. A LED that still toggles would mean the kernel
+is alive and something else is wedged — which would point away from this erratum.
+
+### The hardware watchdog: real, usable, and only half a safety net
+
+The firmware describes a watchdog in the ACPI `WDAT` table, and Linux can drive it
+— which is worth knowing, because the alternative to a hang is holding the power
+button. It is not enabled by default and nothing hints that it exists:
+
+```sh
+ls /sys/bus/platform/devices/ | grep wdat     # wdat_wdt
+sudo modprobe wdat_wdt && sudo wdctl          # 30s timeout, SETTIMEOUT supported
+```
+
+Loading it from `/etc/modules-load.d/` is **not** enough. `systemd` opens
+`/dev/watchdog` while PID 1 starts, which is before `systemd-modules-load.service`
+runs, so the device does not exist yet, systemd gives up, and nothing ever arms it.
+The module has to be in the initramfs. Note that this system uses **dracut**, not
+initramfs-tools — `/etc/initramfs-tools/modules` does not exist here and writing to
+it silently achieves nothing:
+
+```sh
+printf 'force_drivers+=" wdat_wdt "\n' | sudo tee /etc/dracut.conf.d/99-watchdog.conf
+printf '[Manager]\nRuntimeWatchdogSec=30\n' | sudo tee /etc/systemd/system.conf.d/watchdog.conf
+sudo dracut -f
+```
+
+Verify after a reboot — all three, because each can be true while the next is
+false:
+
+```sh
+sudo lsinitrd /boot/initrd.img-$(uname -r) | grep wdat   # in the image
+systemctl show -p RuntimeWatchdogUSec                    # RuntimeWatchdogUSec=30s
+cat /sys/class/watchdog/watchdog0/state                  # active
+```
+
+**Do not count on it to recover a hang.** Tested twice by crashing the kernel
+deliberately — `echo c > /proc/sysrq-trigger`, with `kernel.panic = 0` so the
+kernel cannot reboot itself and any reset must be the watchdog. The first time the
+machine reset itself 63 s later. The second time it stayed dark for six minutes
+and needed the power button. One recovery out of two attempts is not a safety net,
+and the dark screen on the failure — rather than a lit, frozen console — suggests
+this firmware's watchdog action powers the tablet off rather than resetting it.
+Leave it enabled if you like; do not build a test plan that assumes it works.
 
 **Start by recording, not by guessing.** A hard hang gives the kernel no chance
 to flush anything, so the journal simply stops and every theory below looks
