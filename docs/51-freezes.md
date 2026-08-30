@@ -11,7 +11,7 @@ are kept, because neither costs anything.
 
 | | boot hang | idle hang |
 |---|---|---|
-| when | 16-27 s of uptime, every time | ~19 minutes after being left alone |
+| when | within the first half-minute of uptime; the three that were timed died at 21, 22, 23 s | ~19 minutes after being left alone |
 | on screen | the boot log, backlight on | the screensaver, mid-animation |
 | power data | none — `axp288` has not probed yet | `gpu=400MHz`, 70 °C at `busy=14%` |
 | fix | [`intel_idle.states_off=56`](#erratum-cht45-the-processor-may-not-wake-from-c6-or-deeper) | [suppress the screensaver](#the-idle-hangs-were-the-screensaver) |
@@ -144,9 +144,10 @@ it fell before paying the nineteen degrees.
 **How this was confirmed, and how to confirm it on another unit.** One lucky boot
 proves nothing here: the failure is probabilistic, and the rate has to be measured
 on both sides of the change. Reboot the machine in a loop, let each boot live past
-the window where the hangs land — two minutes is plenty for a fault that fires at
-16-27 s — and count afterwards from `journalctl --list-boots`, where a boot that
-ended twenty seconds after it started is a hang:
+the window where the hangs land — two minutes is plenty for a fault whose whole
+envelope is the first half-minute — and count afterwards from
+`journalctl --list-boots`, where a boot that ended twenty seconds after it started
+is a hang:
 
 ```sh
 journalctl --list-boots --no-pager
@@ -262,7 +263,7 @@ shutdown sequence, three of them after **21, 22 and 23 seconds** against a norma
 time — `gpu-manager` and `logind`, `bluetoothd` starting its SDP server,
 `iio-sensor-proxy`, and twice `wpa_supplicant` with `NetworkManager`. No service
 is common to them. A sixth died 19 minutes in while idle, and the owner reports
-it freezing on the screensaver. — **observed on the unit**
+it freezing on the screensaver. — **verified on the unit**
 
 **Three of those five are the moment a radio powers up** — Bluetooth once, Wi-Fi
 twice. That was read at the time as a current peak, and it is what kept the
@@ -292,7 +293,7 @@ the journal. Memory pressure and failing storage both look plausible from the
 outside and neither left a trace.
 
 Five session ends on the reference unit, two on the desktop and three during
-boot. — **measured on the unit**
+boot. — **verified on the unit**
 
 **The battery voltage never sags.** `bv=` sits between 4206 and 4259 mV in every
 sample of every session, including the last one written before each desktop
@@ -308,10 +309,10 @@ shows the boot log or the screensaver still on screen, backlight on. A supply
 collapse takes the backlight with it, and a thermal trip powers the machine down
 rather than parking it on a frame. What that picture does fit is a lockup: the
 display controller keeps scanning out the framebuffer it was given while nothing
-else advances. — **observed**, and it argues against both the charger and the
+else advances. — **verified on the unit**, and it argues against both the charger and the
 thermal readings below being the whole story.
 
-**The six thermal zones, and which of them lies.** — **read off the unit**
+**The six thermal zones, and which of them lies.** — **verified on the unit**
 
 ```
 thermal_zone0  acpitz           43.6 C
@@ -331,7 +332,7 @@ in a first sample is `INT3400` being the only zone registered that early rather
 than a cold machine. It now records all six, with a `--- thermal zones` line
 naming them.
 
-**And the trip points say the freezes are not thermal.** — **read off the unit**
+**And the trip points say the freezes are not thermal.** — **verified on the unit**
 
 ```
 acpitz    critical 100.0 C
@@ -357,7 +358,7 @@ what is actually seen, which is a much larger claim than "it runs warm".
 `gpu=400MHz`, load ~1.3. The same machine idle with it gone: 51-57 °C, `busy=3%`.
 The last desktop sample before a freeze was 70 °C with the GPU at 400 MHz and the
 charge current fallen from 1024 to 592 mA — the system drawing more of the 2 A
-budget, not the supply giving less. — **measured**
+budget, not the supply giving less. — **verified on the unit**
 
 **Suppressing it is what ended the desktop freezes.** Before: repeated hangs
 within ~19 minutes of the machine being left alone, the longest recorded session
@@ -391,9 +392,12 @@ Airmont cores.
 So the reading that "the graphics are broken, and the CPU overheats doing their
 work" fails on both halves.
 
-**Boot freezes land at 16-23 s of uptime**, three of three. The one sample
-captured at the edge read 77 °C and `busy=90%` at `up=23`, on a SoC that had been
-running 70 °C six minutes earlier and never cooled.
+**The three that were timed died at 21, 22 and 23 s of uptime**, against a normal
+17-second boot. `16-23 s` elsewhere on this page is the span of *recorder samples*
+around those deaths, not the span of the deaths — the recorder's first sample
+lands at about 16 s. The one sample captured at the edge read 77 °C and
+`busy=90%` at `up=23`, on a SoC that had been running 70 °C six minutes earlier
+and never cooled.
 
 These are still open, and the screensaver result says nothing about them: it was a
 desktop-idle fault and this is not. The power columns cannot help either —

@@ -86,4 +86,17 @@ the fallback is frequently the thing that actually works.
 
 ## Next
 
-[40-post-install.md](40-post-install.md)
+**First, the freeze fix**, before anything else on the installed system. Without
+it this tablet hung on 10 of 17 boots, within half a minute of powering on:
+
+```sh
+printf 'GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT intel_idle.states_off=56"\n' |
+  sudo tee /etc/default/grub.d/99-cstate-cht45.cfg
+sudo update-grub
+```
+
+Then `sudo ./scripts/postinstall-tune.sh` to preview the rest of the tuning and
+`--apply` to write it; it detects `apt` and works on Debian unchanged.
+
+Then [40-post-install.md](40-post-install.md), which explains
+[why that kernel parameter and not a broader one](40-post-install.md#stop-the-freezes-first).

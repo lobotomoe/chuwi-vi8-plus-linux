@@ -688,7 +688,7 @@ bytcr_rt5651 bytcr_rt5651: quirk IN2_MAP enabled
 bytcr_rt5651 bytcr_rt5651: quirk MCLK_EN enabled
 ```
 
-— **read off the unit**. No `MONO_SPEAKER`, so the DMI entry did not match and the
+— **verified on the unit**. No `MONO_SPEAKER`, so the DMI entry did not match and the
 driver is running on its built-in default. And yet `speaker-test -c 2 -t wav -l 1`
 announces both "Front Left" and "Front Right" audibly through the single physical
 speaker, with nothing lost — **verified on the unit**. Something below the machine

@@ -78,8 +78,16 @@ only.
 **3.** Start **Install Lubuntu** from the desktop.
 
 **4.** Partitioning: **Erase disk**, target the eMMC. Confirm which device that
-is before clicking anything — the microSD card, if inserted, is another
-`mmcblk` device of similar naming.
+is before clicking anything — the microSD card, if inserted, is another `mmcblk`
+device of similar naming, and this is the step that erases it. **The eMMC is the
+~29 GiB one.** Open a terminal and check rather than reading the names:
+
+```sh
+lsblk -d -o NAME,SIZE,TYPE
+```
+
+`mmcblk0` is normally the eMMC and the card is normally `mmcblk2`, but the
+numbering follows probe order and is not guaranteed. The size is.
 
 - No swap partition. zram afterwards is better on 2 GB of RAM and it does not
   wear the eMMC. Calamares' "no swap" option is fine.
@@ -113,6 +121,23 @@ frequently ignores NVRAM entries and only ever boots the removable path, so both
 are worth having.
 
 ## First things after first boot
+
+**Do the freeze fix before anything else.** Without it this tablet hung on 10 of
+17 boots, inside the first half-minute, and no amount of tuning matters on a
+machine that does not finish booting:
+
+```sh
+printf 'GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT intel_idle.states_off=56"\n' |
+  sudo tee /etc/default/grub.d/99-cstate-cht45.cfg
+sudo update-grub
+```
+
+Why that number and why not a bigger one:
+[40-post-install.md](40-post-install.md#stop-the-freezes-first). The tuning script
+does **not** do this one.
+
+Then the script, which needs this repository on the installed system — copy it
+across from the stick before you reformat anything, or clone it once Wi-Fi is up:
 
 ```sh
 sudo ./scripts/postinstall-tune.sh              # shows what it would change

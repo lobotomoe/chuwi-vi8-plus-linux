@@ -2,11 +2,13 @@
 
 Sources for the claims made in this repository.
 
-Two markers appear throughout. **verified** means the claim was checked against
+Three markers appear throughout. **verified** means the claim was checked against
 the thing itself rather than against someone's account of it — kernel or
 distribution source, an ISO, a firmware image, a driver package, a photograph of
 the setup menu. **verified on the unit** means it was observed on the reference
-tablet. Anything with neither marker is a report, and is attributed.
+tablet. **inferred** means the reasoning is sound but the specific claim was never
+checked, and is used where it would be easy to mistake a deduction for a reading.
+Anything with none of the three is a report, and is attributed.
 
 Sections run roughly in the order the guide needs them — booting, installing,
 the hardware, the freezes, the firmware — and end with the community sources
