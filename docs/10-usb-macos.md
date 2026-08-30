@@ -129,6 +129,21 @@ Do **not** use `cp -RL` instead of `rsync`: Debian and Ubuntu ISOs contain a
 self-referential symlink (`debian -> .`, `ubuntu -> .`) and dereferencing it
 recurses forever.
 
+## Sanity check before you unplug it
+
+```sh
+find /Volumes/VI8PLUS -iname 'bootia32.efi'
+```
+
+One path printed is what you want. Nothing printed means the stick carries only
+the 64-bit loader, the tablet will not list it in the boot menu at all, and
+nothing later in this guide will help — rebuild before you walk over to the
+tablet. `make-media.sh` prints the same directory when it finishes, so this is
+confirming what you should already have seen.
+
+The `find` is deliberately case-insensitive: FAT does not care, and whether the
+directory came out `EFI/BOOT` or `EFI/boot` depends on the ISO.
+
 ## If the tablet does not list the stick
 
 macOS types the partition "Microsoft Basic Data" rather than "EFI System".
@@ -143,3 +158,7 @@ Other things to check are in [50-troubleshooting.md](50-troubleshooting.md).
 
 [20-uefi-setup.md](20-uefi-setup.md) — getting into the tablet's firmware and
 booting the stick.
+
+If the stick boots and then drops out mid-session, the USB port is the suspect
+and [13-split-media.md](13-split-media.md) moves the live filesystem onto the
+tablet's own SD slot. It needs `--boot-only`, which this script has.

@@ -155,7 +155,24 @@ sync && sudo umount /mnt/iso /mnt/usb
 links, and Debian/Ubuntu ISOs contain a self-referential `debian -> .` symlink
 that makes any dereferencing copy recurse forever.
 
+## Sanity check before you unplug it
+
+```sh
+sudo mount /dev/sdX1 /mnt && find /mnt -iname 'bootia32.efi'; sudo umount /mnt
+```
+
+One path printed is what you want. Nothing printed means the stick carries only
+the 64-bit loader and the tablet will not list it in the boot menu at all —
+rebuild before you walk over to the tablet. `make-media.sh` prints the same
+directory when it finishes, so this is confirming what you should already have
+seen. Case-insensitive on purpose: whether the directory came out `EFI/BOOT` or
+`EFI/boot` depends on the ISO.
+
 ## Next
 
 [20-uefi-setup.md](20-uefi-setup.md) — getting into the tablet's firmware and
 booting the stick.
+
+If the stick boots and then drops out mid-session, the USB port is the suspect
+and [13-split-media.md](13-split-media.md) moves the live filesystem onto the
+tablet's own SD slot. It needs `--boot-only`, which this script has.

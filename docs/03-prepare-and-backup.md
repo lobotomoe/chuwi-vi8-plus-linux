@@ -1,5 +1,18 @@
 # Before you touch anything
 
+**This page spans three places, and they are not in reading order.** Some of it
+happens in Windows while you still have it, some on your own computer, and the
+backup happens in a Linux live session — which means the install stick has to
+exist first, even though building it is the *last* link on this page. Read the
+whole thing before starting, then work in this order:
+
+| Where | What |
+|---|---|
+| Anywhere | [Shopping list](#shopping-list), [check the battery](#check-the-battery-first) |
+| **Windows**, before wiping | [have the tablet's identity on record](#have-the-tablets-identity-on-record), [copy your files off](#copy-anything-you-care-about-off-the-tablet) |
+| **Your computer** | build the stick — [macOS](10-usb-macos.md) / [Linux](11-usb-linux.md) / [Windows](12-usb-windows.md) |
+| **The tablet, live session** | [the backup](#decide-whether-you-want-windows-back) — needs the stick from the row above |
+
 ## Shopping list
 
 | Item | Why |
@@ -44,8 +57,13 @@ sudo strings /sys/firmware/acpi/tables/MSDM | tail -1
 **Partition table only.** Cheap and fast, enough to reconstruct the layout:
 
 ```sh
-sudo sfdisk --dump /dev/mmcblk0 > emmc-layout.sfdisk
+sudo sfdisk --dump /dev/mmcblk0 > /media/usb-disk/emmc-layout.sfdisk
 ```
+
+**Write it somewhere that survives a reboot.** A live session's home directory
+lives in RAM, so a dump written to the current directory is gone the moment you
+power off — which is the next thing you do. The microSD card or a second stick
+is fine; the eMMC is not, since that is what you are about to erase.
 
 **Full image.** The only real answer if you might want the original Windows
 back exactly as it shipped:

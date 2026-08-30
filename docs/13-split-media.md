@@ -16,8 +16,9 @@ reads `\EFI\BOOT\BOOTIA32.EFI`, GRUB reads its config, the kernel and the initrd
 loaded — roughly 150 MB, read by the **firmware's own USB stack**, which has worked on
 every attempt including the ones that failed later.
 
-Everything after that — nearly 4 GB, read continuously for the whole 30–60 minutes of
-the install — is the live filesystem. And that does not have to be on the same medium.
+Everything after that — nearly 4 GB, read continuously from the live desktop
+appearing until the install finishes — is the live filesystem. And that does not
+have to be on the same medium.
 
 So put it on the microSD card in the tablet's **own** slot. The kernel reads that over
 the SoC's SD controller, which does not involve USB at any point.
@@ -39,6 +40,13 @@ USB hub — that is a USB device on the same path you are trying to get away fro
 ## Build both
 
 Same script, run twice. The order does not matter.
+
+**This needs macOS or Linux.** `make-media.sh` has `--boot-only`; the PowerShell
+`make-media.ps1` does not, so there is no Windows path to the boot half. If
+Windows is all you have, build the pair on someone else's machine, or use one of
+the cheaper fixes in
+[50-troubleshooting.md](50-troubleshooting.md#a-usb-30-stick-cannot-hold-a-link-here)
+instead.
 
 **The live medium** — the microSD card, the whole ISO, no special flag:
 
