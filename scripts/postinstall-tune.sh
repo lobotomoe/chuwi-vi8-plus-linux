@@ -17,7 +17,8 @@ Usage: sudo ${0##*/} [--apply]
 
 Without --apply this only reports. With --apply it will:
 
-  1. zram swap           compressed swap in RAM, sized at half of physical
+  1. zram swap           compressed swap in RAM, sized at half of physical,
+                         and a warning if swap on the eMMC is still active
   2. fstrim.timer        weekly TRIM, so the eMMC does not slow to a crawl
   3. iio-sensor-proxy    the daemon desktops use for automatic screen rotation
   4. journald cap        50 MB of logs instead of unbounded eMMC writes
@@ -107,6 +108,20 @@ compression-algorithm = zstd
 '
   run systemctl daemon-reload
   run systemctl start systemd-zram-setup@zram0.service
+fi
+
+# Adding zram does not displace swap that is already there. Lubuntu's installer
+# leaves a 512 MB /swapfile on the eMMC, and the kernel keeps using it: on the
+# reference tablet it held 339 MB while zram was active, with /proc/pressure/io
+# showing the machine stalled on IO 4-6% of the time. Report it rather than fix
+# it, because removing it means editing /etc/fstab, which this script does not do.
+storage_swap=$(awk 'NR > 1 && $1 !~ /^\/dev\/zram/ { print $1 }' /proc/swaps 2>/dev/null || true)
+if [ -n "$storage_swap" ]; then
+  warn "swap on storage is still active: $(echo "$storage_swap" | tr '\n' ' ')"
+  log "    Paging to eMMC is what turns memory pressure into multi-second stalls."
+  log "    zram will not take over while this is mounted. To remove it, per path:"
+  log "        swapoff PATH && sed -i '\\|^PATH|s/^/#/' /etc/fstab && rm PATH"
+  log "    Left alone here: this script does not edit /etc/fstab."
 fi
 
 step "2. Weekly TRIM"
