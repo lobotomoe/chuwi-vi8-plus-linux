@@ -441,6 +441,27 @@ because a claim repeated by one community is not the same as a verified one.
   its `&`. — **verified** by fetching the file at `v5.15`, `v6.6`, `v6.12` and
   mainline and diffing the block.
 
+## The touchscreen's interrupt storm
+
+- `drivers/input/touchscreen/chipone_icn8505.c`. Two lines carry the whole
+  mechanism: the IRQ is taken with `devm_request_threaded_irq(dev, client->irq,
+  NULL, icn8505_irq, IRQF_ONESHOT, ...)`, and `icn8505_irq()` reads the touch-data
+  register and returns `IRQ_HANDLED` on every entry, `touch_count` zero or not.
+  With a level-triggered line that the controller never deasserts, that is an
+  unbounded loop the kernel cannot detect — `note_interrupt()` only disables a
+  line nobody claims.
+  <https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/drivers/input/touchscreen/chipone_icn8505.c>
+
+- That the line is level-triggered is read from the running kernel rather than
+  inferred: `/sys/kernel/irq/<n>/type` says `level`, `chip_name` says `chv-gpio`,
+  `hwirq` 19. — **verified on the unit**
+
+- Searched for prior art and found none: no report of an ICN8505 interrupt storm
+  in the kernel lists, the driver's history, or the tablet-Linux forums. The
+  general pattern — a level-triggered touch controller asserting on boot with
+  nothing to clear it — is well known, but not this part. Treat the diagnosis
+  here as first-hand rather than corroborated.
+
 ## The device itself
 
 - Notebookcheck review of the Chuwi Vi8 Plus (CWI519) — ports, the single USB-C

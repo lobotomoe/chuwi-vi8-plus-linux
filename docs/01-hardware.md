@@ -88,7 +88,7 @@ unless you know exactly which way your unit boots; owners who tried to move a
 | GPU | Intel HD Graphics (Gen8 / Cherry Trail) |
 | RAM | 2 GB DDR3L, soldered |
 | Storage | 32 GB eMMC + microSD slot |
-| Display | 8.0" IPS, 1280x800, 10-point capacitive touch. Scanout orientation is probably **portrait** (800x1280) — the firmware setup renders upright with the tablet held portrait — and the kernel has no orientation quirk for this model, so expect to rotate it yourself. See [40-post-install.md](40-post-install.md#if-everything-starts-sideways) |
+| Display | 8.0" IPS, 10-point capacitive touch. **Portrait-native: the scanout is 800x1280**, `/sys/class/graphics/fb0/virtual_size` reads `800,1280` — **verified on the unit**. The kernel has no orientation quirk for this model, so expect to rotate it yourself. See [40-post-install.md](40-post-install.md#if-everything-starts-sideways) |
 | Firmware | **32-bit (IA32) UEFI**, no CSM/legacy boot — but see the revision note below; confirm with `fw_platform_size` before trusting it. The unit this guide was written against reports AMI Aptio `2.17.1249`, **BIOS version `1ATFG007`, dated 12/11/2015** |
 | Ports | 1x USB Type-C (USB 2.0, power + data, OTG), micro-HDMI 1.4, microSD, 3.5 mm |
 | Battery | Li-Po. **Sources disagree:** Notebookcheck's review says 5000 mAh, the 4PDA thread's specification header says Chuwi claims 4000 mAh with owners measuring 3900-4050 mAh. Read your own with `cat /sys/class/power_supply/*/energy_full_design` rather than trusting either |
@@ -489,6 +489,59 @@ is the actual open question.
 Reasonable to try if your own flash turns out not to carry the blob. Extract your own
 first if you can — a touchscreen firmware is not a thing to take on trust.
 
+#### The touchscreen holds its interrupt line asserted, forever
+
+On the reference unit — running the substitute firmware above — the touchscreen
+fires **463 interrupts per second with nobody touching it**, and has done since
+boot. It costs more than it looks, and it is invisible in `top` except as one
+kernel thread.
+
+```sh
+grep CHPN0001 /proc/interrupts; sleep 10; grep CHPN0001 /proc/interrupts
+cat /sys/kernel/irq/$(awk -F: '/CHPN0001/{print $1}' /proc/interrupts | tr -d ' ')/type
+```
+
+— **verified on the unit**: `463/s` sustained over 60 s, `type` reads `level`.
+
+**The mechanism, end to end.** The GPIO is level-triggered (`chv-gpio` hwirq 19).
+The driver takes it with `devm_request_threaded_irq(..., NULL, icn8505_irq,
+IRQF_ONESHOT, ...)`, so the line is masked while the handler runs and unmasked
+when it returns. `icn8505_irq()` then reads `ICN8505_REG_TOUCHDATA` over I2C
+*unconditionally* and returns `IRQ_HANDLED` *unconditionally* — including when
+`touch_count` is zero. So if the controller never deasserts the line, the cycle
+repeats at the speed of one I2C read, which measures out at ~2.2 ms.
+
+Two consequences worth knowing:
+
+- **The kernel's own protection cannot see it.** The spurious-interrupt detector
+  disables a line after 100 000 interrupts *nobody claimed*. This handler claims
+  every one of them, so `note_interrupt()` never fires and nothing is ever
+  logged. The storm is silent by construction.
+- **It multiplies on the I2C bus.** Each touchscreen interrupt costs one
+  multi-byte I2C read, and the Cherry Trail LPSS controller interrupts per FIFO
+  threshold: `808622C1:04`, the controller this touchscreen sits on, runs at
+  **~32 000 interrupts per second**. — **verified on the unit**
+
+**What it costs.** The `irq/…-CHPN0001:00` thread measures **3.13% of one core**
+over 60 s. The 32 000/s of hard interrupts on top of that were not separately
+measured. The clearer cost is what it does to idle: over 30 s, CPU0 took
+**707 590 wakeups with a mean idle period of 19 µs**, against `C6N`'s target
+residency of 275 µs. The governor therefore almost never reaches `C6N` —
+`C1` took 44.9% of the wall clock and `C6N` only 3.2%. — **verified on the unit**
+
+That last number connects to [51-freezes.md](51-freezes.md): this tablet's idle
+temperature is a C-state story, and the core servicing the touchscreen is pinned
+out of the deepest state it is allowed to use. **The thermal cost of that has not
+been measured** — doing it properly means unbinding `chipone_icn8505`, which
+takes the touchscreen with it, and comparing `PNIT` over a long idle window.
+
+Whether this is inherent to the ICN8505 or an artefact of running a substitute
+firmware is **not established**. It is the same open question as the section
+above, seen from the other end: the controller answers I2C correctly and reports
+zero touches, and the panel does track a finger — but something keeps the
+attention line raised. A unit whose own BIOS carries the blob would settle it in
+one reading.
+
 ### Wi-Fi / Bluetooth — AmPak AP6212 (Broadcom BCM43430)
 
 - Wi-Fi driver: `brcmfmac` over SDIO (`CONFIG_BRCMFMAC=m`, `CONFIG_BRCMFMAC_SDIO=y`)
@@ -531,7 +584,25 @@ linux-firmware"*, and his unit is an a1. Read the exact name your kernel asked f
 out of `dmesg` rather than assuming; see
 [50-troubleshooting.md](50-troubleshooting.md#bluetooth-appears-but-has-no-address).
 On this a0 unit it asked for `brcm/BCM4343A0.hcd`, did not get it, and brought
-the adapter up anyway with a placeholder address.
+the adapter up anyway with a placeholder address. Both halves of that are visible
+without doing anything:
+
+```
+Bluetooth: hci0: BCM: firmware Patch file not found, tried:
+Bluetooth: hci0: BCM: 'brcm/BCM4343A0.hcd'
+Bluetooth: hci0: BCM: 'brcm/BCM.hcd'
+```
+
+```
+hci0:   Type: Primary  Bus: UART
+        BD Address: AA:AA:AA:AA:AA:AA  ACL MTU: 1021:8  SCO MTU: 64:1
+        UP RUNNING
+```
+
+— **verified on the unit**. `AA:AA:AA:AA:AA:AA` is not a redaction, it is what the
+controller reports when it has no patch file: the address lives in the `.hcd`, so
+without one every such unit claims the same address. `UP RUNNING` is why this is
+easy to miss — the adapter looks healthy and cannot pair.
 
 #### Two chip revisions ship in this model, and they want different NVRAM
 

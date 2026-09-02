@@ -157,24 +157,22 @@ sudo apt install screen-rotate           # if packaged for your release
 
 ### If everything starts sideways
 
-Check this before assuming it is broken. The setup menu on this tablet renders
-upright while the tablet is held in portrait, with the Windows button at the
-bottom — and firmware draws at the panel's native scanout orientation. That is
-consistent with a **portrait-native panel** (800x1280 scanned out, presented as
-1280x800 in landscape use), which is the norm for 8" Windows tablets.
+Check this before assuming it is broken. **This panel is portrait-native** —
+`/sys/class/graphics/fb0/virtual_size` reads `800,1280` — **verified on the
+unit**, which is the norm for 8" Windows tablets and matches the firmware setup
+rendering upright with the tablet held in portrait.
 
-If that is what this panel is, GRUB, the kernel console and the desktop will all
-start rotated 90°, because **the kernel has no panel-orientation quirk for this
-model**. `drivers/gpu/drm/drm_panel_orientation_quirks.c` covers the Chuwi HiBook
+So GRUB, the kernel console and the desktop will all start rotated 90°, because
+**the kernel has no panel-orientation quirk for this model**. `drivers/gpu/drm/drm_panel_orientation_quirks.c` covers the Chuwi HiBook
 (CWI514) and Hi10 Pro (CWI529) but not the Vi8 Plus, so nothing corrects it
 automatically. The HiBook entry matches on `Hampoo` + `Cherry Trail CR`, which
 this tablet also reports, but it is declared for a 1200x1920 panel and the lookup
 compares resolution before anything else, so it cannot misfire here.
 
-Two commands settle it:
+Confirm it on your own unit, and get the connector name while you are there:
 
 ```sh
-cat /sys/class/graphics/fb0/virtual_size        # 1280,800 or 800,1280
+cat /sys/class/graphics/fb0/virtual_size        # 800,1280 here
 xrandr --query | grep -w connected               # X11
 ```
 
@@ -182,7 +180,7 @@ Worth running in the live session too, if you get there before reading this — 
 answer does not change after installing, but knowing it in advance saves meeting a
 sideways installer with no idea whether it is a fault.
 
-If it is portrait-native, the fixes are, in order of preference:
+The fixes, in order of preference:
 
 ```sh
 # the desktop session, per-output and persistent - try this first
@@ -358,10 +356,9 @@ gsettings set org.onboard.window.portrait width 800
 gsettings set org.onboard.window.portrait height 440
 ```
 
-Those numbers assume an 800x1280 portrait scanout, which is what the section
-above says this panel *probably* is rather than what anyone has confirmed. Check
-with `cat /sys/class/graphics/fb0/virtual_size` and substitute your own — the
-`y` is simply panel height minus keyboard height.
+Those numbers are for the 800x1280 scanout this panel actually has; `y` is
+simply panel height minus keyboard height, so substitute if you changed the
+keyboard size.
 
 Theming has a trap in it. Onboard rewrites `org.onboard.theme-settings` from
 its theme file every time it starts, so colours and fonts set with `gsettings`
