@@ -813,14 +813,40 @@ If the raw reads work while buffered reads do not, that diagnosis is right.
 
 ### Storage
 
-- eMMC via `sdhci-acpi`, appears as `/dev/mmcblk0` (occasionally `mmcblk1` — always
-  check with `lsblk` rather than assuming).
-- microSD appears as a **separate** `mmcblk` device, and not necessarily the next
-  number: on this unit a card in the slot came up as `mmcblk2`, because `mmcblk1` is
-  taken by the eMMC's own boot hardware partitions (`mmcblk0boot0`, `mmcblk0boot1`).
-  Check, never assume.
+eMMC via `sdhci-acpi`. **Do not hardcode `mmcblk0`. On this tablet it is not
+`mmcblk0`.**
 
-Stock `/proc/partitions` on an untouched unit, for orientation — sizes in 1 KiB blocks:
+The SoC has three SDHC controllers and the eMMC is not on the first one. Read
+today off the installed system, kernel `7.0.0-30-generic`, with no card in the
+slot:
+
+| host | ACPI | what is on it | block device |
+|---|---|---|---|
+| `mmc0` | `80860F14:02` | **Wi-Fi** — SDIO, Broadcom `0x02d0:0xa9a6`, driver `brcmfmac` | none, it is not storage |
+| `mmc1` | `80860F14:03` | the microSD slot | whatever you insert |
+| `mmc2` | `80860F14:00` | **the eMMC** | `mmcblk2`, plus `mmcblk2boot0/1` and `mmcblk2rpmb` |
+
+— **verified on the unit**
+
+So the eMMC came up as `mmcblk2` with **nothing in the card slot at all**, because
+the Wi-Fi radio holds `mmc0`. A reader who assumes the eMMC is the lowest-numbered
+`mmcblk` is wrong on this hardware, and the mistake lands on `sgdisk --zap-all`.
+
+An earlier capture from a live session, below, shows the same eMMC as `mmcblk0`.
+Both readings are real; what varies is not documented here, so **the number is not
+something to carry between sessions** — derive it every time:
+
+```sh
+lsblk -d -o NAME,SIZE,TYPE          # the eMMC is the ~29 GiB one
+```
+
+Two independent confirmations that you have the right device: only the eMMC has
+`mmcblkNboot0` and `mmcblkNboot1` siblings, and `cat /sys/block/mmcblkN/device/type`
+reads `MMC` for eMMC against `SD` for a card.
+
+Stock `/proc/partitions` on an untouched unit, read from a live session, for
+orientation — sizes in 1 KiB blocks. **Note the device number differs from the
+table above; that is the point of this section:**
 
 ```
 179  0  30310400  mmcblk0        # eMMC, ~28.9 GiB usable of a "32 GB" part

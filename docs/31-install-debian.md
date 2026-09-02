@@ -43,8 +43,11 @@ Remember the radio is 2.4 GHz only — a 5 GHz-only SSID simply will not appear.
 
 **3.** Partitioning. On 32 GB there is nothing clever to do:
 
-- **Guided - use entire disk**, target `/dev/mmcblk0` (confirm with `lsblk`
-  first that it is the ~29 GiB device and not the microSD card).
+- **Guided - use entire disk**, targeting the eMMC — **which is not necessarily
+  `/dev/mmcblk0`.** On the reference unit it is `mmcblk2` with no card inserted,
+  because the Wi-Fi radio is an SDIO card holding `mmc0`
+  ([01-hardware.md](01-hardware.md#storage)). Pick the ~29 GiB device, and confirm
+  with `lsblk` on a shell (Ctrl+Alt+F2) before accepting.
 - **All files in one partition.**
 - Let it create the ESP itself. 512 MB is plenty and Debian's default is fine.
 - **No swap partition.** Set up zram afterwards instead
@@ -67,7 +70,7 @@ Boot the live/installer stick again, drop to a shell, and:
 
 ```sh
 sudo mkdir -p /mnt
-sudo mount /dev/mmcblk0p2 /mnt          # the root partition; check with lsblk
+sudo mount /dev/mmcblkXp2 /mnt          # the eMMC root; find X with lsblk
 sudo ./scripts/postinstall-grub-ia32.sh --root /mnt
 ```
 

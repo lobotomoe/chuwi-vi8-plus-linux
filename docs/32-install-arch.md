@@ -62,19 +62,27 @@ a bug.
 
 ## Partition and install
 
+**Find the eMMC first, and do not assume `mmcblk0`.** On the reference unit the
+eMMC is `mmcblk2` with nothing in the card slot, because the Wi-Fi radio is an
+SDIO card occupying `mmc0` ([01-hardware.md](01-hardware.md#storage)). Every
+command below erases whatever you point it at.
+
 ```sh
-lsblk                                       # eMMC is the ~29 GiB mmcblk device
+lsblk -d -o NAME,SIZE,TYPE                  # the eMMC is the ~29 GiB one
+ls -d /sys/block/mmcblk*boot0               # only the eMMC has boot0/boot1
+emmc=/dev/mmcblkX                           # set this, then check it
+lsblk "$emmc"                               # last look before anything is erased
 
 # GPT: 512 MB ESP + the rest as root. No swap partition; use zram later.
-sgdisk --zap-all /dev/mmcblk0
-sgdisk -n 1:0:+512M -t 1:ef00 -c 1:EFI /dev/mmcblk0
-sgdisk -n 2:0:0     -t 2:8304 -c 2:root /dev/mmcblk0
+sgdisk --zap-all "$emmc"
+sgdisk -n 1:0:+512M -t 1:ef00 -c 1:EFI "$emmc"
+sgdisk -n 2:0:0     -t 2:8304 -c 2:root "$emmc"
 
-mkfs.fat -F 32 /dev/mmcblk0p1
-mkfs.ext4 /dev/mmcblk0p2
+mkfs.fat -F 32 "${emmc}p1"
+mkfs.ext4 "${emmc}p2"
 
-mount /dev/mmcblk0p2 /mnt
-mount --mkdir /dev/mmcblk0p1 /mnt/boot
+mount "${emmc}p2" /mnt
+mount --mkdir "${emmc}p1" /mnt/boot
 
 pacstrap -K /mnt base linux linux-firmware sof-firmware \
     networkmanager iwd alsa-ucm-conf iio-sensor-proxy \
@@ -108,7 +116,7 @@ initrd  /initramfs-linux.img
 options root=PARTUUID=REPLACE_ME rw intel_idle.states_off=56
 EOF
 
-blkid -s PARTUUID -o value /dev/mmcblk0p2    # paste this into the file above
+blkid -s PARTUUID -o value "${emmc}p2"       # paste this into the file above
 ```
 
 `bootctl install` also writes `\EFI\BOOT\BOOTIA32.EFI` as the removable-media

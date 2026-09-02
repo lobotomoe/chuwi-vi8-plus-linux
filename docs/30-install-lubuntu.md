@@ -86,8 +86,10 @@ device of similar naming, and this is the step that erases it. **The eMMC is the
 lsblk -d -o NAME,SIZE,TYPE
 ```
 
-`mmcblk0` is normally the eMMC and the card is normally `mmcblk2`, but the
-numbering follows probe order and is not guaranteed. The size is.
+**Do not go in expecting `mmcblk0`.** On the reference unit the eMMC is
+`mmcblk2` even with the card slot empty, because the Wi-Fi radio is an SDIO card
+holding `mmc0` ([01-hardware.md](01-hardware.md#storage)). The number is not
+predictable; the size is, and only the eMMC has `boot0`/`boot1` siblings.
 
 - No swap partition. zram afterwards is better on 2 GB of RAM and it does not
   wear the eMMC. Calamares' "no swap" option is fine.
@@ -107,7 +109,7 @@ Boot the Lubuntu stick again, open a terminal in the live session, and:
 
 ```sh
 lsblk                                   # find the new root partition
-sudo mount /dev/mmcblk0p2 /mnt          # adjust to what lsblk showed
+sudo mount /dev/mmcblkXp2 /mnt          # the eMMC root, from the lsblk above
 sudo ./scripts/postinstall-grub-ia32.sh --root /mnt
 ```
 

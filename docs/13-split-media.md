@@ -138,8 +138,11 @@ possible with a stick built by `--boot-only`, and means something else is plugge
 alike. Debian's `live-boot` uses `/run/live/medium` for the same job, so a guide
 written for Debian will name that path instead — on an Ubuntu stick it is empty.
 
-`lsblk` is worth a look too. The eMMC is `mmcblk0`; the card is usually `mmcblk2`,
-because `mmcblk1` is taken by the eMMC's boot hardware partitions.
+`lsblk` is worth a look too, and do not go in expecting the eMMC to be `mmcblk0` —
+on the reference unit it is `mmcblk2`, with the card slot on `mmc1`, because the
+Wi-Fi radio is an SDIO card holding `mmc0`. The eMMC is the ~29 GiB device with
+`boot0`/`boot1` siblings; see
+[01-hardware.md](01-hardware.md#storage).
 
 ## Pinning the medium explicitly
 

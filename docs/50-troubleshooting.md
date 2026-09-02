@@ -440,10 +440,15 @@ Expected on Ubuntu and Xubuntu: their installer writes a 64-bit GRUB this
 firmware cannot execute. Boot the live stick again and:
 
 ```sh
-lsblk
-sudo mount /dev/mmcblk0p2 /mnt
+lsblk -d -o NAME,SIZE,TYPE              # the eMMC is the ~29 GiB one, and on
+                                        # this tablet it is not mmcblk0
+sudo mount /dev/mmcblkXp2 /mnt
 sudo ./scripts/postinstall-grub-ia32.sh --root /mnt
 ```
+
+The eMMC's number is not predictable — see
+[01-hardware.md](01-hardware.md#storage) for why the Wi-Fi radio takes `mmc0` on
+this hardware and the eMMC lands on `mmcblk2`.
 
 Add `--offline-debs /path/to/payload` if the live session has no network; build
 that directory beforehand with `scripts/fetch-offline-payload.sh`.
@@ -455,13 +460,13 @@ straight to the firmware menu, the firmware is ignoring NVRAM boot entries. The
 falls back to. Check it landed:
 
 ```sh
-sudo mount /dev/mmcblk0p1 /mnt2 && ls /mnt2/EFI/BOOT/
+sudo mount /dev/mmcblkXp1 /mnt2 && ls /mnt2/EFI/BOOT/   # same X as above
 ```
 
 ## `grub-install` says "cannot find EFI directory" or "i386-efi not found"
 
 - "cannot find EFI directory": the ESP is not mounted at the path you passed.
-  Mount it (`mount /dev/mmcblk0p1 /mnt/boot/efi`) and pass `--esp`.
+  Mount it (`mount /dev/mmcblkXp1 /mnt/boot/efi`) and pass `--esp`.
 - "i386-efi not found": `grub-efi-ia32-bin` is not installed in the *target*
   system. That is what `scripts/postinstall-grub-ia32.sh` installs; if you are
   doing it by hand, `apt install grub-efi-ia32-bin` inside the chroot.
@@ -788,15 +793,16 @@ because on a machine this slow every theory feels confirmed.
 If you took a full image, boot the live stick and restore it:
 
 ```sh
-lsblk                                   # confirm which device is the eMMC
+lsblk -d -o NAME,SIZE,TYPE              # confirm which device is the eMMC;
+                                        # it is not reliably mmcblk0
 sudo ./scripts/restore-emmc.sh \
   --image /media/usb-disk/emmc-tablet-20260815-120000.img.zst \
-  --target /dev/mmcblk0
+  --target /dev/mmcblkX
 ```
 
 The script verifies the image against its `.sha256` sidecar, refuses a target the
 image would not fit on (from the `.size` sidecar), refuses a partition or a
-still-mounted device, and makes you type `RESTORE /dev/mmcblk0` back — all before
+still-mounted device, and makes you type `RESTORE <target>` back — all before
 it writes anything. Do not shortcut it with a bare `dd` — a typo in `of=` on this
 path destroys the disk you are restoring onto.
 

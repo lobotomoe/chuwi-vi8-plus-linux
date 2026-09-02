@@ -54,10 +54,22 @@ If you want to see the key itself:
 sudo strings /sys/firmware/acpi/tables/MSDM | tail -1
 ```
 
+**First, find the eMMC.** Both options below take it as `$emmc`, and **it is not
+reliably `/dev/mmcblk0`** — on the reference unit it is `mmcblk2` even with the
+card slot empty, because the Wi-Fi radio is an SDIO card holding `mmc0`
+([01-hardware.md](01-hardware.md#storage)):
+
+```sh
+lsblk -d -o NAME,SIZE,TYPE           # the eMMC is the ~29 GiB one
+ls -d /sys/block/mmcblk*boot0        # and it is the only one with boot0
+emmc=/dev/mmcblkX                    # set it, then confirm
+lsblk "$emmc"
+```
+
 **Partition table only.** Cheap and fast, enough to reconstruct the layout:
 
 ```sh
-sudo sfdisk --dump /dev/mmcblk0 > /media/usb-disk/emmc-layout.sfdisk
+sudo sfdisk --dump "$emmc" > /media/usb-disk/emmc-layout.sfdisk
 ```
 
 **Write it somewhere that survives a reboot.** A live session's home directory
@@ -69,7 +81,7 @@ is fine; the eMMC is not, since that is what you are about to erase.
 back exactly as it shipped:
 
 ```sh
-sudo ./scripts/backup-emmc.sh --source /dev/mmcblk0 --dest /media/usb-disk
+sudo ./scripts/backup-emmc.sh --source "$emmc" --dest /media/usb-disk
 ```
 
 Check the device name with `lsblk` first — the eMMC is the roughly 29 GiB
