@@ -462,6 +462,22 @@ because a claim repeated by one community is not the same as a verified one.
   nothing to clear it — is well known, but not this part. Treat the diagnosis
   here as first-hand rather than corroborated.
 
+- **The ACPI side, from the firmware rather than from the kernel.** `CHPN0001`'s
+  `_CRS` in the DSDT of `P03_C806.108` declares `GpioInt` pin 19 as
+  `Level ActiveLow Exclusive NoWake`, and a second resource, `GpioIo` pin 25, an
+  output. Both operating systems read the same table, so the trigger mode is not
+  something Linux chose. — **verified** by unpacking the BIOS image with
+  `scripts/inspect-bios-image.py --keep` and decoding the descriptor bytes.
+
+- **Chuwi's Windows driver, `TP_X64/Chpntsc.sys` in the same package the firmware
+  comes from.** Strings show it claims the GPIO resource
+  (`get gpio resource, TransLH:%d,%d, RawLH:%d,%d.`) and carries a reset routine
+  (`icn85xx_ts_reset`); the Linux driver has neither, and no `gpiod_*` call at
+  all. The binary also carries `icn85xx_*` names and a `/system/bin/ICN87xx.bin`
+  path, so it is a port of ChipOne's Android driver — the same ancestor the kernel
+  driver's own comments cite. — **verified** by `strings` on the driver, against
+  `grep` on `chipone_icn8505.c`.
+
 ## The device itself
 
 - Notebookcheck review of the Chuwi Vi8 Plus (CWI519) — ports, the single USB-C

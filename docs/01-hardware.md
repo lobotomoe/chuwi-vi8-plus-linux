@@ -241,8 +241,14 @@ Ubuntu 26.04 LTS (`linux-buildinfo-7.0.0-31-generic`). All of them are enabled.
 - Driver: `chipone_icn8505` (`CONFIG_TOUCHSCREEN_CHIPONE_ICN8505=m`)
 - Enabled by DMI match in `drivers/platform/x86/touchscreen_dmi.c`
   (`CONFIG_TOUCHSCREEN_DMI=y`), struct `chuwi_vi8_plus_data`.
-- Firmware: `chipone/icn8505-HAMP0002.fw`, 35012 bytes,
-  SHA-256 `93e549e0b6a2b4b3889634975ea81378729b8b829eb5ca7f125134f4307cfc7c`.
+- Firmware: `chipone/icn8505-HAMP0002.fw`. **Two different numbers get attached to
+  that name and they are not interchangeable.** 35012 bytes, SHA-256
+  `93e549e0…7cfc7c` is what the kernel's `efi_embedded_fw` descriptor pins when
+  extracting from UEFI. What is actually installed on the reference unit is
+  Chuwi's own build from the Windows driver package: **34900 bytes**, SHA-256
+  `e895933d…ba092b` — **verified on the unit** against the blob extracted from
+  `chpntsc.inf`, byte for byte. The full comparison is
+  [below](#there-is-more-than-one-build-of-this-firmware).
 
 This firmware is **not** shipped by `linux-firmware` — that repository has no
 `chipone/` directory, and its `WHENCE` manifest does not mention `icn8505` or
@@ -535,12 +541,57 @@ out of the deepest state it is allowed to use. **The thermal cost of that has no
 been measured** — doing it properly means unbinding `chipone_icn8505`, which
 takes the touchscreen with it, and comparing `PNIT` over a long idle window.
 
-Whether this is inherent to the ICN8505 or an artefact of running a substitute
-firmware is **not established**. It is the same open question as the section
-above, seen from the other end: the controller answers I2C correctly and reports
-zero touches, and the panel does track a finger — but something keeps the
-attention line raised. A unit whose own BIOS carries the blob would settle it in
-one reading.
+**It is not the firmware.** The blob loaded on the unit while this was measured is
+Chuwi's own `HAMP0002` out of `chpntsc.inf`, `e895933d…ba092b`, byte-identical to
+what the vendor's Windows driver installs — checked with `sha256sum` on the
+tablet against the extracted blob. So the storm happens with the manufacturer's
+build for this exact panel, not with a community substitute. (It is still not the
+35012-byte build the kernel's EFI descriptor pins, so a firmware explanation is
+narrowed rather than closed.)
+
+#### Windows does one thing here that Linux does not
+
+Worth knowing before blaming the chip, because the two drivers are not doing the
+same job. Both read the same ACPI, and the interrupt half is identical: the
+`_CRS` for `CHPN0001` declares
+
+```
+GpioInt  pin 19  Level  ActiveLow  Exclusive  NoWake  debounce 0
+```
+
+— **verified** by extracting the DSDT from `P03_C806.108` and decoding the
+descriptor. Level-triggered active-low is what *both* operating systems get;
+Linux is not misprogramming the line.
+
+The difference is the resource next to it. The same `_CRS` declares a **second**
+resource, `GpioIo` on **pin 25**, an output — and:
+
+| | Linux `chipone_icn8505` | Windows `Chpntsc.sys` |
+|---|---|---|
+| claims the GPIO | **no** — the driver contains no `gpiod_*` call at all | yes: `get gpio resource, TransLH:%d,%d, RawLH:%d,%d.` |
+| resets the controller | **no such code path** | yes: `icn85xx_ts_reset` |
+| ACPI probe reads | `_SUB` only, to build the firmware filename | full resource list |
+
+— **verified** by grepping the kernel driver, and from strings in
+`TP_X64/Chpntsc.sys` in Chuwi's driver package.
+
+`icn8505_probe_acpi()` really does only one thing: `acpi_get_subsystem_id()` into
+`snprintf("chipone/icn8505-%s.fw")`. Nothing else in the driver ever looks at the
+second resource, and `ICN8505_REG_POWER` is written only on suspend. So Linux
+never puts the controller into a known state — not at probe, not ever — while the
+vendor driver has an explicit reset routine wired to a GPIO the vendor put in
+`_CRS` precisely so a driver would drive it.
+
+That is a **plausible mechanism, not a demonstrated one**: a controller nobody
+resets, left holding an active-low attention line that reading touch data does not
+clear. Testing it means driving pin 25 by hand from userspace and watching whether
+the rate drops — cheap, reversible, and not yet done.
+
+One more thing the strings settle: `Chpntsc.sys` carries `icn85xx_*` symbol names
+and a stray `/system/bin/ICN87xx.bin` path, so the Windows driver is itself a port
+of ChipOne's Android driver. The kernel driver's own comment cites that Android
+driver too. All three are working from the same vendor code; only Linux dropped
+the reset.
 
 ### Wi-Fi / Bluetooth — AmPak AP6212 (Broadcom BCM43430)
 
