@@ -590,8 +590,27 @@ the rate drops — cheap, reversible, and not yet done.
 One more thing the strings settle: `Chpntsc.sys` carries `icn85xx_*` symbol names
 and a stray `/system/bin/ICN87xx.bin` path, so the Windows driver is itself a port
 of ChipOne's Android driver. The kernel driver's own comment cites that Android
-driver too. All three are working from the same vendor code; only Linux dropped
-the reset.
+driver too. All three descend from the same vendor code.
+
+**Two things in that Android source argue against the easy version of this story**,
+and they are worth stating because they narrow what the reset could be doing.
+Reading ChipOne's `icn85xx.c` as carried in the rk3188 tree:
+
+- **There is no interrupt-acknowledge write anywhere.** The vendor's touch path is
+  `icn85xx_i2c_rxdata(0x1000, buf, POINT_NUM*POINT_SIZE+2)` and nothing after it —
+  the same register the kernel driver reads, with no follow-up write to clear a
+  status bit. So the Linux driver is **not** missing an ack step; that candidate is
+  out.
+- **The reset is platform-gated even in the vendor's own driver.** `ctp_reset()` is
+  the ordinary active-low pulse — GPIO low, `CTP_RESET_LOW_PERIOD` ms, GPIO high,
+  `CTP_RESET_HIGH_PERIOD` ms — but of its five call sites, four are commented out
+  and the only live one sits inside `#if SUPPORT_SPREADTRUM` in probe. So "everyone
+  but Linux resets the chip" is too strong. What is true is narrower: Chuwi's
+  Windows port ships the reset path live and claims the GPIO for it, and Linux has
+  no such code at all.
+
+— **verified** against
+[`bbelos/rk3188-kernel`](https://github.com/bbelos/rk3188-kernel/blob/master/drivers/input/touchscreen/ICN8503/icn85xx.c).
 
 ### Wi-Fi / Bluetooth — AmPak AP6212 (Broadcom BCM43430)
 
