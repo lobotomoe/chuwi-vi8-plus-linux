@@ -371,6 +371,19 @@ reboot:
 sudo modprobe -r chipone_icn8505 && sudo modprobe chipone_icn8505
 ```
 
+**Then check the interrupt rate before you consider this finished.** This blob
+gives a working touchscreen and a permanent interrupt storm that costs roughly
+4 °C and most of the machine's idle depth, for reasons covered in
+[the section below](#the-touchscreen-holds-its-interrupt-line-asserted-forever):
+
+```sh
+grep CHPN0001 /proc/interrupts; sleep 10; grep CHPN0001 /proc/interrupts
+```
+
+Hundreds per second with nobody touching the glass means you have it. The
+34884-byte build linked in that section does not do this, on the one unit where
+both have been compared.
+
 The probe then succeeds and the touchscreen registers as an input device:
 
 ```
@@ -388,45 +401,63 @@ kernel's EFI path pins 35012 bytes. Do not read more into the probe than it says
 they prove the I2C transfer, not the blob's provenance. The 34884-byte GitHub
 build is still untried here.
 
-#### With that build the axes come out rotated 180°
+#### Rotate the display and touch stops matching it
 
-Touch works and the pointer tracks the finger, but **both axes are inverted** —
-touch the top right and the pointer goes to the bottom left. Measured off two
-frames of a video of the unit rather than eyeballed: finger at (0.69, 0.26) gave
-a pointer at (0.30, 0.74), and finger at (0.84, 0.46) gave (0.18, 0.65). That is
-`x → 1-x, y → 1-y` on both, with no axis swap, so it is a 180° rotation and not
+**In the orientation the tablet ships in, the axes are correct and there is nothing
+on this page you need to do.** This section is for the case where you have
+deliberately rotated the display, because then the pointer starts landing opposite
+the finger: touch the top right and it goes to the bottom left.
+
+Wall mounting is the usual reason to rotate it, and where the charge cable has to
+exit is usually the reason for the angle: the reference unit hangs turned 180° so
+that the single USB-C port ends up along the bottom edge and the cable drops away
+instead of standing up. Turning the tablet fixes the cable and breaks two other
+things in sequence — the display is upside down until you rotate it in software,
+and touch is upside down until you do the separate thing below.
+
+Measured off two frames of a video rather than eyeballed, on a unit rotated 180°:
+finger at (0.69, 0.26) gave a pointer at (0.30, 0.74), and (0.84, 0.46) gave
+(0.18, 0.65) — `x → 1-x, y → 1-y` on both, no axis swap, so a 180° rotation and not
 a 90° one. — **verified on the unit**
 
-This is not something the DMI quirk can explain, and it is worth being precise
-about why, because it is tempting to blame [patch 0001](../patches/):
-`chuwi_vi8_plus_data` carries an `embedded_fw` descriptor and **nothing else** —
-no `.properties`, no `.acpi_name` — so there are no axis properties for a missed
-DMI match to have cost. The orientation arrives from the controller: the driver
-reads the resolution out of the chip over I2C, then applies
-`touchscreen_parse_properties()`, and upstream sets no `touchscreen-inverted-*`
-for this model at all. On the maintainer's unit, running the blob out of EFI, the
-axes must therefore already be correct.
+**This is not a fault in the controller, and an earlier revision of this document
+was wrong to read it as one.** The touchscreen reports in the panel's own
+coordinates and knows nothing about how the display is rotated; X applies the
+rotation to the *output* and, without a transformation matrix, leaves the input
+device alone. A correct controller under a 180°-rotated display produces exactly
+`x → 1-x, y → 1-y`. So does a controller with both scan directions reversed, which
+is why the measurement above cannot tell the two apart — it was never a test of the
+firmware, and reading it as one sent this document chasing firmware builds for a
+problem that was a missing matrix.
 
-Which points at the firmware build rather than the hardware. We are loading a
-*different* build of `HAMP0002` than the one the kernel pins, and the scan
-direction is the controller firmware's business. Untested hypothesis, and the
-experiment that would settle it is cheap: load the 34884-byte build and see
-whether the axes flip.
+Reading the raw evdev stream *does* tell them apart, because it is taken before any
+userspace matrix is applied. On the rotated unit — `xrandr` reporting
+`DSI-1 ... inverted` — one deliberate tap on the *visually* top-left corner, which
+is physically the panel's opposite corner, read `raw=(759,1262)` against axis ranges
+`X (0,799)` and `Y (0,1279)`: 0.95 and 0.99 of full scale. **The controller named
+the corner that was actually touched.** — **verified on the unit**
 
-Two things about that experiment are worth knowing before running it, both read
-out of `icn8505_try_fw_upload()`:
+So if the pointer lands wrong, check `xrandr` first. An output that is rotated while
+its input is not is the whole explanation, and the matrix below is the fix — not a
+different firmware blob.
+
+Two things about swapping firmware builds are worth knowing, both read out of
+`icn8505_try_fw_upload()` and both since exercised on the unit:
 
 - **The firmware goes to SRAM, not to any flash on the controller.** The driver's
   own comments say *"Send the firmware to SRAM"* and *"Boot controller from
   SRAM"*. Nothing is written persistently, so a wrong build cannot brick the
   touchscreen — cutting power discards it.
-- **Swapping the file and reloading the module does nothing.** `icn8505_upload_fw()`
-  reads register `0x000a` first and skips the upload entirely if it returns
-  `0x85`, meaning the controller is already running. So a new blob needs the
-  controller to lose power: a full poweroff, not `modprobe -r` and not
-  necessarily a warm reboot.
+- **Unbind and rebind is enough to load a new blob; a poweroff is not needed.**
+  `icn8505_upload_fw()` reads register `0x000a` and skips the upload if it returns
+  `0x85` for "already running" — but the controller does not survive a rebind in
+  that state, because `_PS0` resets it on the way back in (see
+  [the storm section](#the-touchscreen-holds-its-interrupt-line-asserted-forever)).
+  Measured: a bind takes ~1500 ms against the ~125 ms `_PS0`'s own sleeps account
+  for, and the difference is a full re-upload of the blob over I2C.
+  — **verified on the unit**
 
-Fix it in userspace meanwhile. This is a calibration matrix, which is what it is
+Fix the orientation in userspace. This is a calibration matrix, which is what it is
 for — it survives reboots and works under both X11 and Wayland:
 
 ```sh
@@ -584,19 +615,47 @@ window does establish is that the controller holds the line asserted through 140
 of being ignored entirely, with no driver attached and the IRQ freed. Neither
 reading the touch register nor detaching from it deasserts the line.
 
-**It is not the firmware.** The blob loaded on the unit while this was measured is
-Chuwi's own `HAMP0002` out of `chpntsc.inf`, `e895933d…ba092b`, byte-identical to
-what the vendor's Windows driver installs — checked with `sha256sum` on the
-tablet against the extracted blob. So the storm happens with the manufacturer's
-build for this exact panel, not with a community substitute. (It is still not the
-35012-byte build the kernel's EFI descriptor pins, so a firmware explanation is
-narrowed rather than closed.)
+**It is the firmware build, and swapping it ends the storm.** Everything above was
+measured under Chuwi's own `HAMP0002` out of `chpntsc.inf` — `e895933d…ba092b`,
+34900 bytes, byte-identical to what the vendor's Windows driver installs, checked
+with `sha256sum` on the tablet. So the storm is not the fault of a community
+substitute; it is the fault of the manufacturer's own build for this exact panel.
+Dropping the 34884-byte build from
+[another owner's repository](90-references.md#another-owners-fixes-for-this-exact-tablet)
+into `/lib/firmware/chipone/icn8505-HAMP0002.fw` and rebinding the driver takes the
+line quiet:
 
-#### Windows does one thing here that Linux does not
+| driver bound in both columns | 34900, Chuwi's own | 34884, the other build |
+|---|---|---|
+| touchscreen IRQ | 411-490/s | **0/s** |
+| I2C controller IRQ | 27 858-34 081/s | **0/s** |
+| CPU0 idle wakeups | 14 074/s | **36/s** |
+| `C6N` residency | 2.4% of wall | **66.4%** |
+| mean `C6N` stay | 44 µs | **1122 µs** |
+| `irq/…-CHPN0001:00` thread | 4.5% of a core | **0.0%** |
 
-Worth knowing before blaming the chip, because the two drivers are not doing the
-same job. Both read the same ACPI, and the interrupt half is identical: the
-`_CRS` for `CHPN0001` declares
+— **verified on the unit**
+
+The right-hand column is the machine idling as well as it did with the driver
+unbound entirely, except that the driver is loaded and the touchscreen works.
+That last part was checked rather than assumed, because a controller that has gone
+*silent* looks identical to one that has been *fixed* from every angle except a
+finger: reading the raw evdev stream afterwards gave `BTN_TOUCH` up and down,
+per-frame tracking, releases, and coordinates across the full range of both axes.
+
+The kernel's own pinned build — 35012 bytes — is a third thing again, and could not
+be compared: it is not present in this unit's flash. See
+[60-bios-firmware.md](60-bios-firmware.md#what-could-not-be-determined).
+
+#### Both operating systems reset this controller, by different routes
+
+This section used to argue that Linux never resets the chip and that this was the
+likely cause of the storm. Both halves turned out to be wrong, and the reasoning is
+kept here because the wrong version is the intuitive one and someone else will
+arrive at it.
+
+Both read the same ACPI, and the interrupt half is identical: the `_CRS` for
+`CHPN0001` declares
 
 ```
 GpioInt  pin 19  Level  ActiveLow  Exclusive  NoWake  debounce 0
@@ -620,40 +679,64 @@ resource, `GpioIo` on **pin 25**, an output — and:
 
 `icn8505_probe_acpi()` really does only one thing: `acpi_get_subsystem_id()` into
 `snprintf("chipone/icn8505-%s.fw")`. Nothing else in the driver ever looks at the
-second resource, and `ICN8505_REG_POWER` is written only on suspend. So Linux
-never puts the controller into a known state — not at probe, not ever — while the
-vendor driver has an explicit reset routine wired to a GPIO the vendor put in
-`_CRS` precisely so a driver would drive it.
+second resource, and `ICN8505_REG_POWER` is written only on suspend.
 
-That is a **plausible mechanism, not a demonstrated one**: a controller nobody
-resets, left holding an active-low attention line that reading touch data does not
-clear. Testing it means driving pin 25 by hand from userspace and watching whether
-the rate drops — cheap, reversible, and not yet done.
+**What does not follow — and what an earlier revision of this document claimed — is
+that Linux therefore never resets the controller. It does. The reset lives in the
+firmware, not in the driver.** `CHPN0001`'s `_PS0` *is* the reset pulse:
+
+```asl
+Method (_PS0, 0, Serialized)
+{
+    If ((^^^^GPO1.AVBL == One)) { ^^^^GPO1.TCTL = One }
+    Sleep (0x05)
+    If ((^^^^GPO1.AVBL == One)) { ^^^^GPO1.TCTL = Zero }
+    Sleep (0x78)
+}
+```
+
+`TCTL` is a one-bit field of a `GeneralPurposeIo` operation region in `\_SB.GPO1`
+whose `Connection` names pin `0x19` — pin 25, the same pin. So `_PS0` asserts the
+reset for 5 ms and waits 120 ms for the controller to come back, which is the shape
+of the vendor's `ctp_reset()`. Linux runs it at every probe: `i2c_device_probe()`
+calls `dev_pm_domain_attach()`, and the ACPI power domain puts the device into D0.
+
+Two independent observations show it actually executes, rather than merely existing:
+
+- `/sys/kernel/debug/gpio` labels pin 25 `ACPI:OpRegion`. That label is applied by
+  `acpi_gpio_adr_space_handler()` only when the region is genuinely accessed, and
+  `TCTL` is written in exactly two places in the whole DSDT — the two lines above.
+  So `AVBL` was set and both writes went through.
+- A bind takes **~1500 ms**, where `_PS0`'s own sleeps account for 125 ms. The
+  remainder is a full re-upload of the blob, which `icn8505_upload_fw()` performs
+  only once register `0x000a` has stopped returning `0x85`. The controller had lost
+  its SRAM, so it really was reset.
+
+— **verified on the unit**
+
+And it does not help: a fresh reset followed by a fresh upload of the 34900-byte
+blob brings the line straight back down. **The missing-reset theory is refuted.**
+What survived it was the build, which is what the table above tests. Do not spend
+time driving pin 25 by hand — it is already being driven, and it is not the answer.
 
 One more thing the strings settle: `Chpntsc.sys` carries `icn85xx_*` symbol names
 and a stray `/system/bin/ICN87xx.bin` path, so the Windows driver is itself a port
 of ChipOne's Android driver. The kernel driver's own comment cites that Android
 driver too. All three descend from the same vendor code.
 
-**Two things in that Android source argue against the easy version of this story**,
-and they are worth stating because they narrow what the reset could be doing.
-Reading ChipOne's `icn85xx.c` as carried in the rk3188 tree:
-
-- **There is no interrupt-acknowledge write anywhere.** The vendor's touch path is
-  `icn85xx_i2c_rxdata(0x1000, buf, POINT_NUM*POINT_SIZE+2)` and nothing after it —
-  the same register the kernel driver reads, with no follow-up write to clear a
-  status bit. So the Linux driver is **not** missing an ack step; that candidate is
-  out.
-- **The reset is platform-gated even in the vendor's own driver.** `ctp_reset()` is
-  the ordinary active-low pulse — GPIO low, `CTP_RESET_LOW_PERIOD` ms, GPIO high,
-  `CTP_RESET_HIGH_PERIOD` ms — but of its five call sites, four are commented out
-  and the only live one sits inside `#if SUPPORT_SPREADTRUM` in probe. So "everyone
-  but Linux resets the chip" is too strong. What is true is narrower: Chuwi's
-  Windows port ships the reset path live and claims the GPIO for it, and Linux has
-  no such code at all.
-
-— **verified** against
+That common ancestor also disposes of the other obvious candidate. Reading
+ChipOne's `icn85xx.c` in the rk3188 tree, **there is no interrupt-acknowledge write
+anywhere**: the vendor's touch path is
+`icn85xx_i2c_rxdata(0x1000, buf, POINT_NUM*POINT_SIZE+2)` and nothing after it —
+the same register the kernel driver reads, with no follow-up write to clear a
+status bit. So the Linux driver is not missing an ack step either. — **verified**
+against
 [`bbelos/rk3188-kernel`](https://github.com/bbelos/rk3188-kernel/blob/master/drivers/input/touchscreen/ICN8503/icn85xx.c).
+
+With the ack and the reset both eliminated and the build demonstrated, the
+remaining question is not why Linux storms but **why this build of the firmware
+does**, on hardware whose vendor shipped it. That is a question about the blob, and
+nothing in the driver will answer it.
 
 ### Wi-Fi / Bluetooth — AmPak AP6212 (Broadcom BCM43430)
 

@@ -478,6 +478,30 @@ because a claim repeated by one community is not the same as a verified one.
   driver's own comments cite. — **verified** by `strings` on the driver, against
   `grep` on `chipone_icn8505.c`.
 
+- **`TCS5._PS0` in the DSDT, which is where the reset actually lives.** Pull the
+  table off the running machine rather than out of the BIOS image — it needs no
+  unpacking:
+
+  ```sh
+  sudo cat /sys/firmware/acpi/tables/DSDT > dsdt.aml && iasl -d dsdt.aml
+  ```
+
+  `_PS0` writes `\_SB.GPO1.TCTL`, waits 5 ms, clears it and waits 120 ms; `TCTL` is
+  a one-bit field of a `GeneralPurposeIo` operation region whose `Connection` names
+  pin `0x19`. Both writes are gated on `GPO1.AVBL`, which `_REG` sets when the OS
+  installs the region handler — so on a system where that ordering went wrong the
+  method would degenerate into two sleeps. On this unit it does not: pin 25 carries
+  the `ACPI:OpRegion` label that `acpi_gpio_adr_space_handler()` applies only on a
+  real access, and `TCTL` has no other writer in the table. — **verified on the
+  unit**
+
+- **The blob is the cause, established by substitution.** Under Chuwi's own
+  34900-byte `HAMP0002` the line is held asserted; under the 34884-byte build it is
+  not, with the driver bound and touch working in both. A firmware swap needs only
+  unbind and rebind, because `_PS0` resets the controller on the way back in and
+  `icn8505_upload_fw()` then finds register `0x000a` no longer answering `0x85`.
+  — **verified on the unit**
+
 ## The device itself
 
 - Notebookcheck review of the Chuwi Vi8 Plus (CWI519) — ports, the single USB-C
