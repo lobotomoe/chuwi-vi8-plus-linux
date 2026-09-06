@@ -30,3 +30,6 @@ artifacts/icn8505-*.fw
 .DS_Store
 *.swp
 __pycache__/
+
+# Local credentials for this unit's Home Assistant panel. Never committed.
+.env
