@@ -28,6 +28,13 @@ it, was **not** the cause: the last sample before the final desktop freeze reads
 `chg=1 ilim=2000mA bat=99% bst=Charging` — the full 2 A budget, battery full.
 Every number here is derived below, with what it rests on.
 
+**Two further faults have since turned up in the journal** and are not covered by
+either fix: [the P-Unit refusing the PMIC bus](#the-p-unit-stopped-answering-and-took-the-pmic-and-the-gpu-with-it)
+and [a GPU hang in the browser's renderer](#the-gpu-hung-once-in-the-browsers-renderer).
+Both recovered on their own, so neither shows up as a hang you would notice
+afterwards — you have to go looking in `journalctl -k`. There is no fix for
+either here.
+
 ## Erratum CHT45: the processor may not wake from C6 or deeper
 
 This SoC has a documented, unfixed silicon bug whose symptom is exactly what this
@@ -498,6 +505,156 @@ LED is driven by the kernel's HID layer, so if it still toggles the kernel is
 alive and only userspace is wedged; if it is dead, so is the kernel, and no
 amount of userspace tuning will help.
 
+## Two more faults the journal caught, both survived
+
+Neither is explained by the two fixes above and neither has a fix here. Both are
+recorded because they are freeze-shaped, both left an entry you can look for on
+your own unit, and on the reference unit both recovered without help — which is
+exactly why they are easy to miss. Frequencies below are over one 43-hour boot.
+
+### The P-Unit stopped answering, and took the PMIC and the GPU with it
+
+Twice, one second apart, and not again since:
+
+```
+iosf_mbi_pci 0000:00:00.0: Error P-Unit semaphore timed out, resetting
+iosf_mbi_pci 0000:00:00.0: P-Unit semaphore: 0
+WARNING: arch/x86/platform/intel/iosf_mbi.c:373 at iosf_mbi_block_punit_i2c_access.cold+0xf8/0xff, CPU#0: irq/158-axp288_/803
+i2c_designware 808622C1:05: couldn't acquire bus ownership
+axp20x-i2c i2c-INT33F4:00: Failed to ack 0x49: -110
+i915 0000:00:02.0: [drm] *ERROR* media: timed out waiting for forcewake ack request.
+```
+— **verified on the unit**
+
+The stack names the path exactly, from the PMIC's own interrupt thread down to
+the lock it could not take:
+
+```
+regmap_irq_thread        <- irq/158-axp288_, acking the PMIC's interrupt register
+ regmap_write
+  i2c_transfer
+   i2c_dw_xfer
+    i2c_dw_acquire_lock
+     iosf_mbi_block_punit_i2c_access
+```
+
+The I2C controller that the AXP288 PMIC hangs off is shared with the P-Unit — the
+SoC's own power-management microcontroller — so a driver must take the P-Unit's
+semaphore before touching that bus. Here the P-Unit did not hand it over inside
+the timeout. The kernel gave up, reset the semaphore, and the read-back
+(`P-Unit semaphore: 0`) shows the reset worked, which is why the machine lived.
+
+**The last line is the same fault, not a second one.** i915 holds that same
+PUNIT→PMIC bus around forcewake — `intel_uncore_forcewake_reset()` opens with
+`iosf_mbi_assert_punit_acquired()` — and it registers a notifier so that it is
+told before the bus goes busy. The comment on that notifier names this exact
+error as the thing it exists to prevent:
+
+```c
+case MBI_PMIC_BUS_ACCESS_BEGIN:
+	/*
+	 * forcewake all now to make sure that we don't need to do a
+	 * forcewake later which on systems where this notifier gets
+	 * called requires the punit to access to the shared pmic i2c
+	 * bus, which will be busy after this notification, leading to:
+	 * "render: timed out waiting for forcewake ack request."
+	 * errors.
+	 */
+```
+
+This unit printed the same sentence with `media:` in place of `render:` — a
+different forcewake domain, the same mechanism. So one unresponsive P-Unit
+surfaces twice in the same second: the PMIC interrupt goes unacked (`-110` is
+`ETIMEDOUT`) and a forcewake handshake times out. The precise interleaving is not
+recoverable from the log — the notifier runs *before* the acquire, so the
+forcewake that failed was most likely an unrelated register access landing in the
+same window rather than the notifier's own. — **inferred**
+
+Why it repeated one second later is not established either. An interrupt the
+PMIC driver could not ack would explain it, and the second occurrence failed one
+step earlier (`Failed to read IRQ status: -110` rather than `Failed to ack`),
+which is consistent with the handler being re-entered on a line that never went
+away. — **inferred**
+
+**The WARNING is not a second bug.** Line 373 is the tail of the same function,
+and it fires *because* the acquire failed:
+
+```c
+ret = -ETIMEDOUT;
+dev_err(&mbi_pdev->dev, "Error P-Unit semaphore timed out, resetting\n");
+error:
+	iosf_mbi_reset_semaphore();
+	if (!iosf_mbi_get_sem(&sem))
+		dev_err(&mbi_pdev->dev, "P-Unit semaphore: %d\n", sem);
+success:
+	if (!WARN_ON(ret))          /* <- iosf_mbi.c:373 */
+		iosf_mbi_pmic_i2c_access_count++;
+```
+
+**There is no kernel parameter for this, and that is the useful part.** The
+known hazard — entering C6 or C7 while holding the semaphore requires the P-Unit
+to talk to the PMIC and can hang the SoC — is already handled, unconditionally,
+by the line that runs just before the acquire:
+
+```c
+cpu_latency_qos_update_request(&iosf_mbi_pm_qos, 0);
+```
+
+No CPU-model gate, no module option, nothing to turn on. Do not go looking for
+one.
+
+**What *is* gated away from this SoC** is a second, stronger workaround in i915.
+`__vlv_punit_get()` calls `iosf_mbi_punit_acquire()` for everyone, then does this:
+
+```c
+if (IS_VALLEYVIEW(i915)) {
+	cpu_latency_qos_update_request(&i915->sb_qos, 0);
+	on_each_cpu(ping, NULL, 1);
+}
+```
+
+Cherryview is excluded. The comment there describes a machine hang when the CPU
+package changes power state at the same moment the P-Unit does, and calls it
+likely board-specific — so the exclusion is a judgement, not an oversight, and
+nothing here shows Cherry Trail needs it. Recorded because this is now the
+**third** case on this SoC of a known hazard whose kernel workaround stops short
+of our part; the others are
+[sdhci-acpi and deep C-states](#the-other-mechanism-that-fits-and-is-not-needed-to-explain-this),
+gated to Bay Trail's model 0x37 where this is 0x4C.
+
+To look for it on your unit:
+
+```sh
+journalctl -k --no-pager | grep -E "P-Unit semaphore|bus ownership|forcewake"
+```
+
+### The GPU hung once, in the browser's renderer
+
+```
+i915 0000:00:02.0: [drm] GPU HANG: ecode 8:1:86dffffd, in Renderer [2577]
+i915 0000:00:02.0: [drm] GPU error state saved to /sys/class/drm/card1/error
+i915 0000:00:02.0: [drm] Resetting rcs0 for stopped heartbeat on rcs0
+i915 0000:00:02.0: [drm] Renderer[2577] context reset due to GPU hang
+```
+— **verified on the unit**
+
+The render engine stopped answering its heartbeat, i915 reset that engine alone,
+and the browser's context was reset under it. Once in 43 hours, no reboot needed.
+On a machine whose whole job is compositing a page continuously this is the fault
+most likely to be seen as a freeze and never explained, because it repairs itself
+before anyone reaches for a log.
+
+The two parameters the internet will offer you for this — `i915.enable_psr=0` and
+`i915.enable_dc=0` — are both inert here; see
+[below](#four-things-not-to-bother-with-and-why).
+
+**A connection worth testing, not yet established.** i915 reaches the P-Unit over
+the same sideband to change GPU frequency, so a continuously busy GPU means
+continuous P-Unit traffic competing with the PMIC's I2C. That would tie both
+faults on this page to one cause and make GPU load the lever. It is one sample of
+each, hours apart, and nothing here proves it. The test is to cap the browser's
+frame rate and see whether either entry stops appearing.
+
 ## Things to try, in order
 
 The two fixes this page established come first, because a reader who scrolled
@@ -579,7 +736,7 @@ sudo systemctl restart NetworkManager
 ```
 
 
-### Two things not to bother with, and why
+### Four things not to bother with, and why
 
 **The firmware's `C-States` item does nothing under Linux.**
 `/sys/devices/system/cpu/cpuidle/current_driver` reads `intel_idle` on this unit,
@@ -599,6 +756,24 @@ masks `MWAIT` outright, which would show up as `current_driver` reading
 See [why not `max_cstate=1`](#erratum-cht45-the-processor-may-not-wake-from-c6-or-deeper)
 above. It also needs a reboot to apply and another to undo, where the `disable`
 attributes in item 1 need neither.
+
+**`i915.enable_psr=0` switches off code this kernel does not contain.** Panel
+Self Refresh was deleted for Valleyview and Cherryview in
+[ce3508fd2a77, "drm/i915/psr: Nuke PSR support for VLV and CHV"](https://patchwork.kernel.org/project/intel-gfx/patch/20190403233539.31828-2-jose.souza@intel.com/),
+after exactly the sort of vblank timeouts that make people reach for the
+parameter. It is the standard advice for i915 freezes and it is aimed at
+hardware generations this is not.
+
+**`i915.enable_dc=0` has no DC states to disable on this GPU.** Display C-states
+are driven by DMC firmware, which starts at gen9; this is gen8 Cherryview
+(`Found cherryview (device ID 22b0) integrated display version 8.00`). The log
+settles it from this machine's own data — across every boot in the journal, the
+number of lines mentioning DMC is zero, where a gen9+ machine prints one at every
+i915 init:
+
+```sh
+journalctl -k --no-pager | grep -ci dmc     # 0 on this unit
+```
 
 ### The other mechanism that fits, and is not needed to explain this
 

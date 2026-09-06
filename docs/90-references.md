@@ -21,6 +21,7 @@ that corroborate rather than establish. If you are chasing one claim:
 | a driver, a quirk, a kernel symbol | [hardware in the kernel](#chuwi-vi8-plus-hardware-in-the-kernel), [de Goede's notes](#hans-de-goedes-notes-on-this-exact-tablet) |
 | the setup menu's contents | [The firmware setup menu](#the-firmware-setup-menu) |
 | CHT45, idle states | [The freezes](#the-freezes-intels-own-erratum) |
+| P-Unit timeouts, forcewake, `i915.enable_psr` / `enable_dc` | [The P-Unit, the PMIC bus, and the GPU](#the-p-unit-the-pmic-bus-and-the-gpu) |
 | a BIOS image, a hash, the touchscreen blob | [BIOS / UEFI firmware](#bios--uefi-firmware) |
 | what other owners report | [4PDA](#the-4pda-owners-thread), [recovery](#recovery-and-corroboration-from-outside-4pda), [another owner's fixes](#another-owners-fixes-for-this-exact-tablet) |
 
@@ -440,6 +441,65 @@ because a claim repeated by one community is not the same as a verified one.
   byte-identical from `v5.15` through mainline except for `&intel_idle` losing
   its `&`. — **verified** by fetching the file at `v5.15`, `v6.6`, `v6.12` and
   mainline and diffing the block.
+
+## The P-Unit, the PMIC bus, and the GPU
+
+The claims in
+[51-freezes.md](51-freezes.md#the-p-unit-stopped-answering-and-took-the-pmic-and-the-gpu-with-it)
+rest on kernel source rather than on reports, because the reports for this
+symptom are a decade of forum threads recommending parameters that do nothing
+here.
+
+- `arch/x86/platform/intel/iosf_mbi.c`, `iosf_mbi_block_punit_i2c_access()`. The
+  whole section is read off this one function: the acquire loop and its
+  `-ETIMEDOUT`, the `dev_err` strings that appear verbatim in the unit's log, the
+  `iosf_mbi_reset_semaphore()` that saved the machine, and the closing
+  `if (!WARN_ON(ret))` that is the `iosf_mbi.c:373` in the WARNING. It also
+  carries `cpu_latency_qos_update_request(&iosf_mbi_pm_qos, 0)` immediately
+  before the acquire, which is the evidence that the C6/C7-while-holding-the-
+  semaphore hazard needs no configuration — there is no CPU-model gate on it.
+  — **verified**
+  <https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/x86/platform/intel/iosf_mbi.c>
+
+- `drivers/gpu/drm/i915/intel_uncore.c`, `i915_pmic_bus_access_notifier()`. The
+  comment quoted in full on that page names the error string this unit printed.
+  The same file shows `iosf_mbi_assert_punit_acquired()` at the top of
+  `intel_uncore_forcewake_reset()` and `iosf_mbi_punit_acquire()` wrapped around
+  its callers, which is what ties the GPU to the PMIC's bus. — **verified**
+
+- `drivers/gpu/drm/i915/vlv_sideband.c`, `__vlv_punit_get()`. Source of the claim
+  that the stronger workaround is gated away from this SoC:
+  `iosf_mbi_punit_acquire()` runs for everyone, then the pm_qos request and
+  `on_each_cpu(ping, NULL, 1)` run only `if (IS_VALLEYVIEW(i915))`. Read at
+  `v6.6`, where the function is still self-contained; on mainline it has been
+  moved behind `intel_parent_vlv_iosf_*` indirection and the platform gate lives
+  a layer down. — **verified**
+
+- Hans de Goede, *"x86: baytrail/cherrytrail: Rework and move P-Unit PMIC bus
+  semaphore code"*. The history: the semaphore handling started private to the
+  I2C controller driver and was moved into generic `iosf_mbi` so that i915 and
+  the ACPI PMIC opregion could take part. Attribution for the design, not the
+  source of any claim above.
+  <https://patchwork.ozlabs.org/project/linux-i2c/patch/20181011142911.13750-2-hdegoede@redhat.com/>
+
+- The two i915 parameters ruled out on that page:
+
+  - **PSR.** *"drm/i915/psr: Nuke PSR support for VLV and CHV"*, commit
+    `ce3508fd2a77`. The registers went with it in the follow-up patch below.
+    Nothing on a Cherryview kernel reads `i915.enable_psr`. — **verified**
+    <https://patchwork.kernel.org/project/intel-gfx/patch/20190403233539.31828-2-jose.souza@intel.com/>
+
+  - **DC states.** Ruled out on the unit rather than from source: display C-states
+    are driven by DMC firmware, and `journalctl -k | grep -ci dmc` returns `0`
+    across every boot in the journal, on a machine i915 identifies as
+    `cherryview (device ID 22b0) integrated display version 8.00`.
+    — **verified on the unit**
+
+- The GPU hang entry (`ecode 8:1:86dffffd`, `Resetting rcs0 for stopped
+  heartbeat`) is this unit's own log and is not corroborated by anything else.
+  Searching the string returns reports from Skylake and later, where the usual
+  answers are GuC/HuC firmware — hardware this SoC does not have.
+  — **verified on the unit**
 
 ## The touchscreen's interrupt storm
 
