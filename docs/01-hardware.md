@@ -528,18 +528,61 @@ Two consequences worth knowing:
   threshold: `808622C1:04`, the controller this touchscreen sits on, runs at
   **~32 000 interrupts per second**. — **verified on the unit**
 
-**What it costs.** The `irq/…-CHPN0001:00` thread measures **3.13% of one core**
-over 60 s. The 32 000/s of hard interrupts on top of that were not separately
-measured. The clearer cost is what it does to idle: over 30 s, CPU0 took
-**707 590 wakeups with a mean idle period of 19 µs**, against `C6N`'s target
-residency of 275 µs. The governor therefore almost never reaches `C6N` —
-`C1` took 44.9% of the wall clock and `C6N` only 3.2%. — **verified on the unit**
+**What it costs, measured by taking it away.** Unbinding `chipone_icn8505` for one
+120 s window between two windows with it bound brackets the storm, so drift in
+whatever else the machine is doing shows up as a difference between the two
+brackets rather than as a result. `scripts/measure-touchscreen-irq.sh` runs it and
+rebinds the driver on every exit path, including `Ctrl-C`; the touchscreen is dead
+for the middle window only.
 
-That last number connects to [51-freezes.md](51-freezes.md): this tablet's idle
-temperature is a C-state story, and the core servicing the touchscreen is pinned
-out of the deepest state it is allowed to use. **The thermal cost of that has not
-been measured** — doing it properly means unbinding `chipone_icn8505`, which
-takes the touchscreen with it, and comparing `PNIT` over a long idle window.
+| | 1 bound | 2 unbound | 3 bound again |
+|---|---|---|---|
+| touchscreen IRQ | 411/s | **0** | 466/s |
+| I2C controller IRQ | 27 858/s | **0** | 32 406/s |
+| `irq/…-CHPN0001:00` thread | 4.5% of a core | 0% | 3.5% of a core |
+| CPU0 idle wakeups | 14 074/s | **41/s** | 23 820/s |
+| `C6N` residency | 2.4% of wall | **62.3%** | 3.5% of wall |
+| mean `C6N` stay | 44 µs | **1106 µs** | 59 µs |
+| `PNIT` | 65.4 °C | **61.6 °C** | 66.2 °C |
+| Xorg | 13.7% of a core | 14.2% | 13.8% |
+| the browser running on the unit | 83.2% of a core | 87.8% | 73.0% |
+
+— **verified on the unit**
+
+**The CPU time is not the cost.** 4.5% of one core disappears into the noise: total
+busy across all cores went 35.6% → 32.4% → 29.9%, putting the unbound window
+*between* its brackets rather than below both. Anyone measuring this storm with
+`top` alone would conclude it is harmless.
+
+**The idle cost is what matters.** CPU0's wakeups fall from 14 074/s to 41/s — a
+factor of 345 — and `C6N` goes from 2.4% of the wall clock to 62.3%. The quality
+changes as well as the share: with the storm running, the governor's `C6N` entries
+average 44 µs against a 275 µs target residency, so nearly every entry is a net
+loss; without it they average 1106 µs, four times the target.
+
+**The thermal cost is about 4 °C.** `PNIT` averaged 65.4 °C and 66.2 °C in the
+bracketing windows against 61.6 °C unbound. Treat that as a floor rather than a
+figure: 120 s does not settle a fanless chassis, and the run trended warmer
+throughout. This is the link to [51-freezes.md](51-freezes.md) — the tablet's idle
+temperature is a C-state story, and the core servicing the touchscreen is held out
+of the deepest state it is allowed to use.
+
+**The storm never reaches userspace.** Xorg held at 13.7 / 14.2 / 13.8% and the
+browser at 83.2 / 87.8 / 73.0%, neither of them tracking the storm. That matches
+the driver: `icn8505_irq()` does call `input_sync()` on every interrupt, but with
+no finger down `input_mt_sync_frame()` emits no values — `BTN_TOUCH` is unchanged,
+the ABS axes are unchanged, and input core drops both — so the frame arrives at
+`input_handle_event()`'s flush carrying a lone `SYN_REPORT` and `if (dev->num_vals
+>= 2)` discards it. A userspace process burning CPU on this tablet is therefore
+not burning it on the touchscreen; look elsewhere.
+
+**Rebinding does not clear it, but that says less than it looks.** The storm
+returned at full rate the moment the driver rebound. Rebinding neither resets the
+controller nor re-uploads the firmware — `icn8505_upload_fw()` reads register
+`0x000a`, sees `0x85` for "already running", and skips the upload. What the middle
+window does establish is that the controller holds the line asserted through 140 s
+of being ignored entirely, with no driver attached and the IRQ freed. Neither
+reading the touch register nor detaching from it deasserts the line.
 
 **It is not the firmware.** The blob loaded on the unit while this was measured is
 Chuwi's own `HAMP0002` out of `chpntsc.inf`, `e895933d…ba092b`, byte-identical to
