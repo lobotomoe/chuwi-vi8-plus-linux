@@ -389,6 +389,17 @@ only under `i915`, and a GPU with nothing to do stays on its bottom step — whi
 800x1280 falling back to `llvmpipe` would cost multiples of that across four
 Airmont cores.
 
+**Read `gt_act_freq_mhz`, not `gt_cur_freq_mhz`, if the question is what the GPU
+actually did.** `cur` is what the driver asked for and `act` is what the hardware
+delivered, and at idle they disagree in a way that will mislead you: forcing
+`gt_min_freq_mhz=500` on an idle machine makes `cur` read 500 while `act` stays at
+200, because a GPU parked in RC6 has no clock to report. Under a load heavy enough
+to matter the two separate honestly — `glmark2 -b terrain` at 1600x1200 held
+`act=400`, `cur=500` and RC6 at 1-2 % for thirty seconds, at 20 FPS. So 400 MHz
+(`gt_RP1_freq_mhz`) is the sustained ceiling in practice and 500 (`RP0`) is a burst
+point the hardware declines to hold; a steady 200 MHz reading means an idle GPU,
+never a stuck one. — **verified on the unit**
+
 So the reading that "the graphics are broken, and the CPU overheats doing their
 work" fails on both halves.
 
