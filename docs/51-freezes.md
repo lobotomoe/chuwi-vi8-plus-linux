@@ -33,7 +33,9 @@ either fix: [the P-Unit refusing the PMIC bus](#the-p-unit-stopped-answering-and
 and [a GPU hang in the browser's renderer](#the-gpu-hung-once-in-the-browsers-renderer).
 Both recovered on their own, so neither shows up as a hang you would notice
 afterwards — you have to go looking in `journalctl -k`. There is no fix for
-either here.
+either here. The loudest thing in that log is a **third** entry that is not a
+fault at all: [141 `critical temp reached` lines](#critical-temp-reached-in-the-log-is-a-bad-sensor-read-not-heat)
+from a thermistor that occasionally reads 100 °C while the machine sits at 49.
 
 ## Erratum CHT45: the processor may not wake from C6 or deeper
 
@@ -654,6 +656,212 @@ continuous P-Unit traffic competing with the PMIC's I2C. That would tie both
 faults on this page to one cause and make GPU load the lever. It is one sample of
 each, hours apart, and nothing here proves it. The test is to cap the browser's
 frame rate and see whether either entry stops appearing.
+
+## `critical temp reached` in the log is a bad sensor read, not heat
+
+Grep the journal on this machine and `thermald` dominates it — 141 lines in one
+43-hour boot, roughly one every 18 minutes:
+
+```
+thermald[885]: critical temp reached
+```
+— **verified on the unit**
+
+It is worth knowing what that line means before dismissing it, because thermald
+does not only log:
+
+```c
+if (type == CRITICAL) {
+	if (!ignore_critical && read_temp >= temp) {
+		thd_log_warn("critical temp reached\n");
+		if (crit_trip_count < consecutive_critical_events) {
+			++crit_trip_count;
+			return true;
+		}
+		crit_trip_count = 0;
+		sync();
+		thd_log_warn("power off initiated\n");
+		reboot(RB_POWER_OFF);
+```
+
+`consecutive_critical_events` is 4, so the fifth **consecutive** critical read
+powers the machine off. The `crit_trip_count = 0` on the branch below (when the
+reading is under the trip) is what has kept this unit alive: every glitch so far
+has been a single reading with a normal one after it.
+
+**It is not heat.** thermald has exactly two CRITICAL trips here — `STR0` at
+85.05 °C and `acpitz` at 100 °C — and it reads both from the same sysfs files
+anyone else can read, which it will tell you over D-Bus:
+
+```
+STR0    -> /sys/class/thermal/thermal_zone2/
+acpitz  -> /sys/class/thermal/thermal_zone0/
+```
+
+Sampling both zones once a second for 1500 seconds, while the machine did its
+normal work, produced four distinct values each — and **both zones glitched to
+exactly the same number**:
+
+| `STR0` reading | samples | | `acpitz` reading | samples |
+|---|---|---|---|---|
+| 47.6 °C | 27 | | 47.6 °C | 25 |
+| 48.8 °C | 1032 | | 48.7 °C | 1025 |
+| 49.9 °C | 439 | | 49.8 °C | 449 |
+| **100.0 °C** | **2** | | **100.0 °C** | **1** |
+
+Three events in the whole run, each bracketed by its neighbours one second either
+side, and no two zones ever landing on the same sample:
+
+```
+19:06:09   49.9        STR0
+19:06:11  100.0
+19:06:12   49.9
+
+19:15:02   49.8        acpitz
+19:15:03  100.0
+19:15:05   49.8
+
+19:22:22   48.8        STR0 again
+19:22:23  100.0
+19:22:24   48.8
+```
+— **verified on the unit**
+
+49.9 °C to 100 °C and back inside two seconds is not something a passively cooled
+slab can do, and two sensors cannot independently choose the same impossible
+value.
+
+The rate is the same order as what thermald reports. Three bad reads in 1500 s of
+1 Hz sampling is one per ~8 minutes across both zones; thermald's 141 lines over
+43 hours is one per ~18 minutes. thermald polls more slowly than once a second,
+so it should catch fewer of them, which is the direction the difference goes.
+Those 141 lines also accumulated while nothing was sampling these files, so the
+bad reads are not being provoked by the measurement.
+
+For `acpitz` the coincidence is sharper still: its CRITICAL trip is *exactly*
+100 °C, so a glitched read does not overshoot the trip, it lands on it.
+
+**Why exactly 100.0.** The firmware ships the thermistor's own conversion table,
+and 100.0 °C is the last entry in it:
+
+```asl
+Name (LPAT, Package (0x2A)      // 21 (temperature, raw ADC) pairs
+{
+    0x0AAC, 0x0ADC,             // 2732 dK = 0.0 C
+    ...
+    0x0E62, 0x6E,
+    0x0E94, 0x61                // 3732 dK = 100.0 C  <- the ceiling
+})
+```
+
+The zone can express 0 °C to 100 °C and nothing else, so an out-of-range ADC
+sample surfaces as the top of the table rather than as an obviously absurd
+number. Two zones independently producing that exact value, and no other
+impossible value between them, is what a saturating table looks like and is not
+what two unrelated faults would look like. — the table is **verified**; that an
+out-of-range sample is what lands there is **inferred**, but corroborated by the
+second zone.
+
+**Why these sensors in particular can fail.** Neither is a die sensor, and they
+are not two separate devices — they are two thermistor channels on one PMIC,
+reached over one I2C controller. `STR0`'s ACPI description calls it a *"Skin
+hotspot proxy thermistor"*, and it reads `TMP0` through the PMIC over I2C — the
+same bus the P-Unit semaphore guards:
+
+```asl
+Method (_TMP, 0, Serialized)
+{
+    If ((PMID == Zero))
+    {
+        If ((\_SB.PCI0.I2C7.PMIC.AVBG == One))
+        {
+            \_SB.PCI0.I2C7.PMIC.GMP0 = Zero
+            If ((\_SB.PCI0.I2C7.PMIC.AVBD == One))
+            {
+                Return (\_SB.PCI0.I2C7.PMIC.TMP0)
+            }
+        }
+    }
+    ...
+    Return (Zero)               // every guard failed
+}
+```
+
+That the guarded path really does fail on this machine is visible without any
+instrumentation: `Return (Zero)` is zero deci-Kelvin, and two of this zone's trip
+points read back as **-274.0 °C** in sysfs, which is that fallback converted.
+
+```sh
+grep . /sys/class/thermal/thermal_zone2/trip_point_*_temp
+```
+
+`acpitz` is `ThermalZone (TZ00)` in the DSDT, and it is the same device one
+channel over — it declares a dependency on the same controller, reads `TMP2`
+instead of `TMP0`, and is gated by the same two flags:
+
+```asl
+ThermalZone (TZ00)
+{
+    Name (_DEP, Package (0x01) { \_SB.PCI0.I2C7 })
+    Method (_TMP, 0, Serialized)
+    {
+        If ((PMID == Zero))
+        {
+            If ((\_SB.PCI0.I2C7.PMIC.AVBG == One))
+            {
+                \_SB.PCI0.I2C7.PMIC.GMP2 = Zero
+                If ((\_SB.PCI0.I2C7.PMIC.AVBD == One))
+                {
+                    Return (\_SB.PCI0.I2C7.PMIC.TMP2)
+                }
+            }
+        }
+        ...
+        Return (0x0AAC)         // 2732 dK = 0.0 C, the table's floor
+    }
+
+    Method (_CRT, 0, Serialized)
+    {
+        Return ((0x0AAC + (CRTT * 0x0A)))
+    }
+}
+```
+— **verified from this unit's firmware**
+
+`_CRT` decodes the same way: `0x0AAC + CRTT * 0x0A` with `CRTT` = 100 is
+3732 dK — the 100 °C critical trip thermald reports over D-Bus, which is also
+the `LPAT` ceiling. The trip and the failure value are the same number by
+construction, which is why this zone's glitch reads as a critical event rather
+than as nonsense.
+
+So "two sensors" is the wrong mental model. There is one bus, one PMIC, and one
+conversion table behind both readings, and the two thermal zones are two views of
+it. That is the whole reason the same impossible value shows up in both.
+
+**The honest risk.** One glitch is harmless and five in a row powers the machine
+off, so the question is only whether glitches can arrive together. The evidence
+cuts both ways and it is worth keeping both halves.
+
+Against: in 1500 paired samples containing three separate events, the two zones
+never glitched on the same second, and no glitch ever lasted two samples. That is
+what genuinely independent single-sample noise looks like, and at that rate five
+consecutive criticals never happen.
+
+For: the two zones are not independent *by construction* — one bus, one PMIC, one
+table — and that bus is the one
+[the P-Unit stalled for two seconds](#the-p-unit-stopped-answering-and-took-the-pmic-and-the-gpu-with-it).
+Single-sample noise being uncorrelated says nothing about a bus stall, which is a
+different failure entirely: it would hold across many polls, and it would hit
+both zones at once rather than one at a time. A stall spanning five of thermald's
+polls is the shape of event that would line them up.
+
+No such shutdown has happened here and every previous boot in the journal ended
+through `systemd-shutdown`. This remains a mechanism rather than an observation.
+— **inferred**
+
+Nothing needs changing. Record it so that the log lines are not mistaken for a
+cooling problem, and so that a tablet found switched off with no freeze before it
+has a first suspect.
 
 ## Things to try, in order
 

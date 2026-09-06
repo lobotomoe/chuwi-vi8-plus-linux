@@ -22,6 +22,7 @@ that corroborate rather than establish. If you are chasing one claim:
 | the setup menu's contents | [The firmware setup menu](#the-firmware-setup-menu) |
 | CHT45, idle states | [The freezes](#the-freezes-intels-own-erratum) |
 | P-Unit timeouts, forcewake, `i915.enable_psr` / `enable_dc` | [The P-Unit, the PMIC bus, and the GPU](#the-p-unit-the-pmic-bus-and-the-gpu) |
+| `critical temp reached`, a sensor reading 100 °C | [thermald and the skin thermistor](#thermald-and-the-skin-thermistor) |
 | a BIOS image, a hash, the touchscreen blob | [BIOS / UEFI firmware](#bios--uefi-firmware) |
 | what other owners report | [4PDA](#the-4pda-owners-thread), [recovery](#recovery-and-corroboration-from-outside-4pda), [another owner's fixes](#another-owners-fixes-for-this-exact-tablet) |
 
@@ -500,6 +501,47 @@ here.
   Searching the string returns reports from Skylake and later, where the usual
   answers are GuC/HuC firmware — hardware this SoC does not have.
   — **verified on the unit**
+
+## thermald and the skin thermistor
+
+- `thermal_daemon/src/thd_trip_point.cpp`, `cthd_trip_point::thd_trip_point_check()`.
+  Source of the `critical temp reached` string, of the `reboot(RB_POWER_OFF)` that
+  follows it, and of the `crit_trip_count = 0` on the below-trip branch that makes
+  the count consecutive rather than cumulative. `consecutive_critical_events` is
+  declared `static constexpr int … = 4` in `thd_trip_point.h`. — **verified**
+  <https://github.com/intel/thermal_daemon/blob/master/src/thd_trip_point.cpp>
+
+- Which trips thermald actually holds, and which files it reads them from, came
+  from the running daemon over D-Bus rather than from its config — `GetZoneCount`,
+  `GetZoneTripAtIndex`, `GetSensorInformation` on
+  `org.freedesktop.thermald`. Trip types decode as
+  `0=CRITICAL 1=MAX 2=PASSIVE 3=ACTIVE 4=POLLING`, and the only two CRITICAL
+  entries are `STR0` at 85.05 °C and `acpitz` at 100 °C.
+  — **verified on the unit**
+
+- `STR0` itself is in **SSDT1**, not the DSDT — `_HID` `INT3403`, `_STR`
+  *"Skin hotspot proxy thermistor"*, with `XDEP`/`TDEP`/`CDEP`/`WDEP` naming
+  `\_SB.PCI0.I2C7` and its PMIC objects, and a `_TMP` whose only non-fallback
+  return is `\_SB.PCI0.I2C7.PMIC.TMP0`. The `LPAT` conversion table that ends at
+  `0x0E94` — 3732 deci-Kelvin, exactly 100.0 °C — is in the **DSDT**, beside the
+  `\_SB.PCI0.I2C7.PMI1` GPIO region. — **verified**
+
+  ```sh
+  sudo sh -c 'cat /sys/firmware/acpi/tables/DSDT  > dsdt.aml
+              cat /sys/firmware/acpi/tables/SSDT1 > ssdt1.aml'
+  iasl -d dsdt.aml ssdt1.aml
+  ```
+
+  Do not look for these in the DSDT alone; the int340x thermal devices on this
+  firmware live in an SSDT, and grepping only the DSDT returns nothing and looks
+  like the zone does not exist.
+
+- Prior art that the INT3403 sensors misreport and that the consequence is an
+  unexpected shutdown rather than a warning. Neither establishes anything about
+  this tablet — the measurement above does — but both show the failure mode is
+  the platform's, not this unit's.
+  <https://bugs.launchpad.net/bugs/1873083>
+  <https://lkml.rescloud.iu.edu/hypermail/linux/kernel/2012.2/03806.html>
 
 ## The touchscreen's interrupt storm
 
