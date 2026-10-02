@@ -234,6 +234,7 @@ and stays under the GPL v3+ — [`LICENSE`](LICENSE),
 | `restore-emmc.sh` | tablet | Writes that image back, checksum-verified, to get Windows back |
 | `postinstall-grub-ia32.sh` | tablet | Installs a 32-bit GRUB into the installed system's ESP |
 | `postinstall-tune.sh` | tablet | zram, TRIM, rotation daemon, journal cap — reports before it acts |
+| `panel-bench/` | tablet | Frame timing from inside the browser while a real touch swipe is injected, plus whether the GPU is doing the compositing — [what it is for](docs/53-performance.md) |
 
 Shell scripts are `bash`, pass `shellcheck` cleanly, and depend only on what the OS
 ships. Every script that can destroy data prints what it found and refuses to continue

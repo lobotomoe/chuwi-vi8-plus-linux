@@ -603,6 +603,19 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+group "panel-bench"
+
+if command -v python3 >/dev/null 2>&1; then
+  if output=$(python3 "$REPO_ROOT/tests/check-panel-bench.py" 2>&1); then
+    pass "modules compile and the EVIOCGBIT request is the documented one"
+  else
+    fail "modules compile and the EVIOCGBIT request is the documented one" "$output"
+  fi
+else
+  skip "panel-bench checks" "python3 not available"
+fi
+
+# ---------------------------------------------------------------------------
 group "make-media.sh end to end (virtual disk)"
 
 if [ "$(id -u)" -ne 0 ]; then
