@@ -108,6 +108,10 @@ Confirm which one you have before doing anything else — see
 7. When something misbehaves: [docs/50-troubleshooting.md](docs/50-troubleshooting.md).
    The freezes get [a file of their own](docs/51-freezes.md), because they are the
    one problem here that took an experiment rather than a recipe to settle.
+8. When it works but feels slow: [docs/53-performance.md](docs/53-performance.md).
+   One setting is worth more than every other change combined, and most of what
+   seems worth doing is worth nothing — measured, with the method that shows which
+   is which on a machine that is not this one.
 
 Not part of the install: [docs/60-bios-firmware.md](docs/60-bios-firmware.md) —
 the tablet's BIOS releases, what the circulating firmware archives actually
