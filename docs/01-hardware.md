@@ -970,6 +970,34 @@ missing bits that never got into it.
 So `MONO_SPEAKER` is worth setting for correctness, not for rescue. The half of the
 quirk still unverified here is `HP_LR_SWAPPED` — that needs headphones and an ear.
 
+#### The internal microphone records, and the obvious test does not show it
+
+**Verified on the unit** 2026-10-03 by acoustic loopback: a 1 kHz tone played
+through the tablet's own speaker comes back in a simultaneous capture with the
+1000 Hz bin at roughly 600 times its 700 Hz and 1300 Hz neighbours, against an
+RMS that rises from 235 to 925 for exactly the length of the tone. Nothing in the
+mixer needed changing — `Internal Mic` on, `IN2 Boost` +20 dB, `ADC Boost`
++12 dB, `ADC` +6 dB, `RECMIXL/R BST2` on, and `Stereo1 ADC L1 Mux` on `ADC`
+rather than `DMIC`.
+
+**Recording and looking at the level proves nothing here, and looks like it
+does.** A 25-second capture of a quiet room gives a steady −43 dBFS with peaks
+at 18% of full scale, which reads as a working microphone until the spectrum is
+broken out: essentially all of it sits at **50 Hz**, the level varies only 1.3x
+across the whole recording, and not one 100 ms window rises to three times the
+floor. That is mains hum on the analog input, which an input with no working
+element in front of it would show just as well. Two cheap discriminators settle
+it without any tone at all — band energy at 50/100/200 Hz against 800 Hz and
+above, and the ratio of successive-difference energy to signal energy, which
+sits near 2.0 for broadband sound and collapses toward zero for a single low
+hum.
+
+One practical note for anyone repeating this: the kiosk runs with the sink
+volume at **0.06**. A first attempt at the tone test was inaudible to the
+microphone at that setting and produced only the amplifier's broadband power-on
+click, which is easy to misread as a response. Raise the volume for the test and
+put it back.
+
 #### Forcing the quirk by hand
 
 The module takes a `quirk=` override — `module_param_named(quirk, quirk_override,
