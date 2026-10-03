@@ -788,6 +788,33 @@ The recipes for the first two are in
 Measure before and after — `top -o %CPU`, `free -m`, `cat /proc/pressure/io` —
 because on a machine this slow every theory feels confirmed.
 
+## A reboot stops at "Rebooting." and the screen never clears
+
+The shutdown runs to the end -- filesystems unmounted, `Syncing filesystems and
+block devices`, `Rebooting.` -- and then nothing. The panel sits on that last line
+indefinitely.
+
+Seen once, 2026-10-03, and only on a kernel that had already taken two oopses
+earlier in the same boot (an out-of-tree module whose remove path corrupted a
+list). A reboot issued on a clean kernel an hour later completed in 72 seconds on
+the same machine, so this is not a property of the hardware and there is no reason
+to go adding `reboot=` kernel parameters.
+
+The recovery is the power button, held for about ten seconds. **It is safe at that
+point**: the log shows `EXT4-fs (mmcblk1p2): re-mounted ... ro` and `All filesystems
+unmounted` before the hang, so nothing is waiting to be written.
+
+Do not wait for the hardware watchdog to rescue it. systemd arms `wdat_wdt` for
+this exact case -- you can see `Using hardware watchdog '/dev/watchdog0'` and
+`Watchdog running with a hardware timeout of 10min` in the shutdown log, and the
+`watchdog did not stop!` line means it is still armed -- but the machine here was
+power-cycled at five minutes, so whether it would have fired at ten was never
+established. Afterwards `/sys/class/watchdog/watchdog0/bootstatus` read `0`, which
+is how to tell a watchdog reset from a human afterwards, if the driver reports it.
+
+The practical rule: a kernel that has oopsed may not be able to reboot itself, so
+treat module experiments as something to do when somebody can reach the tablet.
+
 ## Getting back to Windows
 
 If you took a full image, boot the live stick and restore it:

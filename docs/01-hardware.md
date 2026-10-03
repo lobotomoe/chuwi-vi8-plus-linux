@@ -1189,11 +1189,29 @@ That gets most of the way and then stops short of a picture. Measured 2026-10-03
 `7.0.0-34-generic`: `atomisp-isp2` binds `00:03.0`, reports `ISP HPLL frequency
 base = 1600 MHz`, finds both sensors, logs `Connected 2 cameras`, and the front sensor
 answers on I2C with `sensor_revision id = 0x2680`. No `/dev/video*` appears, and the
-reason is that **this tablet has two identical sensors**: the second fails with
-`failed to register clk 'xvclk'` and `-EEXIST`. Video nodes are registered from the
-async notifier's `.complete` callback, which never fires while one expected subdev is
-missing, so a single unbindable sensor costs both cameras. One `ov2680` per machine
-looks like the only case this path has been exercised on.
+reason is that **this tablet has two identical sensors**, and they race: whichever
+probes first takes the fixed-rate clock named `xvclk` and the loser dies with
+`-EEXIST`. The winner is not stable -- `OVTI2680:00` won on one boot and
+`OVTI2680:01` on the next, same kernel, same configuration. Video nodes are
+registered from the async notifier's `.complete` callback, which never fires while
+one expected subdev is missing, so whichever sensor loses costs both cameras. One
+`ov2680` per machine looks like the only case this path has been exercised on.
+
+The two are not interchangeable, and ACPI says which one it means. `OVTI2680:01`
+sits on `i2c-2` with a real DSM entry (`Using DSM entry CsiPort=0`), a regulator
+supplier and a wakeup source. `OVTI2680:00` sits on `i2c-0`, gets `Using default
+CsiPort=1` because the DSM has nothing to say about it, and stays in
+`waiting_for_supplier` indefinitely. Prefer `:01` if only one can work.
+
+**Limiting the bridge to one CSI port does not stop the other sensor probing.**
+A module parameter on `atomisp_csi2_bridge_parse_firmware` that skips a port works
+as far as the notifier is concerned -- the log shows `skipping CSI port 1
+(only_port=0)` -- but `ov2680` binds by ACPI match and `ipu_bridge` builds fwnode
+endpoints for every sensor it finds, so both still probe and still race. Winning
+the race deterministically needs one of them gone: `delete_device` on the adapter
+works, but the client's I2C address is not recorded anywhere readable in sysfs and
+is not the `0x36` an ov2680 usually answers on, so it has to be found by trying
+(a write for an address with no device returns `ENOENT` and changes nothing).
 
 The clock failure has a precise address, for anyone who would rather fix it than work
 around it. `ov2680.c` asks for its clock with
@@ -1222,8 +1240,27 @@ at refcount `-1`, where it can be neither loaded nor unloaded. Only a reboot cle
 that. It also never needs unloading: it stays at refcount 0 whether or not atomisp is
 bound to the ISP.
 
-So: unusable as shipped, and not proven usable here either. What is settled is *why*,
-which is more than "no driver".
+**Past the sensors there is a second wall, and it is memory.** With one port skipped,
+the driver gets as far as loading the CSS firmware and fails there:
+
+```
+alloc_pages_bulk() failed
+hmm_bo_alloc_pages failed.
+css load fw failed.
+Failed to init css.
+probe with driver atomisp-isp2 failed with error -22
+```
+
+That was with `MemFree` at 151 MB and 836 MB sitting in page cache, on 1.9 GB total
+with a kiosk browser running. The firmware wants a bulk allocation the machine
+cannot produce under that pressure, so anything serious here has to stop the
+browser and drop caches first -- and on a unit with a watchdog that relaunches the
+browser, stop the watchdog too, or the memory comes straight back.
+
+So: unusable as shipped, and not proven usable here either. What is settled is *why*
+at each of three separate walls -- the unbuilt driver, the clock-name collision
+between two identical sensors, and the firmware allocation -- which is a good deal
+more than "no driver".
 
 ### Power — X-Powers AXP288 PMIC
 
