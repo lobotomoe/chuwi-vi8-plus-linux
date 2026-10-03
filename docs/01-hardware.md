@@ -1262,6 +1262,42 @@ batch (`--stream-skip=40`) rather than reading the first one. Most of the ISP's
 controls return `error 22 getting ctrl` on this build; `image_color_effect` is one of
 the few that answers.
 
+**What it costs.** Measured 2026-10-03 with the kiosk dashboard running, which
+idles at 3% of the four cores; temperatures stayed between 38 and 40 C
+throughout, well under this SoC's 77 C cliff.
+
+| Size | fps | Per frame | Stream | CPU, 4 cores |
+|---|---|---|---|---|
+| 640x480 | 28 | 452 kB | 12.4 MB/s | 2% |
+| 800x600 | 28 | 732 kB | 20.1 MB/s | 2% |
+| 1600x1200 | 27 | 2816 kB | 76.6 MB/s | 6% |
+
+**The frame rate is not a knob.** `VIDIOC_S_PARM` returns `EINVAL` and
+`--get-parm` reports `Frames per second: invalid (0/0)`; the sensor runs at ~28
+fps at every size it offers. Resolution is the only setting that changes the
+load, and the way to get a lower rate is to keep the stream open and drop
+frames — stopping and restarting it costs about 40 frames of exposure settling
+each time.
+
+Two measurement traps, both of which produced wrong numbers here first:
+
+- `--stream-to=/dev/null` measures the driver and the DMA, not the work.
+  A `write()` to `/dev/null` never reads the buffer, so the CPU never touches a
+  pixel and 1600x1200 looks as cheap as 640x480. The table above pipes the
+  frames into `wc -c` instead, which does.
+- `--set-fmt-video` belongs to the open file description, not to the device.
+  Setting it in one `v4l2-ctl` invocation and streaming in the next silently
+  gives full-resolution frames while `--get-fmt-video` cheerfully reports the
+  size you asked for. Put both in the same invocation.
+
+Encoding is what actually costs, and it has to be done in software — there is no
+JPEG encoder in this ISP's path. PIL at 640x480 and 5 fps takes **about 20% of
+one core** (8% of four, with the kiosk running). Scaling that to the sensor's
+full 28 fps lands past a whole core, so a few frames per second is the sensible
+ceiling for anything that re-encodes here. Over a remote link the raw stream is
+not an option either — 12.4 MB/s at 640x480, against roughly 130 kB/s for the
+same frames as JPEG at quality 70 and 5 fps.
+
 **Three things to know before trying any of this, all learned the hard way.**
 
 `atomisp` loads once per boot. A second `insmod` in the same session fails at probe
