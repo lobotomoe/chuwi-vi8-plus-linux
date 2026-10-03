@@ -1315,11 +1315,31 @@ that. The way around it is not to unload it: blacklist the stock module so the l
 one can be inserted into a clean boot. See
 [40-post-install.md](40-post-install.md#cameras).
 
-**None of this survives a reboot, by choice.** The modules are inserted by hand, so a
-tablet that is doing a job keeps its memory and its stability until someone asks for a
-camera. Making it permanent means installing both modules into
-`/lib/modules/.../updates/`, dropping the blacklist (it matches on module name, so it
-would block the local build too), and accepting that atomisp holds the ISP from boot.
+**It survives a reboot and a kernel upgrade, through DKMS.** —
+**verified on the unit**: after `scripts/camera/install-persistent.sh` and a reboot,
+`atomisp`, `atomisp_gmin_platform` and `ov2680` load by themselves, both sensors bind,
+`/dev/video0` is present, and a frame can be taken without touching a module. Three
+things make that work, and each of them is a decision rather than a detail:
+
+- **DKMS, not a copy into `/lib/modules`.** A module is built for one exact kernel, so
+  the next update changes `vermagic` and the camera disappears silently. DKMS rebuilds
+  on every kernel install, which converts that into a visible build failure, and it is
+  why `linux-headers-generic` has to be present as the meta package. It is not a
+  guarantee: atomisp is staging, its internal APIs move, and some kernel will need the
+  sources refreshed rather than rebuilt.
+- **`intel_atomisp2_pm` is blacklisted so atomisp can have the device.** Both match PCI
+  `8086:22b8`, and the stub's only job is parking the ISP in D3cold. Nothing is given
+  up: with atomisp bound and nothing streaming, the device reads back `D3cold` and
+  `runtime_status suspended`, so an idle camera costs nothing measurable.
+- **The in-tree `ov2680` is deliberately not blacklisted.** A blacklist matches on
+  module name, and the DKMS build carries the same name; it wins because `updates/`
+  comes before `kernel/` in the search order. The earlier blacklist existed only while
+  the local module had to be inserted by hand into a boot where nothing had claimed the
+  sensors yet.
+
+A browser needs two more things that have nothing to do with the driver: Firefox here
+is a snap, so its `camera` interface has to be connected, and `getUserMedia` is refused
+outside HTTPS or localhost whatever the camera is.
 
 ### Power — X-Powers AXP288 PMIC
 

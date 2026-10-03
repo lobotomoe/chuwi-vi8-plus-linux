@@ -170,7 +170,7 @@ kernel symbols.
 | micro-HDMI | Yes | Untested |
 | Bluetooth (BCM43430 over UART) | Yes | **Half-works, and the half that is missing matters** — `hci0` appears and comes up `UP RUNNING`, but with the placeholder address `AA:AA:AA:AA:AA:AA`, because the controller never got its `.hcd` patch. That file comes from `bluez-firmware`, **not** `linux-firmware`, and no distribution ships one for an a0 chip. Not paired with anything |
 | Suspend | Partly | Untested here. The maintainer's table scores it as suspending but **not** reaching S0i3, so expect idle drain |
-| Cameras | Yes, after building two modules | Both `ov2680` sensors work and `/dev/video0` gives the front camera as input 0 and the rear as input 1, 1600x1200 raw YUV. Ubuntu ships `CONFIG_INTEL_ATOMISP` unset, so the ISP capture driver has to be built against the installed headers, and the stock `ov2680` has to be replaced by a build that gives two identical sensors different clock names. Loaded by hand, once per boot. [Measurements](docs/01-hardware.md#cameras) |
+| Cameras | Yes, after building two modules | Both `ov2680` sensors work and `/dev/video0` gives the front camera as input 0 and the rear as input 1. Ubuntu ships `CONFIG_INTEL_ATOMISP` unset, so the ISP capture driver has to be built against the installed headers, and the stock `ov2680` has to be replaced by a build that gives two identical sensors different clock names. Through DKMS it survives reboots and kernel updates and loads at boot. [Measurements](docs/01-hardware.md#cameras) |
 
 ### Why several of those say "does not match"
 

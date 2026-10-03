@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 #
-# Take one frame from each camera. Run it on a freshly booted tablet, after
-# build-modules.sh, and expect to reboot before running it again.
+# Take one frame from each camera.
 #
-# Three conditions have to hold at the same time, and none of them survives a
-# second attempt in the same session:
+# After install-persistent.sh there is nothing to set up: the modules load at
+# boot and /dev/video0 is simply there, so this goes straight to capturing.
+#
+# Without that install it falls back to loading the modules by hand, and then
+# three conditions have to hold at once, none of which survives a second try in
+# the same session:
 #
 #   1. atomisp binds once per boot. What its CSI2 bridge attaches to the ACPI
 #      devices on the first load is never torn down, so a second insmod fails
@@ -31,37 +34,46 @@ memfree() { awk '/^MemFree/{print $2}' /proc/meminfo; }
 
 mkdir -p "$outdir"
 
-if lsmod | grep -q '^atomisp '; then
-  log "atomisp is already loaded; it binds once per boot, so reboot first"
-  exit 1
-fi
-if lsmod | grep -q '^ov2680 '; then
-  log "the stock ov2680 holds the sensors and unloading it is not safe here"
-  exit 1
+if [[ -e /dev/video0 ]]; then
+  log "/dev/video0 is already there, capturing"
+  preloaded=yes
+else
+  preloaded=no
+  if lsmod | grep -q '^atomisp '; then
+    log "atomisp is loaded but gave no node; it binds once per boot, so reboot first"
+    exit 1
+  fi
+  if lsmod | grep -q '^ov2680 '; then
+    log "the stock ov2680 holds the sensors and unloading it is not safe here"
+    exit 1
+  fi
 fi
 
 log "up $(cut -d' ' -f1 /proc/uptime)s, MemFree $(memfree) kB"
 
-log "freeing memory"
-systemctl --user stop kiosk-watchdog.timer 2>/dev/null || true
-pkill -f 'snap/firefox' || log "no kiosk browser was running"
-sleep 3
-sync
-echo 3 | sudo tee /proc/sys/vm/drop_caches > /dev/null
-sleep 1
-log "MemFree $(memfree) kB"
+if [[ $preloaded == no ]]; then
+  log "freeing memory"
+  systemctl --user stop kiosk-watchdog.timer 2>/dev/null || true
+  pkill -f 'snap/firefox' || log "no kiosk browser was running"
+  sleep 3
+  sync
+  echo 3 | sudo tee /proc/sys/vm/drop_caches > /dev/null
+  sleep 1
+  log "MemFree $(memfree) kB"
 
-log "modules"
-for m in mc videodev v4l2-async v4l2-fwnode v4l2-cci videobuf2-common \
-         videobuf2-v4l2 videobuf2-vmalloc ipu-bridge intel_skl_int3472_discrete; do
-  sudo modprobe "$m" || log "modprobe $m failed"
-done
-sudo insmod "$ov2680_ko" || log "insmod ov2680 reported the above"
-# intel_atomisp2_pm parks the ISP in D3cold and has to let go of the device.
-sudo rmmod intel_atomisp2_pm || log "rmmod intel_atomisp2_pm reported the above"
-sudo insmod "$atomisp_src/pci/atomisp_gmin_platform.ko" || log "gmin reported the above"
-sudo insmod "$atomisp_src/atomisp.ko" || log "insmod atomisp reported the above"
-sleep 10
+  log "modules"
+  for m in mc videodev v4l2-async v4l2-fwnode v4l2-cci videobuf2-common \
+           videobuf2-v4l2 videobuf2-vmalloc ipu-bridge intel_skl_int3472_discrete; do
+    sudo modprobe "$m" || log "modprobe $m failed"
+  done
+  sudo insmod "$ov2680_ko" || log "insmod ov2680 reported the above"
+  # intel_atomisp2_pm parks the ISP in D3cold and has to let go of the device.
+  sudo rmmod intel_atomisp2_pm || log "rmmod intel_atomisp2_pm reported the above"
+  sudo insmod "$atomisp_src/pci/atomisp_gmin_platform.ko" || log "gmin reported the above"
+  sudo insmod "$atomisp_src/atomisp.ko" || log "insmod atomisp reported the above"
+  sleep 10
+
+fi
 
 log "sensors bound"
 find /sys/bus/i2c/drivers/ov2680 -maxdepth 1 -name 'i2c-*' -printf '%f\n' || true
@@ -94,6 +106,8 @@ cat <<'VIEW'
            -vf transpose=1 frame.png
 VIEW
 
-log "restoring the kiosk"
-systemctl --user start kiosk-watchdog.timer 2>/dev/null || true
-setsid nohup sh "$HOME/.local/bin/ha-kiosk.sh" > /dev/null 2>&1 < /dev/null &
+if [[ $preloaded == no ]]; then
+  log "restoring the kiosk"
+  systemctl --user start kiosk-watchdog.timer 2>/dev/null || true
+  setsid nohup sh "$HOME/.local/bin/ha-kiosk.sh" > /dev/null 2>&1 < /dev/null &
+fi

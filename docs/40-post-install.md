@@ -481,37 +481,50 @@ minute, and it is the strategy this repo can vouch for.
 
 ## Cameras
 
-Both cameras work, but not as a setting you can switch. Ubuntu ships the ISP
-capture driver unbuilt, so a fresh install has no `/dev/video*` and nothing in the
-desktop will find one. Two modules built against the installed headers are enough —
-no replacement kernel — and [01-hardware.md](01-hardware.md#cameras) has the whole
-story, including why each step is the way it is.
+Both cameras work. Ubuntu ships the ISP capture driver unbuilt, so a fresh
+install has no `/dev/video*` and nothing in the desktop will find one, but two
+modules built against the installed headers are enough — no replacement kernel.
+[01-hardware.md](01-hardware.md#cameras) has the whole story, including why each
+step is the way it is.
 
 ```sh
-scripts/camera/build-modules.sh         # once; the atomisp build is the slow part
-
-sudo tee /etc/modprobe.d/zz-ov2680-local.conf > /dev/null <<'CONF'
-# The in-tree ov2680 gives both of this tablet's identical sensors the same
-# clock name, so one of them never binds. Unloading it to make room for the
-# local build oopses the kernel, so keep it from loading in the first place.
-blacklist ov2680
-CONF
-
+scripts/camera/build-modules.sh         # build and check the two modules
+scripts/camera/install-persistent.sh    # hand them to DKMS, set the blacklist
 sudo reboot
-scripts/camera/capture.sh               # once per boot, on a fresh one
 ```
 
-Three things that are not optional. `atomisp` binds **once per boot** — a second
-attempt in the same session fails at probe, so reboot between tries. The firmware
-load needs real free memory, not available memory, so the capture script stops the
-kiosk browser, stops the watchdog that would relaunch it, and drops caches before
-loading anything. And **never `rmmod ov2680`**: its remove path oopses the kernel
-here, which is what the blacklist exists to avoid.
+After that the cameras are simply present: `/dev/video0` appears during boot
+with the front camera as input 0 and the rear as input 1, and
+`scripts/camera/capture.sh` takes a frame without touching a module.
 
-What comes out is raw: `/dev/video0` with the front camera as input 0 and the rear as
-input 1, 1600x1200 planar YUV 4:2:0. Nothing in a desktop app will open it as a
-webcam without a conversion step. Treat a working camera as a project, not a
-checkbox.
+**Why DKMS and not a copy into `/lib/modules`.** Modules are built for one exact
+kernel. The next update changes `vermagic`, the camera disappears, and nothing
+says why. DKMS rebuilds on every kernel install, which turns a silent
+disappearance into a visible build failure — and it is the reason
+`linux-headers-generic` has to be installed as the meta package, so a new kernel
+always arrives with headers to build against. It is not a guarantee: atomisp is
+a staging driver whose internal APIs move, so some future kernel will need the
+sources refreshed rather than merely rebuilt.
+
+**What the install decides at module load time.** `intel_atomisp2_pm` and
+`atomisp` both match PCI `8086:22b8`; the stub only parks the ISP in D3cold, so
+it gets blacklisted and atomisp wins the device. Nothing is lost by that —
+atomisp puts the ISP back in D3cold by itself, verified after boot as
+`power_state D3cold`, `runtime_status suspended`. The in-tree `ov2680`, by
+contrast, is deliberately **not** blacklisted: a blacklist matches on module
+name, and the DKMS build carries the same name and wins by living in `updates/`.
+
+Two things that remain true. **Never `rmmod ov2680`** — its remove path oopses
+the kernel here. And the picture is dim indoors: this driver has no 3A, only one
+control on the video node answers at all (`image_color_effect`), and the sensor
+exposes no exposure or gain control through it. Gamma correction belongs on the
+viewing side; `scripts/camera/watch-remote.sh` shows the camera on another
+machine over ssh and does exactly that.
+
+Frames are raw — 1600x1200 or smaller, planar YUV 4:2:0. Firefox as shipped is a
+snap and needs its `camera` interface connected (`snap connect firefox:camera`),
+and a browser will only hand the camera to a page served over HTTPS or from
+localhost, which is a browser policy rather than anything about this hardware.
 
 ## Sensible software for 2 GB of RAM
 
