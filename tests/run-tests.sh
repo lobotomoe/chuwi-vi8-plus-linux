@@ -87,8 +87,15 @@ expect_contains() {
 # ---------------------------------------------------------------------------
 group "Static analysis"
 
+# Nested too: scripts/camera/ and scripts/camera/server/ hold shell scripts that
+# a single-level glob silently walked past.
+shell_scripts=()
+while IFS= read -r f; do
+  shell_scripts+=("$f")
+done < <(find "$SCRIPTS" "$REPO_ROOT/tests" -name '*.sh' | sort)
+
 if command -v shellcheck >/dev/null 2>&1; then
-  if out=$(shellcheck "$SCRIPTS"/*.sh "$REPO_ROOT"/tests/*.sh 2>&1); then
+  if out=$(shellcheck "${shell_scripts[@]}" 2>&1); then
     pass "shellcheck is clean"
   else
     fail "shellcheck is clean" "$out"
@@ -97,7 +104,7 @@ else
   skip "shellcheck is clean" "shellcheck not installed"
 fi
 
-for f in "$SCRIPTS"/*.sh "$REPO_ROOT"/tests/*.sh; do
+for f in "${shell_scripts[@]}"; do
   if bash -n "$f" 2>/dev/null; then
     pass "parses: ${f#"$REPO_ROOT"/}"
   else
@@ -613,6 +620,23 @@ if command -v python3 >/dev/null 2>&1; then
   fi
 else
   skip "panel-bench checks" "python3 not available"
+fi
+
+# ---------------------------------------------------------------------------
+group "camera server"
+
+if command -v python3 >/dev/null 2>&1; then
+  if python3 -c 'import PIL' >/dev/null 2>&1; then
+    if output=$(python3 "$REPO_ROOT/tests/check-camera-server.py" 2>&1); then
+      pass "frame geometry, rotation, gamma and the health predicate"
+    else
+      fail "frame geometry, rotation, gamma and the health predicate" "$output"
+    fi
+  else
+    skip "camera server checks" "PIL not installed"
+  fi
+else
+  skip "camera server checks" "python3 not available"
 fi
 
 # ---------------------------------------------------------------------------

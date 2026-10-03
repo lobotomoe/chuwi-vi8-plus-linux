@@ -1242,6 +1242,29 @@ and dropping caches. The exact threshold was not measured, only the two outcomes
 On a unit whose watchdog relaunches the browser, stop the watchdog too, or the memory
 is back inside a minute.
 
+**The same allocation runs on every `open()`, and failing it costs a reboot.** The
+module load is not the only time this matters: the ISP powers up when the capture
+node is opened, so each open re-runs the firmware path. When it fails there the
+driver abandons the power-on and the PCI device's runtime PM latches `error` —
+after which every later open returns `EINVAL` with `Failed to open /dev/video0:
+Invalid argument`, including opens made when memory is plentiful again. Dropping
+caches afterwards does not help, because the error state is already set and
+`pm_runtime_get_sync()` refuses before any allocation is attempted. Clearing it
+means rebinding the driver, and this one binds once per boot.
+
+Measured 2026-10-03: an open failed at `MemFree` 96 MB with `MemAvailable` 860 MB
+and 977 MB of cache; after `drop_caches` took `MemFree` to 658 MB the same open
+still failed, and `power/runtime_status` read `error` until the machine was
+rebooted. After the reboot an open succeeded at `MemFree` 119 MB. So the bracket
+on the real threshold is 96 MB on the failing side and 119 MB on the working one
+— narrower than the 151/673 pair above, which bracketed the module load instead.
+
+The practical consequence is that **opening the device per request is the wrong
+shape for this hardware**, however much "on demand" suggests it. Anything serving
+this camera should open once, early at boot, and hold the node for its lifetime;
+`scripts/camera/server/` does exactly that, and refuses to open at all below a
+MemFree floor rather than risk latching the error.
+
 **What you get.** One capture node, not two: `/dev/video0` with the two sensors as
 selectable inputs, plus `/dev/media0`.
 

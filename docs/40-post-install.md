@@ -517,14 +517,54 @@ name, and the DKMS build carries the same name and wins by living in `updates/`.
 Two things that remain true. **Never `rmmod ov2680`** — its remove path oopses
 the kernel here. And the picture is dim indoors: this driver has no 3A, only one
 control on the video node answers at all (`image_color_effect`), and the sensor
-exposes no exposure or gain control through it. Gamma correction belongs on the
-viewing side; `scripts/camera/watch-remote.sh` shows the camera on another
-machine over ssh and does exactly that.
+exposes no exposure or gain control through it. A gamma curve is the only
+brightness control there is, and it buys visibility by amplifying sensor noise.
+`scripts/camera/watch-remote.sh` shows the camera on another machine over ssh
+and applies one; the HTTP service below applies one on the tablet.
 
 Frames are raw — 1600x1200 or smaller, planar YUV 4:2:0. Firefox as shipped is a
 snap and needs its `camera` interface connected (`snap connect firefox:camera`),
 and a browser will only hand the camera to a page served over HTTPS or from
 localhost, which is a browser policy rather than anything about this hardware.
+
+### Serving it to Home Assistant
+
+```sh
+SUDO_ASKPASS=$HOME/.local/bin/sudo-askpass scripts/camera/server/install.sh
+```
+
+That installs a service on port 8081 with three endpoints — `/snapshot`,
+`/stream` and `/healthz` — behind basic auth, whose password it generates on
+first run and keeps across re-runs. Home Assistant's **MJPEG IP Camera**
+integration takes it as it stands: the stream URL, the still URL, and the
+credentials, which it detects as basic auth by itself. Nothing custom is needed
+on the Home Assistant side, and the phone never talks to the tablet — Home
+Assistant re-serves the stream from `/api/camera_proxy_stream/<entity>`, so
+whatever remote access it already has covers the camera too.
+
+**The service holds the device open for its whole life, and that is the point,
+not an oversight.** Opening the node powers the ISP up, and that power-on
+allocates through `alloc_pages_bulk()`, which never reclaims — only MemFree
+counts. When it falls short the driver abandons the power-on and the PCI
+device's runtime PM latches `error`, after which *every* open returns EINVAL,
+not just the one that failed. Since atomisp binds once per boot, that costs a
+reboot. Measured here: an open failed at MemFree 96 MB while 860 MB was
+MemAvailable and 977 MB sat in reclaimable cache, and dropping those caches did
+not revive it, because the error had already latched. The same open succeeds at
+119 MB. So the unit starts at boot, while memory is still free, and never lets
+go. It also refuses to open below a MemFree floor rather than gamble, which is
+why a restart in a running session wants a cache drop first — `install.sh` does
+that before starting the service.
+
+The costs, measured: capture runs continuously at 2.8% of one core, a single
+5 fps viewer adds about 16%, and the tablet sat at 38.7 °C throughout. Rotation
+and gamma are query parameters (`?rotate=90&gamma=2.2`) rather than config, so
+trying a different orientation never requires the restart that a reopen implies.
+`max_streams` caps concurrent viewers; the default is 2.
+
+One thing to fix before it bites: the URL carries the tablet's DHCP address. A
+reservation on the router, or a hostname Home Assistant can resolve, is what
+keeps the camera from vanishing on a new lease.
 
 ## Sensible software for 2 GB of RAM
 
