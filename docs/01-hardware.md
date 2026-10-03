@@ -1180,16 +1180,47 @@ details decide whether that build works: atomisp's Makefile writes every include
 `$(srctree)/drivers/staging/media/atomisp/...` while `linux-headers` ships no driver
 sources, so the extracted subtree has to be reachable at exactly that path inside the
 headers tree; and Secure Boot has to be off, or the unsigned module will not load.
+Two warnings from that build are noise: the compiler one compares
+`x86_64-linux-gnu-gcc` against `gcc` of the identical version, and BTF generation is
+skipped because `pahole` is not installed, which costs the module nothing but BPF
+introspection.
 
 That gets most of the way and then stops short of a picture. Measured 2026-10-03 on
 `7.0.0-34-generic`: `atomisp-isp2` binds `00:03.0`, reports `ISP HPLL frequency
 base = 1600 MHz`, finds both sensors, logs `Connected 2 cameras`, and the front sensor
 answers on I2C with `sensor_revision id = 0x2680`. No `/dev/video*` appears, and the
 reason is that **this tablet has two identical sensors**: the second fails with
-`failed to register clk 'xvclk'` and `-EEXIST`, because the `ov2680` driver registers
-that clock under a fixed name. Video nodes are registered from the async notifier's
-`.complete` callback, which never fires while one expected subdev is missing. One
-`ov2680` per machine looks like the only case this path has been exercised on.
+`failed to register clk 'xvclk'` and `-EEXIST`. Video nodes are registered from the
+async notifier's `.complete` callback, which never fires while one expected subdev is
+missing, so a single unbindable sensor costs both cameras. One `ov2680` per machine
+looks like the only case this path has been exercised on.
+
+The clock failure has a precise address, for anyone who would rather fix it than work
+around it. `ov2680.c` asks for its clock with
+`devm_v4l2_sensor_clk_get(dev, "xvclk")`; that helper lives in v4l2-core, so inside
+`videodev`, and when ACPI supplies no clock it registers a fixed-rate one under the
+bare con_id. Two identical sensors therefore collide every time. A real fix needs a
+unique name per sensor, which means rebuilding `videodev` -- which half the system
+holds open. The cheap way around it is a module parameter on the bridge limiting it to
+one CSI port, so the notifier stops waiting for a sensor that will never arrive.
+Whether that yields an actual frame was not established here.
+
+**Two things to know before trying any of this, both learned the hard way.**
+
+`atomisp` loads once per boot. A second `insmod` in the same session fails at probe
+with `-EEXIST`, after a burst of `the pages is not freed, free pages first` and `the bo
+is still binded, unbind it first...`. The colliding state is not inside atomisp:
+`ipu_bridge`, `intel_skl_int3472_discrete` and `atomisp_gmin_platform` each sit at a
+refcount of 1 held by atomisp, and unloading atomisp alone leaves all three in place
+along with the fwnode graph `ipu_bridge` built. Unload the whole group, or reboot
+between attempts.
+
+**Do not unload `ov2680`.** Its remove path corrupts a list and then crashes --
+`WARNING: lib/list_debug.c:62 at __list_del_entry_valid_or_report`, then `Oops: general
+protection fault, probably for non-canonical address` -- and leaves the module wedged
+at refcount `-1`, where it can be neither loaded nor unloaded. Only a reboot clears
+that. It also never needs unloading: it stays at refcount 0 whether or not atomisp is
+bound to the ISP.
 
 So: unusable as shipped, and not proven usable here either. What is settled is *why*,
 which is more than "no driver".
