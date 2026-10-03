@@ -655,11 +655,29 @@ ls -l /usr/lib/firmware/brcm/BCM43430A1.hcd*
 That covers an **a1** unit. An **a0** unit wants `brcm/BCM4343A0.hcd`, which no
 Debian or Ubuntu package provides — check which revision you have with the
 command in
-[01-hardware.md](01-hardware.md#two-chip-revisions-ship-in-this-model-and-they-want-different-nvram)
-before hunting for a file that is not there.
+[01-hardware.md](01-hardware.md#two-chip-revisions-ship-in-this-model-and-they-want-different-nvram).
+
+For a0 the file comes from `armbian/firmware`, which carries it under exactly
+the name the kernel asks for:
+
+```sh
+sudo curl -fsSL -o /lib/firmware/brcm/BCM4343A0.hcd \
+  https://raw.githubusercontent.com/armbian/firmware/master/brcm/BCM4343A0.hcd
+sudo chmod 644 /lib/firmware/brcm/BCM4343A0.hcd
+echo serial0-0 | sudo tee /sys/bus/serial/drivers/hci_uart_bcm/unbind
+echo serial0-0 | sudo tee /sys/bus/serial/drivers/hci_uart_bcm/bind
+hciconfig hci0 | grep 'BD Address'
+```
+
+Expect 38644 bytes, SHA-256
+`e427c4e9c32da61613bd7c885d1a075c76f21523195f8c6334c8a0cb5a77cffd`, and a real
+address in place of the placeholder. No reboot is needed, and it persists
+because the patch is read from `/lib/firmware` at every attach.
 
 Wi-Fi and Bluetooth share the antenna path on this module, so heavy Bluetooth
-use degrades 2.4 GHz Wi-Fi throughput. That is the hardware.
+use degrades 2.4 GHz Wi-Fi throughput. That is the hardware. A 15-second LE
+discovery, though, cost nothing measurable: pinging the gateway once a second
+through it lost no packets, so scanning is not the case to worry about.
 
 ## The touchscreen does not respond
 

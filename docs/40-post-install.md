@@ -604,6 +604,39 @@ is the browser itself, which on 2 GB is the whole budget. Measure rather than
 guess — `top -o %CPU`, `cat /proc/pressure/io`, and `free -m` tell you within a
 minute which of the three you are actually looking at.
 
+## Changing things on a tablet you cannot reach
+
+Once this tablet is on a wall, the only way in is its own Wi-Fi, and anything
+that touches the radio, the network stack or a shared combo chip can cut that.
+The cost of guessing wrong is not a lost session, it is a trip to wherever the
+tablet lives. So arm a dead man's switch before the change and disarm it once
+the way back is proven:
+
+```sh
+scripts/remote/safety-net.sh arm 10     # restore networking in 10 min unless disarmed
+# ... make the change, confirm you can still get in ...
+scripts/remote/safety-net.sh disarm
+```
+
+It escalates instead of reaching for the reboot: unblock the radio, then bounce
+NetworkManager, then bounce the tunnel, and only reboot if the gateway is still
+unreachable after all three. Each rung checks before taking the next, so firing
+it on a healthy machine is harmless — it stops at the first check and touches
+nothing. Verified by letting it fire deliberately:
+
+```
+safety net fired; gateway 192.168.0.1
+radio unblock was enough
+```
+
+Read what it did with `journalctl -u safety-net.service`. It logs under that
+unit rather than under a syslog identifier of its own.
+
+**It does not survive a reboot**, because it is a transient systemd timer. That
+is the right trade for what it guards: a change that breaks networking without
+rebooting is exactly the case it catches, and a change that reboots the machine
+already gets networking back on the way up.
+
 ## Verify the result
 
 ```sh

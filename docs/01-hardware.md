@@ -753,26 +753,51 @@ Wi-Fi is reliable **once it has NVRAM**.
 Bluetooth needs its own patch file, and this is the one place the two chip revisions
 diverge in a way no amount of configuration fixes:
 
-| Revision | File `btbcm` looks for | Packaged? |
+| Revision | File `btbcm` looks for | Where it comes from |
 |---|---|---|
-| a1 | `brcm/BCM43430A1.hcd` | yes — `bluez-firmware`, **Ubuntu multiverse** |
-| a0 | `brcm/BCM4343A0.hcd` | **no — and not upstream either** |
+| a1 | `brcm/BCM43430A1.hcd` | `bluez-firmware`, **Ubuntu multiverse** |
+| a0 | `brcm/BCM4343A0.hcd` | no distribution package; **[armbian/firmware](https://github.com/armbian/firmware/blob/master/brcm/BCM4343A0.hcd) carries it** |
 
 So on an a1 unit `sudo apt install bluez-firmware` is the whole fix, provided
 multiverse is enabled; the package is not in `main`, so a default install will
 report it as unavailable rather than as missing a component.
 
-On an a0 unit there is nothing to install, and the reason is worth knowing before
-you go looking. `bluez-firmware` repackages the Cypress-licensed set that the
-Raspberry Pi project maintains, and that set is `BCM43430A1`, `BCM43430B0`,
-`BCM4343A2`, `BCM4345C0`, `BCM4345C5` — **verified** by unpacking
+On an a0 unit no distribution packages it, and the reason is worth knowing.
+`bluez-firmware` repackages the Cypress-licensed set that the Raspberry Pi
+project maintains, and that set is `BCM43430A1`, `BCM43430B0`, `BCM4343A2`,
+`BCM4345C0`, `BCM4345C5` — **verified** by unpacking
 `bluez-firmware_1.2-11ubuntu2_all.deb`, whose `brcm/` directory holds exactly those
-five. A0 is not a packaging omission somebody could file a bug about; it is absent
-from the licensed release the package is built from. `linux-firmware` has it no
-better: its `WHENCE` lists one Broadcom `.hcd` in total, `BCM-0bb4-0306.hcd`. The
-vendor file (`BCM4343A0-26M.hcd` in Broadcom's naming) is not redistributed, and a
-GitHub-wide search for it returns two hits, both of them somebody's notes rather
-than the file.
+five. A0 is absent from the licensed release the package is built from, and
+`linux-firmware` has it no better: its `WHENCE` lists one Broadcom `.hcd` in
+total, `BCM-0bb4-0306.hcd`.
+
+**The file does exist, though, and an earlier version of this page was wrong to
+say otherwise.** `armbian/firmware` carries `brcm/BCM4343A0.hcd` — 38644 bytes,
+SHA-256 `e427c4e9c32da61613bd7c885d1a075c76f21523195f8c6334c8a0cb5a77cffd`. It
+parses as 203 HCI records consuming the file exactly, 202 `Write_RAM` (`0xfc4c`)
+and one `Launch_RAM` (`0xfc4e`), and carries the identity string
+`BCM4343A0 26MHz AP6212_CL1 OTP_BD-0061` — this chip, this clock, this module.
+
+The earlier search missed it for a reason worth repeating: it looked for
+Broadcom's own name for the blob, `BCM4343A0-26M.hcd`, which does return nothing
+but other people's notes. Armbian ships the same blob under the name the kernel
+actually asks for, without the `-26M`. **Search for the filename out of `dmesg`,
+not the vendor's name for the part.**
+
+Installed to `/lib/firmware/brcm/BCM4343A0.hcd` it works immediately, and the
+driver can be re-attached without a reboot:
+
+```sh
+echo serial0-0 | sudo tee /sys/bus/serial/drivers/hci_uart_bcm/unbind
+echo serial0-0 | sudo tee /sys/bus/serial/drivers/hci_uart_bcm/bind
+```
+
+**Verified on the unit** 2026-10-03: the address changed from
+`AA:AA:AA:AA:AA:AA` to a real one, the controller's firmware build went from
+`0000` to `0245`, and a 60-second discovery found 15 devices with plausible RSSI
+between −55 and −74 dBm, six of them Xiaomi `LYWSD03MMC` sensors. It survives a
+reboot with nothing done by hand, because the patch is loaded from
+`/lib/firmware` at every attach.
 
 This matches how the driver's maintainer scores the tablet — his own status table
 marks Bluetooth `FIR`, defined there as *"needs firmware which is not in
