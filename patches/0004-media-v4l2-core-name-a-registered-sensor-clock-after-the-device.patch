@@ -1,0 +1,61 @@
+media: v4l2-core: name a registered sensor clock after the device
+
+__devm_v4l2_sensor_clk_get() registers a fixed-rate clock itself when the
+platform supplies none, which is the normal case on ACPI. It names that
+clock after the con_id the caller passed. Clock names are global, so a
+board carrying two identical sensors has both of them register the same
+name, and the second one to probe fails with -EEXIST and never binds.
+
+The Chuwi Vi8 Plus is such a board: two ov2680, both asking for "xvclk".
+Which one loses is decided by probe order and changes between boots, and
+on an atomisp machine it costs both cameras rather than one, because the
+video nodes are created from the async notifier's .complete callback and
+that never fires while an expected subdev is missing.
+
+The name is only needed to identify the clock, which is handed straight
+back to the caller rather than looked up by name, so deriving it from the
+device makes it unique without affecting anything else. The function
+already does exactly that when the caller passes no con_id; do it for the
+registration in every case, and keep using the con_id for the lookup that
+precedes it.
+
+Signed-off-by: Your Name <your.email@example.com>
+---
+ Generated against the Ubuntu linux-source-7.0.0 tree (7.0.0-34-generic).
+ Apply with: git am, or patch -p1 < this file
+
+ Status: the mechanism is verified on the reference unit, this exact hunk
+ is not. Making ov2680 pass NULL as its con_id takes the same branch and
+ produces the same per-device clock name; with that change both sensors
+ bound on every attempt and /dev/video0 appeared. The hunk below moves
+ that behaviour into the helper, where it also covers sensors that have a
+ reason to keep their con_id, and it has not itself been compiled.
+---
+--- a/drivers/media/v4l2-core/v4l2-common.c
++++ b/drivers/media/v4l2-core/v4l2-common.c
+@@ -792,14 +792,17 @@
+ 	/* We need a rate to create a clock. */
+ 	if (ret)
+ 		return ERR_PTR(ret == -EINVAL ? -EPROBE_DEFER : ret);
+ 
+-	if (!id) {
+-		clk_id = kasprintf(GFP_KERNEL, "clk-%s", dev_name(dev));
+-		if (!clk_id)
+-			return ERR_PTR(-ENOMEM);
+-		id = clk_id;
+-	}
++	/*
++	 * The clock is registered here rather than looked up, so its name only
++	 * has to be unique -- and it has to be: two identical sensors on one
++	 * board would otherwise both register the caller's con_id, and the
++	 * second would fail to probe with -EEXIST.
++	 */
++	clk_id = kasprintf(GFP_KERNEL, "clk-%s", dev_name(dev));
++	if (!clk_id)
++		return ERR_PTR(-ENOMEM);
+ 
+-	clk_hw = devm_clk_hw_register_fixed_rate(dev, id, NULL, 0, rate);
++	clk_hw = devm_clk_hw_register_fixed_rate(dev, clk_id, NULL, 0, rate);
+ 	if (IS_ERR(clk_hw))
+ 		return ERR_CAST(clk_hw);
+ 

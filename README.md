@@ -170,7 +170,7 @@ kernel symbols.
 | micro-HDMI | Yes | Untested |
 | Bluetooth (BCM43430 over UART) | Yes | **Half-works, and the half that is missing matters** — `hci0` appears and comes up `UP RUNNING`, but with the placeholder address `AA:AA:AA:AA:AA:AA`, because the controller never got its `.hcd` patch. That file comes from `bluez-firmware`, **not** `linux-firmware`, and no distribution ships one for an a0 chip. Not paired with anything |
 | Suspend | Partly | Untested here. The maintainer's table scores it as suspending but **not** reaching S0i3, so expect idle drain |
-| Cameras | Not on a stock install | Both sensors are `ov2680` and both are enumerated, but Ubuntu ships `CONFIG_INTEL_ATOMISP` unset, so nothing claims the ISP and there is no `/dev/video*`. The driver builds as a module without replacing the kernel and gets as far as `Connected 2 cameras`; it stops there on this unit, where the two identical sensors collide over one hard-coded clock name. [Measurements](docs/01-hardware.md#cameras) |
+| Cameras | Yes, after building two modules | Both `ov2680` sensors work and `/dev/video0` gives the front camera as input 0 and the rear as input 1, 1600x1200 raw YUV. Ubuntu ships `CONFIG_INTEL_ATOMISP` unset, so the ISP capture driver has to be built against the installed headers, and the stock `ov2680` has to be replaced by a build that gives two identical sensors different clock names. Loaded by hand, once per boot. [Measurements](docs/01-hardware.md#cameras) |
 
 ### Why several of those say "does not match"
 
@@ -292,8 +292,9 @@ field gained and lost focus, across a cold boot.
 | [Debian](docs/31-install-debian.md) and [Arch](docs/32-install-arch.md) guides | ISO contents and installer source, read. **Neither was installed on this tablet** |
 | [`make-media.ps1`](scripts/make-media.ps1) | Never run — no Windows machine was involved |
 | `restore-emmc.sh`, `postinstall-*.sh` | Argument handling is unit-tested; neither has run on the tablet |
-| The three [`patches/`](patches/) | Apply cleanly to mainline. Never compiled, never booted |
-| Suspend, HDMI, audio, cameras | Not exercised on the installed system |
+| [`patches/`](patches/) 0001-0003 | Apply cleanly to mainline. Never compiled, never booted |
+| [`patches/`](patches/) 0004 | The change it makes is verified on the unit in an equivalent form; this exact hunk is not compiled |
+| Suspend, HDMI, audio | Not exercised on the installed system |
 | Bluetooth | Only far enough to see `hci0` come up without its address. Nothing was paired |
 
 **The date all three patches depend on.** They hard-code BIOS date

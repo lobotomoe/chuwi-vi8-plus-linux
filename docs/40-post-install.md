@@ -479,15 +479,39 @@ journalctl -b -p warning --since "-5 min"
 Shutting down is a legitimate strategy on a machine that boots in well under a
 minute, and it is the strategy this repo can vouch for.
 
-## What is not going to work
+## Cameras
 
-The cameras, at least not as a setting you can switch. Cherry Trail routes them
-through the Intel ISP and Ubuntu ships the capture driver unbuilt, so a fresh
-install has no `/dev/video*`. The driver can be built as a module without
-replacing the kernel, which brings the ISP up and detects both sensors but still
-produces no capture on this unit --
-[01-hardware.md](01-hardware.md#cameras) has the measurements and exactly where
-it stops. Treat a working camera as a project, not a checkbox.
+Both cameras work, but not as a setting you can switch. Ubuntu ships the ISP
+capture driver unbuilt, so a fresh install has no `/dev/video*` and nothing in the
+desktop will find one. Two modules built against the installed headers are enough —
+no replacement kernel — and [01-hardware.md](01-hardware.md#cameras) has the whole
+story, including why each step is the way it is.
+
+```sh
+scripts/camera/build-modules.sh         # once; the atomisp build is the slow part
+
+sudo tee /etc/modprobe.d/zz-ov2680-local.conf > /dev/null <<'CONF'
+# The in-tree ov2680 gives both of this tablet's identical sensors the same
+# clock name, so one of them never binds. Unloading it to make room for the
+# local build oopses the kernel, so keep it from loading in the first place.
+blacklist ov2680
+CONF
+
+sudo reboot
+scripts/camera/capture.sh               # once per boot, on a fresh one
+```
+
+Three things that are not optional. `atomisp` binds **once per boot** — a second
+attempt in the same session fails at probe, so reboot between tries. The firmware
+load needs real free memory, not available memory, so the capture script stops the
+kiosk browser, stops the watchdog that would relaunch it, and drops caches before
+loading anything. And **never `rmmod ov2680`**: its remove path oopses the kernel
+here, which is what the blacklist exists to avoid.
+
+What comes out is raw: `/dev/video0` with the front camera as input 0 and the rear as
+input 1, 1600x1200 planar YUV 4:2:0. Nothing in a desktop app will open it as a
+webcam without a conversion step. Treat a working camera as a project, not a
+checkbox.
 
 ## Sensible software for 2 GB of RAM
 

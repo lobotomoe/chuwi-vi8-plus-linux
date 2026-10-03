@@ -1158,90 +1158,70 @@ Cherry Trail routes the cameras through the Intel ISP2401 ("atomisp") on PCI
 `00:03.0` (`8086:22b8`, subsystem `7270`). Both sensors are `ov2680`, 2 MP, and both
 are enumerated over ACPI and I2C as `OVTI2680:00` and `OVTI2680:01`.
 
-They do not work on a stock install, and the reason is one kernel config option
-rather than a missing driver. Ubuntu ships `# CONFIG_INTEL_ATOMISP is not set`
-(checked on `7.0.0-34-generic`), so the only thing claiming the ISP is
-`intel_atomisp2_pm`, whose whole job is to park the device in D3cold to save power.
-Everything else is already present: the mainline `ov2680` driver is built and loaded,
-`CONFIG_IPU_BRIDGE` and the `videobuf2` modules are built, and the firmware the ISP
-asks for ships in `linux-firmware-intel-graphics` as
-`/usr/lib/firmware/intel/ipu/shisp_2401a0_v21.bin.zst`. Without the capture driver the
-sensor sits in deferred probe -- `ov2680: waiting for fwnode graph endpoint` -- because
-that endpoint is created by atomisp's own CSI2 bridge, and there is no `/dev/video*`
-node at all. Distributions disable the option because before kernel 6.7 the driver
-broke unrelated machines (Launchpad #2017444); 6.7 merged ISP2400 and ISP2401 support
-into one build.
+**Both cameras work, with two locally built modules and no replacement kernel.** —
+**verified on the unit**, 2026-10-03 on `7.0.0-34-generic`: both sensors bind,
+`/dev/video0` appears, and a frame from the front camera shows the room it is
+pointed at. They do not work on a stock install, and getting from one to the other
+meant passing three separate walls. `scripts/camera/build-modules.sh` builds the
+modules and `scripts/camera/capture.sh` takes a frame from each camera.
 
-**The kernel does not have to be rebuilt to try it.** atomisp is a module and every
-dependency is already `=m`, so its subtree builds against the installed headers --
-which is also the only way to get matching symbol CRCs, since `CONFIG_MODVERSIONS=y`
-and the published `linux-source` package runs ahead of the installed kernel. Two
-details decide whether that build works: atomisp's Makefile writes every include as
+**Wall 1: the driver is unbuilt, not missing.** Ubuntu ships
+`# CONFIG_INTEL_ATOMISP is not set`, so the only thing claiming the ISP is
+`intel_atomisp2_pm`, whose whole job is to park the device in D3cold. Everything
+else is already in place: the mainline `ov2680` driver is built and loaded,
+`CONFIG_IPU_BRIDGE` and the `videobuf2` modules are built, and the firmware ships in
+`linux-firmware-intel-graphics` as
+`/usr/lib/firmware/intel/ipu/shisp_2401a0_v21.bin.zst`. Distributions disable the
+option because before kernel 6.7 the driver broke unrelated machines (Launchpad
+#2017444). atomisp is a module and every dependency is already `=m`, so its subtree
+builds against the installed headers — which is also the only way to get matching
+symbol CRCs, since `CONFIG_MODVERSIONS=y` and the published `linux-source` package
+runs ahead of the installed kernel. Two details decide whether that build works:
+atomisp's Makefile writes every include as
 `$(srctree)/drivers/staging/media/atomisp/...` while `linux-headers` ships no driver
 sources, so the extracted subtree has to be reachable at exactly that path inside the
 headers tree; and Secure Boot has to be off, or the unsigned module will not load.
 Two warnings from that build are noise: the compiler one compares
 `x86_64-linux-gnu-gcc` against `gcc` of the identical version, and BTF generation is
-skipped because `pahole` is not installed, which costs the module nothing but BPF
-introspection.
+skipped because `pahole` is not installed.
 
-That gets most of the way and then stops short of a picture. Measured 2026-10-03 on
-`7.0.0-34-generic`: `atomisp-isp2` binds `00:03.0`, reports `ISP HPLL frequency
-base = 1600 MHz`, finds both sensors, logs `Connected 2 cameras`, and the front sensor
-answers on I2C with `sensor_revision id = 0x2680`. No `/dev/video*` appears, and the
-reason is that **this tablet has two identical sensors**, and they race: whichever
-probes first takes the fixed-rate clock named `xvclk` and the loser dies with
-`-EEXIST`. The winner is not stable -- `OVTI2680:00` won on one boot and
-`OVTI2680:01` on the next, same kernel, same configuration. Video nodes are
-registered from the async notifier's `.complete` callback, which never fires while
-one expected subdev is missing, so whichever sensor loses costs both cameras. One
-`ov2680` per machine looks like the only case this path has been exercised on.
+**Wall 2: two identical sensors, one clock name.** `ov2680.c` asks for its clock with
+`devm_v4l2_sensor_clk_get(dev, "xvclk")`. On ACPI there is no clock provider to find,
+so the helper — `__devm_v4l2_sensor_clk_get()` in `drivers/media/v4l2-core/` —
+registers a fixed-rate clock itself and names it after that con_id. Clock names are
+global, so the second sensor to probe dies with `-EEXIST`, and which one that is
+changes between boots. On atomisp it costs *both* cameras rather than one: the video
+nodes are registered from the async notifier's `.complete` callback, which never
+fires while one expected subdev is missing.
 
-The two are not interchangeable, and ACPI says which one it means. `OVTI2680:01`
-sits on `i2c-2` with a real DSM entry (`Using DSM entry CsiPort=0`), a regulator
-supplier and a wakeup source. `OVTI2680:00` sits on `i2c-0`, gets `Using default
-CsiPort=1` because the DSM has nothing to say about it, and stays in
-`waiting_for_supplier` indefinitely. Prefer `:01` if only one can work.
+The helper already has the answer in it. Given a NULL con_id it names the clock
+`clk-<dev_name>`, which is unique per sensor, and the registered clock is handed
+straight back to the caller rather than looked up by name — so the name is free to
+be anything. One argument is the whole fix, and rebuilding `videodev` is not
+required: changing `ov2680` alone is enough, and `ov2680` is a small module nothing
+holds open. The better form of the same change belongs in the helper, where it
+covers every ACPI board with two identical sensors; it is written out in
+[`patches/0004-…`](../patches/0004-media-v4l2-core-name-a-registered-sensor-clock-after-the-device.patch).
 
-**Limiting the bridge to one CSI port does not stop the other sensor probing.**
-A module parameter on `atomisp_csi2_bridge_parse_firmware` that skips a port works
-as far as the notifier is concerned -- the log shows `skipping CSI port 1
-(only_port=0)` -- but `ov2680` binds by ACPI match and `ipu_bridge` builds fwnode
-endpoints for every sensor it finds, so both still probe and still race. Winning
-the race deterministically needs one of them gone: `delete_device` on the adapter
-works, but the client's I2C address is not recorded anywhere readable in sysfs and
-is not the `0x36` an ov2680 usually answers on, so it has to be found by trying
-(a write for an address with no device returns `ENOENT` and changes nothing).
+Two approaches that look like they should work do not, and both were tried first:
 
-The clock failure has a precise address, for anyone who would rather fix it than work
-around it. `ov2680.c` asks for its clock with
-`devm_v4l2_sensor_clk_get(dev, "xvclk")`; that helper lives in v4l2-core, so inside
-`videodev`, and when ACPI supplies no clock it registers a fixed-rate one under the
-bare con_id. Two identical sensors therefore collide every time. A real fix needs a
-unique name per sensor, which means rebuilding `videodev` -- which half the system
-holds open. The cheap way around it is a module parameter on the bridge limiting it to
-one CSI port, so the notifier stops waiting for a sensor that will never arrive.
-Whether that yields an actual frame was not established here.
+- **Deleting one sensor's I2C client cannot work, at any address.**
+  `delete_device_store()` only walks `adap->userspace_clients`, the list of clients
+  created through `new_device`. An ACPI-enumerated sensor is never on that list, so
+  the write returns `ENOENT` whatever address it carries. The addresses, for the
+  record, are `0x10` on `i2c-2` and `0x36` on `i2c-0`.
+- **Keeping one sensor out of the fwnode graph aborts the whole graph.**
+  `ipu_bridge_connect_sensor()` treats an error from the per-sensor parse callback as
+  fatal — `goto err_put_adev`, and the caller unwinds every sensor it had already
+  built. A port filter there costs both cameras instead of excluding one.
+  A filter in atomisp's own `atomisp_csi2_bridge_parse_firmware()` (the `only_port`
+  module parameter, kept because it is still useful) narrows only what the notifier
+  waits for; `ov2680` binds by ACPI match and `ipu_bridge` builds endpoints for every
+  sensor it finds, so the other sensor still probes and still takes the clock.
 
-**Two things to know before trying any of this, both learned the hard way.**
-
-`atomisp` loads once per boot. A second `insmod` in the same session fails at probe
-with `-EEXIST`, after a burst of `the pages is not freed, free pages first` and `the bo
-is still binded, unbind it first...`. The colliding state is not inside atomisp:
-`ipu_bridge`, `intel_skl_int3472_discrete` and `atomisp_gmin_platform` each sit at a
-refcount of 1 held by atomisp, and unloading atomisp alone leaves all three in place
-along with the fwnode graph `ipu_bridge` built. Unload the whole group, or reboot
-between attempts.
-
-**Do not unload `ov2680`.** Its remove path corrupts a list and then crashes --
-`WARNING: lib/list_debug.c:62 at __list_del_entry_valid_or_report`, then `Oops: general
-protection fault, probably for non-canonical address` -- and leaves the module wedged
-at refcount `-1`, where it can be neither loaded nor unloaded. Only a reboot clears
-that. It also never needs unloading: it stays at refcount 0 whether or not atomisp is
-bound to the ISP.
-
-**Past the sensors there is a second wall, and it is memory.** With one port skipped,
-the driver gets as far as loading the CSS firmware and fails there:
+**Wall 3: the firmware allocation counts `MemFree`, not `MemAvailable`.** With the
+sensors sorted out, the driver gets as far as loading the CSS firmware and can fail
+there:
 
 ```
 alloc_pages_bulk() failed
@@ -1251,16 +1231,59 @@ Failed to init css.
 probe with driver atomisp-isp2 failed with error -22
 ```
 
-That was with `MemFree` at 151 MB and 836 MB sitting in page cache, on 1.9 GB total
-with a kiosk browser running. The firmware wants a bulk allocation the machine
-cannot produce under that pressure, so anything serious here has to stop the
-browser and drop caches first -- and on a unit with a watchdog that relaunches the
-browser, stop the watchdog too, or the memory comes straight back.
+The firmware is 11.5 MB — 2953 order-0 pages, requested in one `alloc_pages_bulk()`
+call with `__GFP_NOWARN | __GFP_RECLAIM | __GFP_FS`. The bulk allocator does not
+reclaim: it checks the zone watermark against `free pages`, and on any shortfall
+returns a single page, which the driver reads as failure. So the 700-odd MB of
+`MemAvailable` that a kiosk tablet reports is irrelevant — it is page cache, and the
+allocator will not turn it back into free pages. This failed at `MemFree` 151 MB with
+836 MB in page cache, and succeeded at `MemFree` 673 MB after stopping the browser
+and dropping caches. The exact threshold was not measured, only the two outcomes.
+On a unit whose watchdog relaunches the browser, stop the watchdog too, or the memory
+is back inside a minute.
 
-So: unusable as shipped, and not proven usable here either. What is settled is *why*
-at each of three separate walls -- the unbuilt driver, the clock-name collision
-between two identical sensors, and the firmware allocation -- which is a good deal
-more than "no driver".
+**What you get.** One capture node, not two: `/dev/video0` with the two sensors as
+selectable inputs, plus `/dev/media0`.
+
+| Input | I2C | ACPI | CSI port | Faces |
+|---|---|---|---|---|
+| 0 | `2-0010` | `OVTI2680:01` | 0 | front, the side the screen is on |
+| 1 | `0-0036` | `OVTI2680:00` | 1 | rear |
+
+The port numbers are the driver's own: `atomisp_csi2_parse_sensor_fwnode()` assigns
+`V4L2_FWNODE_ORIENTATION_BACK` to link 1 and `FRONT` to everything else, and the ACPI
+descriptions agree — `OVTI2680:01` has a real DSM entry (`Using DSM entry CsiPort=0`),
+a regulator supplier and a wakeup source, while `OVTI2680:00` gets
+`Using default CsiPort=1` because its DSM has nothing to say.
+
+Frames come out as 1600x1200 planar YUV 4:2:0, 2883584 bytes with the padding. The
+first frames are a bright noise band over black, before exposure settles — skip a
+batch (`--stream-skip=40`) rather than reading the first one. Most of the ISP's
+controls return `error 22 getting ctrl` on this build; `image_color_effect` is one of
+the few that answers.
+
+**Three things to know before trying any of this, all learned the hard way.**
+
+`atomisp` loads once per boot. A second `insmod` in the same session fails at probe
+with `-EEXIST`, after a burst of `the pages is not freed, free pages first` and `the bo
+is still binded, unbind it first...`. The colliding state is not inside atomisp:
+`ipu_bridge`, `intel_skl_int3472_discrete` and `atomisp_gmin_platform` each sit at a
+refcount of 1 held by atomisp, and unloading atomisp alone leaves all three in place
+along with the fwnode graph `ipu_bridge` built. Reboot between attempts.
+
+**Do not unload `ov2680`.** Its remove path corrupts a list and then crashes —
+`WARNING: lib/list_debug.c:62 at __list_del_entry_valid_or_report`, then `Oops: general
+protection fault, probably for non-canonical address` — and leaves the module wedged
+at refcount `-1`, where it can be neither loaded nor unloaded. Only a reboot clears
+that. The way around it is not to unload it: blacklist the stock module so the local
+one can be inserted into a clean boot. See
+[40-post-install.md](40-post-install.md#cameras).
+
+**None of this survives a reboot, by choice.** The modules are inserted by hand, so a
+tablet that is doing a job keeps its memory and its stability until someone asks for a
+camera. Making it permanent means installing both modules into
+`/lib/modules/.../updates/`, dropping the blacklist (it matches on module name, so it
+would block the local build too), and accepting that atomisp holds the ISP from boot.
 
 ### Power — X-Powers AXP288 PMIC
 

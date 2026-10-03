@@ -835,8 +835,8 @@ What it offers, with what we could establish about each:
   intel_idle.max_cstate=1` against random freezes, `i915 pwm-lpss-platform` in
   the initramfs module list for backlight control, and disabling NetworkManager's
   Wi-Fi power save to stop firmware crashes.
-- Says both cameras are unusable. True of a stock install, but not for the reason
-  implied: the capture driver is simply not built, see
+- Says both cameras are unusable. True of a stock install, but not inherently:
+  the capture driver is simply not built, and both cameras work once it is, see
   [01-hardware.md](01-hardware.md#cameras).
 
 
@@ -862,11 +862,14 @@ What it establishes, and what it does not:
   systemd reached userspace. Building only the atomisp subtree against the
   installed headers avoids both, and is what
   [01-hardware.md](01-hardware.md#cameras) describes.
-- **Their tablet has one sensor and this one has two.** That is the difference
-  that matters: the second `ov2680` here cannot register its clock, so the thread
-  does not show that this unit can work, only that the driver can.
+- **Their tablet has one sensor and this one has two.** That was the difference
+  that mattered, and it is now settled rather than inherited: two identical
+  sensors collide over one clock name, and giving them different names makes both
+  work here too. The thread was right that the driver can produce a picture; it
+  could not show that this unit would.
 
 The driver's own `TODO` in `drivers/staging/media/atomisp` is the honest summary
-of what to expect if it ever does run: capture works through `v4l2-ctl` and
-gstreamer, there is no 3A library, so exposure and gain have to be set by hand or
-the frame comes out over- or under-exposed.
+of what to expect: capture works through `v4l2-ctl` and gstreamer, there is no 3A
+library, so exposure and gain have to be set by hand or the frame comes out over-
+or under-exposed. That held exactly — the first frames here are a bright band over
+black, and a frame taken after exposure settles is usable but dim.

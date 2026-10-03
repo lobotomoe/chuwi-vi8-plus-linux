@@ -1,11 +1,14 @@
-# Kernel patches for a Vi8 Plus with unfilled DMI
+# Kernel patches for a Vi8 Plus
 
 Three patches that make the kernel recognise a Chuwi Vi8 Plus whose firmware
-left `sys_vendor` and `product_name` at `To be filled by O.E.M.`.
+left `sys_vendor` and `product_name` at `To be filled by O.E.M.`, and one that
+is not about this tablet's DMI at all -- it lets any ACPI board with two
+identical sensors give both of them a clock.
 
-**Status: prepared, never compiled, never booted.** They apply cleanly to
-mainline and are modelled on entries already upstream, but no kernel has been
-built with them. The values they carry are a separate question and a better one —
+**Status of 0001-0003: prepared, never compiled, never booted.** They apply
+cleanly to mainline and are modelled on entries already upstream, but no kernel
+has been built with them. **0004 is different**: the change it makes is verified
+on the reference unit in an equivalent form, and the file carries the detail. The values they carry are a separate question and a better one —
 the DMI capture, the BIOS date and the audio quirk value have each been read off
 the running hardware, and are marked where they appear below.
 
@@ -14,6 +17,7 @@ the running hardware, and are marked where they appear below.
 | `0001-…touchscreen_dmi…` | `platform/x86` | ICN8505 firmware extraction from UEFI — **probably a no-op on the reference unit**, whose BIOS carries no such blob to extract; say so when sending |
 | `0002-…brcmfmac…` | `wifi` | NVRAM lookup for the BCM43430 |
 | `0003-…bytcr_rt5651…` | `ASoC/Intel` | mono speaker, swapped headphones, IN2 mic |
+| `0004-…v4l2-core…` | `media` | a per-device name for a sensor clock the v4l2 core registers itself, so two identical sensors stop colliding -- [what it fixes here](../docs/01-hardware.md#cameras) |
 
 Before sending: check the DMI values below against your own tablet — the BIOS
 date is part of every match and yours may differ — then build and boot a kernel
