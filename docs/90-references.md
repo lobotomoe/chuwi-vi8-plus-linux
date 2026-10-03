@@ -835,5 +835,38 @@ What it offers, with what we could establish about each:
   intel_idle.max_cstate=1` against random freezes, `i915 pwm-lpss-platform` in
   the initramfs module list for backlight control, and disabling NetworkManager's
   Wi-Fi power save to stop firmware crashes.
-- Agrees with this repo that both cameras are unusable.
+- Says both cameras are unusable. True of a stock install, but not for the reason
+  implied: the capture driver is simply not built, see
+  [01-hardware.md](01-hardware.md#cameras).
 
+
+## Someone else's working atomisp camera on Cherry Trail
+
+A Mageia forum thread is the only report found of the built-in camera actually
+producing a picture on this ISP, and the hardware match is close enough to be
+worth keeping: a TrekStor SurfTab twin 11.6, Atom x5-Z8350, ISP reported as
+`vendor:8086 device:22b8 subv:8086 subd:7270` — the same ids this tablet gives,
+subsystem included — and the same `ov2680` sensor.
+<https://forums.mageia.org/en/viewtopic.php?f=7&t=15444> — **read, not reproduced
+here**
+
+What it establishes, and what it does not:
+
+- Rebuilding a 6.12 kernel with `CONFIG_INTEL_ATOMISP=y` and
+  `CONFIG_VIDEO_ATOMISP=m` produced a live stream in `camorama`. The working
+  `lsmod` is `atomisp`, `atomisp_gmin_platform`, `ipu_bridge`, with `ov2680`
+  bound through `v4l2_fwnode` and `v4l2_async`.
+- `cheese` does not start at all against this driver while `camorama` works, so a
+  dead viewer is not evidence of a dead camera.
+- Their full kernel rebuild cost about 35 GB and the first attempt hung before
+  systemd reached userspace. Building only the atomisp subtree against the
+  installed headers avoids both, and is what
+  [01-hardware.md](01-hardware.md#cameras) describes.
+- **Their tablet has one sensor and this one has two.** That is the difference
+  that matters: the second `ov2680` here cannot register its clock, so the thread
+  does not show that this unit can work, only that the driver can.
+
+The driver's own `TODO` in `drivers/staging/media/atomisp` is the honest summary
+of what to expect if it ever does run: capture works through `v4l2-ctl` and
+gstreamer, there is no 3A library, so exposure and gain have to be set by hand or
+the frame comes out over- or under-exposed.

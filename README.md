@@ -170,7 +170,7 @@ kernel symbols.
 | micro-HDMI | Yes | Untested |
 | Bluetooth (BCM43430 over UART) | Yes | **Half-works, and the half that is missing matters** — `hci0` appears and comes up `UP RUNNING`, but with the placeholder address `AA:AA:AA:AA:AA:AA`, because the controller never got its `.hcd` patch. That file comes from `bluez-firmware`, **not** `linux-firmware`, and no distribution ships one for an a0 chip. Not paired with anything |
 | Suspend | Partly | Untested here. The maintainer's table scores it as suspending but **not** reaching S0i3, so expect idle drain |
-| Cameras | **No** | Cherry Trail ISP has no usable mainline driver. Treat them as absent |
+| Cameras | Not on a stock install | Both sensors are `ov2680` and both are enumerated, but Ubuntu ships `CONFIG_INTEL_ATOMISP` unset, so nothing claims the ISP and there is no `/dev/video*`. The driver builds as a module without replacing the kernel and gets as far as `Connected 2 cameras`; it stops there on this unit, where the two identical sensors collide over one hard-coded clock name. [Measurements](docs/01-hardware.md#cameras) |
 
 ### Why several of those say "does not match"
 

@@ -481,9 +481,13 @@ minute, and it is the strategy this repo can vouch for.
 
 ## What is not going to work
 
-The cameras. Cherry Trail routes them through the Intel ISP, and the mainline
-driver in `drivers/staging/` does not produce a usable device. Do not spend an
-evening on it.
+The cameras, at least not as a setting you can switch. Cherry Trail routes them
+through the Intel ISP and Ubuntu ships the capture driver unbuilt, so a fresh
+install has no `/dev/video*`. The driver can be built as a module without
+replacing the kernel, which brings the ISP up and detects both sensors but still
+produces no capture on this unit --
+[01-hardware.md](01-hardware.md#cameras) has the measurements and exactly where
+it stops. Treat a working camera as a project, not a checkbox.
 
 ## Sensible software for 2 GB of RAM
 

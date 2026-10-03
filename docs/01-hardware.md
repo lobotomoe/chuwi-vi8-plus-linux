@@ -1154,9 +1154,45 @@ USB problems described in
 
 ### Cameras
 
-Cherry Trail routes the cameras through the Intel ISP2400 ("atomisp"). The mainline
-driver is in `drivers/staging/` and does not produce a usable camera on this hardware.
-Treat both cameras as non-functional. This is not going to change.
+Cherry Trail routes the cameras through the Intel ISP2401 ("atomisp") on PCI
+`00:03.0` (`8086:22b8`, subsystem `7270`). Both sensors are `ov2680`, 2 MP, and both
+are enumerated over ACPI and I2C as `OVTI2680:00` and `OVTI2680:01`.
+
+They do not work on a stock install, and the reason is one kernel config option
+rather than a missing driver. Ubuntu ships `# CONFIG_INTEL_ATOMISP is not set`
+(checked on `7.0.0-34-generic`), so the only thing claiming the ISP is
+`intel_atomisp2_pm`, whose whole job is to park the device in D3cold to save power.
+Everything else is already present: the mainline `ov2680` driver is built and loaded,
+`CONFIG_IPU_BRIDGE` and the `videobuf2` modules are built, and the firmware the ISP
+asks for ships in `linux-firmware-intel-graphics` as
+`/usr/lib/firmware/intel/ipu/shisp_2401a0_v21.bin.zst`. Without the capture driver the
+sensor sits in deferred probe -- `ov2680: waiting for fwnode graph endpoint` -- because
+that endpoint is created by atomisp's own CSI2 bridge, and there is no `/dev/video*`
+node at all. Distributions disable the option because before kernel 6.7 the driver
+broke unrelated machines (Launchpad #2017444); 6.7 merged ISP2400 and ISP2401 support
+into one build.
+
+**The kernel does not have to be rebuilt to try it.** atomisp is a module and every
+dependency is already `=m`, so its subtree builds against the installed headers --
+which is also the only way to get matching symbol CRCs, since `CONFIG_MODVERSIONS=y`
+and the published `linux-source` package runs ahead of the installed kernel. Two
+details decide whether that build works: atomisp's Makefile writes every include as
+`$(srctree)/drivers/staging/media/atomisp/...` while `linux-headers` ships no driver
+sources, so the extracted subtree has to be reachable at exactly that path inside the
+headers tree; and Secure Boot has to be off, or the unsigned module will not load.
+
+That gets most of the way and then stops short of a picture. Measured 2026-10-03 on
+`7.0.0-34-generic`: `atomisp-isp2` binds `00:03.0`, reports `ISP HPLL frequency
+base = 1600 MHz`, finds both sensors, logs `Connected 2 cameras`, and the front sensor
+answers on I2C with `sensor_revision id = 0x2680`. No `/dev/video*` appears, and the
+reason is that **this tablet has two identical sensors**: the second fails with
+`failed to register clk 'xvclk'` and `-EEXIST`, because the `ov2680` driver registers
+that clock under a fixed name. Video nodes are registered from the async notifier's
+`.complete` callback, which never fires while one expected subdev is missing. One
+`ov2680` per machine looks like the only case this path has been exercised on.
+
+So: unusable as shipped, and not proven usable here either. What is settled is *why*,
+which is more than "no driver".
 
 ### Power — X-Powers AXP288 PMIC
 
